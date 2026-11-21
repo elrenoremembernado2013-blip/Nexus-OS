@@ -7,36 +7,54 @@
 | First target architecture | x86_64 (AMD64) |
 | Display protocol | Wayland |
 | Legacy application compatibility | XWayland is part of the planned desktop stack |
-| First validation target | A virtual machine before physical hardware |
+| First validation target | QEMU virtual machine before physical hardware |
+| Main desktop base | Ubuntu 26.04 LTS minimal/server base, customised by NEXUS |
+| Experimental image path | Keep the existing Buildroot external tree for small appliance-style experiments |
 
-These decisions define the initial development target. They do not imply that a bootable image exists yet.
+These decisions define the initial development target. They do not imply that a bootable NEXUS image exists yet.
+
+## Why Ubuntu LTS is the recommended main base
+
+NEXUS is intended to be a general-purpose desktop with gaming, programming and everyday application support. A custom desktop distribution needs a maintainable package ecosystem, graphics drivers, firmware, audio, session services, 32-bit compatibility libraries and regular security updates.
+
+Valve's current Steam Linux documentation identifies the latest Ubuntu LTS as its supported stable-client baseline. Its requirements also include 64-bit and 32-bit runtime libraries and graphics drivers, X11 or XWayland, D-Bus, PulseAudio or PipeWire's PulseAudio-compatible service, and OpenGL/Vulkan drivers. Steam's newer runtime documentation also describes typical desktop distributions such as Arch, Debian and Fedora, and requires glibc 2.31 or newer. These are a much more natural fit for a maintained general-purpose Linux base than a hand-assembled Buildroot desktop.
+
+**Selected starting point: Ubuntu 26.04 LTS minimal/server base, not the full Ubuntu GNOME desktop.** NEXUS will provide its own Wayland desktop shell and visual identity on top. Ubuntu 26.04 LTS is the current LTS release and receives standard security maintenance until May 2031. We will pin an exact point-release image and verify its checksums when the image-build stage begins.
+
+This is a pragmatic engineering base, not a claim that NEXUS is an Ubuntu derivative officially supported by Valve. Steam and Proton must still pass NEXUS's own tests before compatibility is advertised.
+
+Official references:
+- Valve Steam Linux requirements: https://github.com/ValveSoftware/steam-for-linux
+- Valve Steam Linux beta requirements: https://github.com/ValveSoftware/steam-for-linux/blob/master/README.beta.md
+- Valve Steam Linux support notice: https://help.steampowered.com/en/faqs/view/107F-BB20-FB5A-1CE4
+- Ubuntu 26.04 LTS release notes and support lifespan: https://documentation.ubuntu.com/release-notes/26.04/
+- Ubuntu release lifecycle: https://ubuntu.com/about/release-cycle
+
+## Role of Buildroot
+
+The existing NEXUS Buildroot external tree will be retained as a separate experimental path for:
+- very small recovery or diagnostic images;
+- appliance-style builds with a tightly controlled hardware target;
+- learning and measuring how much smaller a purpose-built image can be.
+
+It will **not** be the primary foundation for the first full NEXUS gaming desktop. This avoids making Steam multilib, GPU drivers, audio services, desktop integration and long-term security maintenance unnecessarily difficult.
 
 ## Proposed graphics bring-up sequence
 
-1. Bring up a minimal x86_64 Linux image in QEMU.
+1. Build a minimal x86_64 Ubuntu-based test image or VM environment.
 2. Confirm kernel graphics/input support and a working Wayland session.
-3. Use Weston as a temporary reference compositor for early hardware and session testing.
-4. Add XWayland and verify that X11 applications can run inside the Wayland session.
-5. Prototype the NEXUS native shell separately, then decide whether Weston remains useful as a base or is replaced by the production compositor/shell.
-6. Measure memory after each layer is added; do not treat the 128 MB aspiration as a guaranteed target.
+3. Use Weston temporarily as a reference compositor for early hardware/session testing.
+4. Add XWayland and verify that X11 applications run inside the Wayland session.
+5. Prototype the NEXUS native shell separately; choose the production compositor and toolkit after a working prototype.
+6. Measure memory after each layer is added. The 128 MB aspiration is not a guaranteed target.
 
-Weston is a bring-up tool choice, not a final visual-design decision. The NEXUS Liquid Glass interface and NEXUS ORBIT remain product requirements, not features delivered by this initial Linux scaffold.
+Weston is a bring-up tool choice, not a final visual-design decision. The NEXUS Liquid Glass interface and NEXUS ORBIT remain product requirements, not features delivered by the Linux base.
 
-## Steam compatibility: a release gate
+## Steam compatibility: release gate
 
-Steam support must be tested rather than inferred from the CPU architecture or the presence of Wayland.
+Steam support must be tested rather than inferred from CPU architecture or Wayland support.
 
-Valve's published Linux requirements include:
-- x86_64 plus both 64-bit and 32-bit runtime libraries and graphics drivers;
-- X11 or XWayland;
-- D-Bus session services;
-- PulseAudio or PipeWire's PulseAudio-compatible service;
-- working OpenGL and Vulkan drivers.
-
-Valve also states that Steam no longer supports Linux distributions with glibc older than 2.31. The project must therefore choose and maintain a compatible C library/runtime and keep it security-updated.
-
-Steam compatibility checklist:
-- [ ] glibc version meets Valve's current minimum.
+- [ ] Current glibc meets Valve's minimum.
 - [ ] 32-bit and 64-bit userspace libraries are available.
 - [ ] 32-bit and 64-bit graphics driver support is available for supported GPUs.
 - [ ] XWayland works in the Wayland session.
@@ -44,40 +62,18 @@ Steam compatibility checklist:
 - [ ] Steam installs, launches and updates in a repeatable test environment.
 - [ ] At least one Proton game is tested on supported hardware before making a compatibility claim.
 
-Official references:
-- Valve Steam Linux requirements: https://github.com/ValveSoftware/steam-for-linux
-- Valve Steam Linux beta requirements: https://github.com/ValveSoftware/steam-for-linux/blob/master/README.beta.md
-- Steam Linux support and glibc notice: https://help.steampowered.com/en/faqs/view/107F-BB20-FB5A-1CE4
-
-## Build-system decision still open
-
-The existing NEXUS Buildroot external tree is only a scaffold. Buildroot is attractive for a compact, controlled system image, but a general-purpose gaming desktop has a broader maintenance burden: multilib, graphics drivers, audio, D-Bus, desktop portals, firmware and ongoing security updates.
-
-Before committing to Buildroot as the final desktop base, compare two paths:
-
-### Path A — Buildroot-based image
-- Strong control over the package set and image footprint.
-- Suitable for a minimal appliance-like base and tightly controlled hardware targets.
-- Requires explicit validation that the needed 32-bit Steam runtime, graphics stack and update strategy can be maintained.
-
-### Path B — General-purpose x86_64 Linux base
-- A maintained desktop distribution base may make Steam, multilib graphics drivers and ongoing security updates easier to support.
-- NEXUS can still provide its own Wayland shell, launcher, settings and branded experience.
-- Likely larger than a highly trimmed Buildroot image; measure rather than assume.
-
-**Current recommendation:** keep the Buildroot scaffold as an experimental minimal-image path, but do not make it the final gaming-desktop base until the Steam requirements have been proven. Compare both paths with a small reproducible QEMU prototype before choosing.
-
 ## Decisions still needed
 
 - [ ] BIOS, UEFI, or both for the first boot target.
-- [ ] Buildroot versus a general-purpose Linux base for the desktop release.
-- [ ] Init/service manager and update model.
+- [ ] Exact Ubuntu 26.04 point-release image and checksum to pin.
+- [ ] Init/service manager and update/rollback model.
 - [ ] Production Wayland compositor and native shell toolkit.
 - [ ] Supported GPU scope and driver strategy.
+- [ ] Installer and partitioning approach.
 
 ## Non-goals for this stage
 
 - No claim that NEXUS OS is bootable.
-- No claim of Steam or Proton compatibility.
+- No claim of Steam or Proton compatibility until tested.
 - No promise of a 128 MB desktop idle footprint.
 - No hardware-control features until their native implementation and permissions are tested.
