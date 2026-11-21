@@ -122,7 +122,7 @@ if(app==="settings"){
  previewDialog.addEventListener("close",()=>{pendingWallpaper=null});
  $("#applyWallpaperPreview").onclick=()=>{
   const chosen=pendingWallpaper;
-  if(chosen){applyWallpaper(chosen);$("#wallpaperStatus").textContent="Applied: "+$("#wallpaperGrid [data-wallpaper=\\""+chosen+"\\"] span").textContent;}
+  if(chosen){applyWallpaper(chosen);const chosenItem=$('[data-wallpaper="'+chosen+'"]');$("#wallpaperStatus").textContent="Applied: "+chosenItem.querySelector("span").textContent;}
   closeWallpaperPreview();
  };
  $("[data-wallpaper-filter]").forEach(filter=>filter.onclick=()=>{
