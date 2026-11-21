@@ -270,7 +270,7 @@ if(app==="settings"){
  $("[data-wallpaper]").forEach(item=>item.onclick=()=>openWallpaperPreview(item.dataset.wallpaper));
  $("[data-preview-close]").forEach(button=>button.onclick=closeWallpaperPreview);
  previewDialog.addEventListener("click",event=>{if(event.target===previewDialog)closeWallpaperPreview()});
- previewDialog.addEventListener("close",()=>{pendingWallpaper=null});
+ previewDialog.addEventListener("close",()=>{pendingWallpaper=null;pendingCustomWallpaper=null;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}$("#applyWallpaperPreview").textContent="Apply wallpaper";});
  $("#applyWallpaperPreview").onclick=async()=>{
   const chosen=pendingWallpaper;
   const customFile=pendingCustomWallpaper;
