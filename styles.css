@@ -439,3 +439,23 @@
 .desktop.theme-light .wallpaper-preview-dialog{background:rgba(247,247,250,.94);border-color:rgba(30,30,40,.16)}
 @media(max-width:520px){.wallpaper-preview-shell{padding:14px}.wallpaper-preview-actions{flex-direction:column-reverse}.wallpaper-preview-actions .action-button{width:100%}}
 @media(prefers-reduced-motion:reduce){.wallpaper-preview-dialog{scroll-behavior:auto}}
+
+/* Custom wallpaper import controls */
+.custom-wallpaper-import{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 14px;
+ align-items:center;margin-top:16px;padding:14px;
+ border:1px solid rgba(255,255,255,.12);border-radius:14px;
+ background:rgba(255,255,255,.035);
+}
+.custom-wallpaper-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.custom-wallpaper-copy strong{font-size:12px;color:var(--text)}
+.custom-wallpaper-copy small{font-size:10px;line-height:1.5;color:var(--muted)}
+.custom-wallpaper-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.custom-wallpaper-button,.custom-wallpaper-remove{grid-column:2;grid-row:1}
+.custom-wallpaper-remove{grid-row:2}
+.custom-wallpaper-status{grid-column:1/-1;margin:0}
+.custom-wallpaper-import .action-button{white-space:nowrap}
+@media(max-width:520px){
+ .custom-wallpaper-import{grid-template-columns:1fr}
+ .custom-wallpaper-button,.custom-wallpaper-remove{grid-column:1;grid-row:auto}
+}
