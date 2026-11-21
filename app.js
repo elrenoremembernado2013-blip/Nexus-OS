@@ -15,6 +15,32 @@ function setDesktopWallpaper(id,persist=true){
  if(persist)localStorage.setItem("nexus-wallpaper",id);
  return true;
 }
+let startupCustomWallpaperUrl=null;
+async function restoreCustomWallpaperAtStartup(){
+ if(localStorage.getItem("nexus-wallpaper")!=="custom"||!("indexedDB" in window))return;
+ try{
+  const db=await new Promise((resolve,reject)=>{
+   const request=indexedDB.open("nexus-wallpaper-store",1);
+   request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains("wallpapers"))request.result.createObjectStore("wallpapers");};
+   request.onsuccess=()=>resolve(request.result);
+   request.onerror=()=>reject(new Error("Could not open local wallpaper storage."));
+  });
+  const blob=await new Promise((resolve,reject)=>{
+   const tx=db.transaction("wallpapers","readonly");
+   const request=tx.objectStore("wallpapers").get("custom");
+   request.onsuccess=()=>resolve(request.result||null);
+   request.onerror=()=>reject(new Error("Could not read the saved wallpaper."));
+   tx.oncomplete=()=>db.close();
+  });
+  if(blob&&["image/jpeg","image/png","image/webp"].includes(blob.type)){
+   startupCustomWallpaperUrl=URL.createObjectURL(blob);
+   desktop.style.backgroundImage='linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url("'+startupCustomWallpaperUrl+'")';
+  }else if(!blob){
+   localStorage.setItem("nexus-wallpaper","alpine");
+   setDesktopWallpaper("alpine",false);
+  }
+ }catch(error){console.warn("NEXUS custom wallpaper restore:",error);}
+}
 let activeApp=null, toastTimer, maximized=false;
 const appNames={files:"Files",browser:"Browser",notes:"Notes",terminal:"Terminal",gaming:"Gaming Hub",monitor:"System Monitor",settings:"Settings",calculator:"Calculator"};
 function clock(){const d=new Date();$("#clock").textContent=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
@@ -166,10 +192,11 @@ if(app==="settings"){
  }
  async function restoreCustomWallpaper(){
   try{
-   const blob=await readCustomWallpaper();
+   if(startupCustomWallpaperUrl){customWallpaperUrl=startupCustomWallpaperUrl;startupCustomWallpaperUrl=null;}
+   const blob=customWallpaperUrl?customWallpaperBlob:await readCustomWallpaper();
    if(!blob)return;
    if(!["image/jpeg","image/png","image/webp"].includes(blob.type))return;
-   const url=URL.createObjectURL(blob);
+   const url=customWallpaperUrl||URL.createObjectURL(blob);
    customWallpaperBlob=blob;customWallpaperUrl=url;
    if(localStorage.getItem("nexus-wallpaper")==="custom"){
     desktop.style.backgroundImage='linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url("'+url+'")';
@@ -244,7 +271,7 @@ if(app==="settings"){
  $("[data-preview-close]").forEach(button=>button.onclick=closeWallpaperPreview);
  previewDialog.addEventListener("click",event=>{if(event.target===previewDialog)closeWallpaperPreview()});
  previewDialog.addEventListener("close",()=>{pendingWallpaper=null});
- $("#applyWallpaperPreview").onclick=()=>{
+ $("#applyWallpaperPreview").onclick=async()=>{
   const chosen=pendingWallpaper;
   const customFile=pendingCustomWallpaper;
   const customUrl=pendingCustomUrl;
@@ -494,6 +521,6 @@ $("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$( ".dock
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
 $("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
 $$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
-setDesktopWallpaper(localStorage.getItem("nexus-wallpaper")||"alpine",false);
+if(localStorage.getItem("nexus-wallpaper")==="custom"){restoreCustomWallpaperAtStartup();}else{setDesktopWallpaper(localStorage.getItem("nexus-wallpaper")||"alpine",false);}
 const savedAccent=localStorage.getItem("nexus-accent");document.documentElement.style.setProperty("--accent",savedAccent||"#ffad7a");const savedBlur=localStorage.getItem("nexus-blur");document.documentElement.style.setProperty("--blur",(savedBlur||"18")+"px");if(localStorage.getItem("nexus-reduced-motion")==="true")document.body.classList.add("reduced-motion");
 })();
