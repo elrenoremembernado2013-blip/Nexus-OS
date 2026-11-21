@@ -25,7 +25,7 @@ Build a lightweight, secure, customizable desktop environment designed to run sm
 ## Current next tasks
 1. Review existing desktop/window code and correct bugs first.
 2. Review and test the updated window manager: focus/z-order, drag, resize, minimise, maximise/restore, edge snap; ensure snap/maximise states can restore cleanly. Check for syntax errors and pointer edge cases.
-3. Replace calculator's dynamic Function-based expression evaluation with a safe parser that supports basic arithmetic only.
+3. Keep the calculator's hand-written arithmetic parser free of eval()/Function(); add regression tests if its logic changes.
 4. Improve keyboard accessibility, escape-to-close panels, and reduced motion.
 5. Keep notifications integrated in Control Centre.
 6. Do not claim system-level RAM, CPU, storage, network, power, security scans, or Steam integration unless connected to a native backend.
