@@ -16,8 +16,17 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){control.classList.a
 $$("[data-toggle]").forEach(b=>b.onclick=()=>{b.classList.toggle("active");notify(b.querySelector("b").textContent+" toggled (prototype)")});
 $("#brightness").oninput=e=>desktop.style.filter="brightness("+e.target.value/100+")";
 $("#volume").oninput=e=>notify("Volume level: "+e.target.value+"% (visual prototype)");
-$$("[data-app]").forEach(b=>b.addEventListener("click",()=>openApp(b.dataset.app)));
-function openApp(app){if(!appNames[app])return;activeApp=app;closePanels();launcher.classList.add("hidden");win.classList.remove("hidden");win.classList.remove("maximized");maximized=false;title.textContent=appNames[app];content.innerHTML=appView(app);wireApp(app)}
+$$("[data-app]").forEach(b=>b.addEventListener("click",()=>{
+ const app=b.dataset.app;
+ if(b.classList.contains("dock-app")&&activeApp===app){
+  if(win.classList.contains("hidden")){win.classList.remove("hidden");$(".dock-app[data-app='"+app+"']")?.classList.remove("minimized");focusWindow()}
+  else focusWindow();
+  closePanels();
+  return;
+ }
+ openApp(app);
+}));
+function openApp(app){if(!appNames[app])return;activeApp=app;closePanels();launcher.classList.add("hidden");win.classList.remove("hidden");win.classList.remove("maximized");maximized=false;title.textContent=appNames[app];content.innerHTML=appView(app);wireApp(app);$( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});focusWindow()}
 function appView(app){
 const heading=(t,s)=>'<h2 class="content-title">'+t+'</h2><p class="content-sub">'+s+'</p>';
 if(app==="files")return heading("Files","A simple workspace preview.")+'<div class=card-grid><div class=content-card><h3>Home</h3><p>Personal files and folders</p></div><div class=content-card><h3>Documents</h3><p>Saved documents</p></div><div class=content-card><h3>Downloads</h3><p>Downloaded items</p></div><div class=content-card><h3>Pictures</h3><p>Images and wallpapers</p></div></div><p class=content-sub style=margin-top:20px>This is a mock file browser. It does not access your computer’s files yet.</p>';
@@ -137,8 +146,8 @@ titlebar.addEventListener("dblclick",e=>{
  if(e.target.closest(".window-control"))return;
  if(maximized||snapped)restoreWindow();else maximizeWindow();
 });
-$("#windowClose").onclick=()=>{win.classList.add("hidden");activeApp=null};
-$("#windowMin").onclick=()=>{win.classList.add("hidden");notify("Window minimised")};
+$("#windowClose").onclick=()=>{win.classList.add("hidden");if(activeApp){$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.remove("running","minimized"))}activeApp=null};
+$("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.add("minimized"))}notify("Window minimised")};
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
 $("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
 $$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
