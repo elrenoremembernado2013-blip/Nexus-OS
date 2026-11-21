@@ -31,9 +31,9 @@ See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the Steam compatibi
 
 ## Decisions required before a real defconfig
 
-1. **Boot mode:** choose BIOS, UEFI, or both for the first QEMU target.
-2. **Base system:** prove the Steam/runtime requirements on Buildroot or select a maintained general-purpose Linux base before committing to a desktop release.
-3. **Init system:** select and justify a maintainable option.
+1. **First boot target:** UEFI in QEMU using OVMF; evaluate legacy BIOS later.
+2. **Bootloader:** GRUB for the first Ubuntu-based image.
+3. **Init system:** systemd, matching Ubuntu's service model.
 4. **Native desktop:** choose the production Wayland compositor and shell toolkit. Weston may be used temporarily for bring-up, not assumed to be the final shell.
 5. **Buildroot release (if retained):** pin a verified stable release or commit and record its source checksum/commit.
 6. **RAM target:** treat 128 MB as an aspirational measurement target, not a promise. A graphical desktop and modern shell may require substantially more memory.
@@ -42,7 +42,8 @@ See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the Steam compatibi
 
 - [x] Create a separate NEXUS Buildroot external-tree scaffold.
 - [x] Choose and document x86_64 and Wayland as the first platform direction.
-- [x] Choose the first QEMU firmware mode: UEFI/OVMF.\n- [x] Choose GRUB as the first bootloader and systemd as the init/service manager.
+- [x] Choose the first QEMU firmware mode: UEFI/OVMF.
+- [x] Choose GRUB as the first bootloader and systemd as the init/service manager.
 - [x] Select Ubuntu 26.04 LTS minimal/server as the recommended main desktop base.
 - [x] Retain Buildroot for separate minimal-image experiments, not the primary gaming desktop.
 - [ ] Validate XWayland and Steam runtime requirements in the Ubuntu-based test environment.
