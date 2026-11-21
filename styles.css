@@ -179,3 +179,24 @@
  .settings-main{padding:0}
  .settings-range input{width:min(28vw,110px)}
 }
+
+
+/* Theme choices and light appearance */
+.theme-options{display:flex;gap:8px;margin:14px 0 9px;flex-wrap:wrap}
+.theme-choice{padding:8px 15px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.055);color:var(--text);font:inherit;font-size:11px;cursor:pointer}
+.theme-choice:hover{background:rgba(255,255,255,.11)}
+.theme-choice.selected{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:color-mix(in srgb,var(--accent) 62%,transparent);color:var(--text)}
+.desktop.theme-light{--glass:rgba(241,239,237,.94);--line:rgba(42,37,35,.16);--text:#29252a;--muted:#6d666c;color:var(--text)}
+.desktop.theme-light .topbar{background:rgba(245,242,239,.82);color:var(--text);border-bottom-color:rgba(42,37,35,.12)}
+.desktop.theme-light .top-center,.desktop.theme-light .top-icon,.desktop.theme-light .status-pill,.desktop.theme-light .shortcut,.desktop.theme-light .dock-app{color:var(--text)}
+.desktop.theme-light .dock{background:rgba(242,239,236,.82);border-color:rgba(42,37,35,.18)}
+.desktop.theme-light .panel,.desktop.theme-light .launcher,.desktop.theme-light .window{background:rgba(245,242,239,.94);border-color:rgba(42,37,35,.18)}
+.desktop.theme-light .window-titlebar{color:var(--text);background:rgba(42,37,35,.035)}
+.desktop.theme-light .content-card,.desktop.theme-light .settings-card,.desktop.theme-light .tile,.desktop.theme-light .app-item span{background:rgba(42,37,35,.045);border-color:var(--line)}
+.desktop.theme-light .settings-nav{color:var(--muted)}
+.desktop.theme-light .settings-nav.active{color:var(--text)}
+.desktop.theme-light .settings-nav span{color:var(--text)}
+.desktop.theme-light .action-button,.desktop.theme-light .switch-button,.desktop.theme-light .theme-choice,.desktop.theme-light .window-control{color:var(--text);background:rgba(42,37,35,.06);border-color:var(--line)}
+.desktop.theme-light .tile.active,.desktop.theme-light .theme-choice.selected{background:color-mix(in srgb,var(--accent) 22%,white);color:var(--text)}
+.desktop.theme-light .note-area,.desktop.theme-light .browser-address input,.desktop.theme-light .terminal-input input{color:var(--text);background:rgba(42,37,35,.06)}
+.desktop.theme-light .panel-foot,.desktop.theme-light .content-sub,.desktop.theme-light .settings-row-note{color:var(--muted)}
