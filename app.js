@@ -8,10 +8,11 @@ clock();setInterval(clock,30000);
 function notify(msg){toast.textContent=msg;toast.classList.remove("hidden");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.add("hidden"),2200)}
 function closePanels(){control.classList.add("hidden");launcher.classList.add("hidden")}
 $("#controlButton").onclick=()=>{launcher.classList.add("hidden");control.classList.toggle("hidden")};
-$("#notificationButton").onclick=()=>{launcher.classList.add("hidden");control.classList.remove("hidden");control.scrollIntoView({block:"nearest"})};
+$("#notificationButton").onclick=()=>{launcher.classList.add("hidden");control.classList.remove("hidden");$("#controlNotifications").scrollIntoView({block:"nearest",behavior:document.body.classList.contains("reduced-motion")?"auto":"smooth"})};
+$("#clearNotifications").onclick=()=>{$("#notificationList").innerHTML='<div class="notification-empty"><p>You're all caught up.</p><small>Notifications will appear here.</small></div>';notify("Notifications cleared")};
 $("#launcherButton").onclick=()=>{control.classList.add("hidden");launcher.classList.toggle("hidden");$("#appSearch").focus()};
 $("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.add("hidden"));
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){control.classList.add("hidden");launcher.classList.add("hidden");if(!win.classList.contains("hidden")){win.classList.add("hidden");activeApp=null}}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){control.classList.add("hidden");launcher.classList.add("hidden")}});
 $$("[data-toggle]").forEach(b=>b.onclick=()=>{b.classList.toggle("active");notify(b.querySelector("b").textContent+" toggled (prototype)")});
 $("#brightness").oninput=e=>desktop.style.filter="brightness("+e.target.value/100+")";
 $("#volume").oninput=e=>notify("Volume level: "+e.target.value+"% (visual prototype)");
