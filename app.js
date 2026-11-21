@@ -13,9 +13,45 @@ $("#clearNotifications").onclick=()=>{$("#notificationList").innerHTML='<div cla
 $("#launcherButton").onclick=()=>{control.classList.add("hidden");launcher.classList.toggle("hidden");$("#appSearch").focus()};
 $("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.add("hidden"));
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){control.classList.add("hidden");launcher.classList.add("hidden")}});
-$$("[data-toggle]").forEach(b=>b.onclick=()=>{b.classList.toggle("active");notify(b.querySelector("b").textContent+" toggled (prototype)")});
-$("#brightness").oninput=e=>desktop.style.filter="brightness("+e.target.value/100+")";
-$("#volume").oninput=e=>notify("Volume level: "+e.target.value+"% (visual prototype)");
+const controlDefaults={wifi:true,bluetooth:false,dnd:false,power:false};
+const controlState={...controlDefaults};
+function applyControlToggle(button, enabled){
+ const key=button.dataset.toggle;
+ controlState[key]=enabled;
+ button.classList.toggle("active",enabled);
+ button.setAttribute("aria-pressed",String(enabled));
+ const stateLabel=enabled?"On":"Off";
+ button.querySelector("small").textContent=stateLabel+" · preview";
+ localStorage.setItem("nexus-control-"+key,String(enabled));
+ if(key==="power")desktop.classList.toggle("lightweight",enabled);
+}
+$("[data-toggle]").forEach(button=>{
+ const key=button.dataset.toggle;
+ const saved=localStorage.getItem("nexus-control-"+key);
+ applyControlToggle(button,saved===null?controlDefaults[key]:saved==="true");
+ button.onclick=()=>applyControlToggle(button,!controlState[key]);
+});
+const brightness=$("#brightness"),volume=$("#volume");
+const savedBrightness=localStorage.getItem("nexus-brightness");
+const savedVolume=localStorage.getItem("nexus-volume");
+if(savedBrightness!==null)brightness.value=savedBrightness;
+if(savedVolume!==null)volume.value=savedVolume;
+function updateSlider(input,output,key){
+ output.value=input.value+"%";
+ output.textContent=input.value+"%";
+ localStorage.setItem(key,input.value);
+}
+function updateBrightness(){
+ updateSlider(brightness,$("#brightnessValue"),"nexus-brightness");
+ desktop.style.filter="brightness("+Number(brightness.value)/100+")";
+}
+function updateVolume(){
+ updateSlider(volume,$("#volumeValue"),"nexus-volume");
+}
+brightness.oninput=updateBrightness;
+volume.oninput=updateVolume;
+updateBrightness();
+updateVolume();
 $$("[data-app]").forEach(b=>b.addEventListener("click",()=>{
  const app=b.dataset.app;
  if(b.classList.contains("dock-app")&&activeApp===app){
