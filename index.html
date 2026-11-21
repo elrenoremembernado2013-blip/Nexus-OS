@@ -23,45 +23,45 @@
       <p class="welcome-sub">A quieter space to get things done.</p>
     </section>
     <div class="desktop-shortcuts" id="shortcuts">
-      <button class="shortcut" data-app="files"><span class="shortcut-icon">▤</span><span>Files</span></button>
+      <button class="shortcut" data-app="files"><span class="shortcut-icon">▤</span><span>File Manager</span></button>
       <button class="shortcut" data-app="notes"><span class="shortcut-icon">✎</span><span>Notes</span></button>
       <button class="shortcut" data-app="settings"><span class="shortcut-icon">⚙</span><span>Settings</span></button>
       <button class="shortcut" data-app="gaming"><span class="shortcut-icon">⌘</span><span>Gaming</span></button>
     </div>
     <div class="dock-wrap"><nav class="dock" aria-label="Application dock">
-      <button class="dock-app launcher-app" id="launcherButton" title="App launcher">◈</button>
+      <button class="dock-app launcher-app" id="launcherButton" title="App launcher" aria-label="App launcher">◈</button>
       <span class="dock-separator"></span>
-      <button class="dock-app" data-app="files" title="Files">▤</button>
-      <button class="dock-app" data-app="browser" title="Browser">◉</button>
-      <button class="dock-app" data-app="notes" title="Notes">✎</button>
-      <button class="dock-app" data-app="terminal" title="Terminal">⌘</button>
-      <button class="dock-app" data-app="gaming" title="Gaming Hub">🎮</button>
+      <button class="dock-app" data-app="files" title="File Manager" aria-label="File Manager">▤</button>
+      <button class="dock-app" data-app="browser" title="Browser" aria-label="Browser">◉</button>
+      <button class="dock-app" data-app="notes" title="Notes" aria-label="Notes">✎</button>
+      <button class="dock-app" data-app="terminal" title="Terminal" aria-label="Terminal">⌘</button>
+      <button class="dock-app" data-app="gaming" title="Gaming Hub" aria-label="Gaming Hub">🎮</button>
       <span class="dock-separator"></span>
-      <button class="dock-app" data-app="settings" title="Settings">⚙</button>
+      <button class="dock-app" data-app="settings" title="Settings" aria-label="Settings">⚙</button>
     </nav></div>
     <div class="panel control-panel hidden" id="controlPanel">
       <div class="panel-heading"><div><h2>Control Centre</h2><p>Quick settings</p></div><button class="close-btn" data-close="controlPanel">×</button></div>
       <div class="toggle-grid">
-        <button class="tile active" data-toggle="wifi" aria-pressed="true"><span>⌁</span><b>Wi-Fi</b><small>On · preview</small></button>
-        <button class="tile" data-toggle="bluetooth" aria-pressed="false"><span>ᛒ</span><b>Bluetooth</b><small>Off · preview</small></button>
+        <button class="tile" type="button" disabled title="Network integration requires a native system service"><span>⌁</span><b>Wi-Fi</b><small>Native service unavailable</small></button>
+        <button class="tile" type="button" disabled title="Bluetooth integration requires a native system service"><span>ᛒ</span><b>Bluetooth</b><small>Native service unavailable</small></button>
         <button class="tile" data-toggle="dnd" aria-pressed="false"><span>◐</span><b>Do Not Disturb</b><small>Off · preview</small></button>
         <button class="tile" data-toggle="power" aria-pressed="false"><span>ϟ</span><b>Power Saver</b><small>Off · preview</small></button>
       </div>
-      <div class="slider-row"><label for="brightness">Brightness</label><div class="slider-control"><input id="brightness" type="range" min="35" max="100" value="100"><output id="brightnessValue" for="brightness">100%</output></div></div>
-      <div class="slider-row"><label for="volume">Volume</label><div class="slider-control"><input id="volume" type="range" min="0" max="100" value="65"><output id="volumeValue" for="volume">65%</output></div></div>
+      <div class="slider-row"><label for="brightness">Preview brightness</label><div class="slider-control"><input id="brightness" type="range" min="35" max="100" value="100"><output id="brightnessValue" for="brightness">100%</output></div></div>
+      <div class="slider-row audio-unavailable"><label for="volume">System volume</label><div class="slider-control"><input id="volume" type="range" min="0" max="100" value="65" disabled aria-describedby="volumeUnavailable"><output id="volumeValue" for="volume">Unavailable</output></div><span id="volumeUnavailable" class="visually-hidden">Audio integration requires a native system service.</span></div>
       <section class="notification-section" id="controlNotifications" aria-labelledby="notificationHeading">
         <div class="notification-heading"><h3 id="notificationHeading">Notifications</h3><button class="clear-notifications" id="clearNotifications" type="button">Clear</button></div>
         <div id="notificationList" aria-live="polite"><div class="notification-empty"><p>You're all caught up.</p><small>Notifications will appear here.</small></div></div>
       </section>
-      <div class="panel-foot">Preview controls only — hardware settings are not connected in this browser build.</div>
+      <div class="panel-foot">Brightness changes this desktop preview. Wi-Fi, Bluetooth, audio and system power need native services.</div>
     </div>
     <section class="launcher hidden" id="launcher">
       <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
       <div class="app-grid" id="appGrid">
-        <button class="app-item" data-app="files"><span>▤</span>Files</button><button class="app-item" data-app="browser"><span>◉</span>Browser</button>
+        <button class="app-item" data-app="files"><span>▤</span>File Manager</button><button class="app-item" data-app="browser"><span>◉</span>Browser</button>
         <button class="app-item" data-app="notes"><span>✎</span>Notes</button><button class="app-item" data-app="terminal"><span>⌘</span>Terminal</button>
         <button class="app-item" data-app="gaming"><span>🎮</span>Gaming Hub</button><button class="app-item" data-app="monitor"><span>▥</span>System Monitor</button>
-        <button class="app-item" data-app="settings"><span>⚙</span>Settings</button><button class="app-item" data-app="calculator"><span>＋</span>Calculator</button>
+        <button class="app-item" data-app="software"><span>◈</span>Software Centre</button><button class="app-item" data-app="settings"><span>⚙</span>Settings</button><button class="app-item" data-app="calculator"><span>＋</span>Calculator</button>
       </div>
     </section>
     <section class="window hidden" id="appWindow" aria-live="polite">
@@ -70,6 +70,11 @@
     </section>
     <div class="toast hidden" id="toast"></div>
   </main>
+  <script src="apps/app-registry.js"></script>
+  <script src="apps/files.js"></script>
+  <script src="apps/software-centre.js"></script>
+  <script src="apps/system-monitor.js"></script>
+  <script src="apps/settings-sections.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

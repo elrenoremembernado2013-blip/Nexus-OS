@@ -5,22 +5,23 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 ## Prototype features
 - Desktop wallpaper, top bar, dock and shortcuts
 - App launcher with search
-- Control Centre with simulated quick toggles and sliders
+- Control Centre with local Do Not Disturb and lightweight-mode preferences, plus a desktop-only brightness preview
 - Notifications entry integrated into Control Centre
-- Mock Files app
+- File Manager with an explicit user-selected folder, browsing, search, preview, create, rename, copy, move and delete where supported by the browser
+- Software Centre catalogue with search and categories
+- System Monitor interface that clearly reports unavailable native telemetry
 - Notes with browser-local autosave
-- Settings: organised Appearance, Performance, Notifications, Accessibility and System sections with browser-local preferences
+- Settings: appearance, wallpaper, accent, glass, performance, notifications, accessibility, system information and native-integration status pages
 - Browser launcher (opens valid HTTP/HTTPS links in a new tab)
 - Safe Terminal simulation (demo commands only)
 - Gaming Hub preview
-- System Monitor mockup
 - Basic calculator
 
 ## Run
 Open `index.html` in a modern browser.
 
 ## Prototype limitations
-Quick settings, monitoring, Files and Terminal are simulated. The Browser opens websites in separate tabs. Notes and desktop preferences use local browser storage. Native Linux integration will be required for hardware controls, real file access, system monitoring and Steam/Proton support.
+The File Manager uses browser file-system permissions only after the user explicitly chooses a folder. Browsers without the File System Access API can open selected files for read-only preview; folder mutations remain unavailable there. File operations are confined to the browser-granted folder. Package installation, hardware controls, system monitoring and Steam/Proton support are not native Linux integrations. Wi-Fi, Bluetooth and system volume controls are unavailable here; no host metrics are fabricated. Notes and desktop preferences use local browser storage. The Browser opens websites in separate tabs.
 
 ## Roadmap
 1. Stabilize desktop shell and accessibility.
