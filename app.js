@@ -111,7 +111,7 @@ function appView(app){
 const heading=(t,s)=>'<h2 class="content-title">'+t+'</h2><p class="content-sub">'+s+'</p>';
 if(app==="files")return heading("Files","A simple workspace preview.")+'<div class=card-grid><div class=content-card><h3>Home</h3><p>Personal files and folders</p></div><div class=content-card><h3>Documents</h3><p>Saved documents</p></div><div class=content-card><h3>Downloads</h3><p>Downloaded items</p></div><div class=content-card><h3>Pictures</h3><p>Images and wallpapers</p></div></div><p class=content-sub style=margin-top:20px>This is a mock file browser. It does not access your computer’s files yet.</p>';
 if(app==="notes")return heading("Notes","Your notes are saved locally in this browser.")+'<textarea class="note-area" id="notesText" placeholder="Write something…"></textarea><div style="display:flex;justify-content:space-between;margin-top:10px"><small class=content-sub id=notesStatus>Autosave ready</small><button class=action-button id=clearNotes>Clear note</button></div>';
-if(app==="settings")return '<div class="settings-layout"><aside class="settings-sidebar" aria-label="Settings categories"><p class="settings-kicker">PREFERENCES</p><button class="settings-nav active" data-settings-section="appearance"><span>◐</span> Appearance</button><button class="settings-nav" data-settings-section="performance"><span>ϟ</span> Performance</button><button class="settings-nav" data-settings-section="notifications"><span>◉</span> Notifications</button><button class="settings-nav" data-settings-section="accessibility"><span>◎</span> Accessibility</button><button class="settings-nav" data-settings-section="system"><span>⌘</span> System</button></aside><div class="settings-main"><section class="settings-page" data-settings-page="appearance">'+heading("Appearance","Make NEXUS feel like your own.")+'<div class="settings-card"><div class="settings-card-heading"><h3>Desktop theme</h3><p>Choose the overall look of your workspace.</p></div><div class="theme-options"><button class="theme-choice" data-theme-choice="dark" type="button">Dark</button><button class="theme-choice" data-theme-choice="light" type="button">Light</button><button class="theme-choice" data-theme-choice="system" type="button">System</button></div><p class="settings-hint" id="themeStatus">Dark theme selected.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Accent colour</h3><p>Choose the highlight used across the interface.</p></div><div class="accent-options"><button class="accent-swatch" data-accent="#ffad7a" aria-label="Copper accent" title="Copper"></button><button class="accent-swatch" data-accent="#8b7cff" aria-label="Violet accent" title="Violet"></button><button class="accent-swatch" data-accent="#44c9e8" aria-label="Cyan accent" title="Cyan"></button><button class="accent-swatch" data-accent="#5ed3a3" aria-label="Emerald accent" title="Emerald"></button><button class="accent-swatch" data-accent="#ee82b6" aria-label="Rose accent" title="Rose"></button></div><p class="settings-hint" id="accentStatus">Copper is the default NEXUS accent.</p></div><div class="settings-card wallpaper-card"><div class="settings-card-heading"><h3>Desktop wallpaper</h3><p>Choose a photographic background for your workspace. Images are served by Unsplash.</p></div><div class="wallpaper-filters" role="group" aria-label="Wallpaper categories"><button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button><button class="wallpaper-filter" data-wallpaper-filter="nature" type="button">Nature</button><button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space</button><button class="wallpaper-filter" data-wallpaper-filter="architecture" type="button">Architecture</button></div><div class="wallpaper-grid" id="wallpaperGrid"><button class="wallpaper-option" type="button" data-wallpaper="mountain-night" data-category="nature" aria-label="Apply mountain night wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Starry sky above a mountain range"><span>Mountain Night</span></button><button class="wallpaper-option" type="button" data-wallpaper="alpine" data-category="nature" aria-label="Apply alpine landscape wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Dramatic alpine mountain peaks"><span>Alpine</span></button><button class="wallpaper-option" type="button" data-wallpaper="forest" data-category="nature" aria-label="Apply forest wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Sunlight through a green forest"><span>Forest</span></button><button class="wallpaper-option" type="button" data-wallpaper="cosmos" data-category="space" aria-label="Apply cosmos wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Colourful deep space nebula"><span>Cosmos</span></button><button class="wallpaper-option" type="button" data-wallpaper="city" data-category="architecture" aria-label="Apply city wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="City skyline at dusk"><span>City Lights</span></button><button class="wallpaper-option" type="button" data-wallpaper="modern" data-category="architecture" aria-label="Apply architecture wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Modern architectural structure"><span>Architecture</span></button><div class="custom-wallpaper-import">
+if(app==="settings")return '<div class="settings-layout"><aside class="settings-sidebar" aria-label="Settings categories"><p class="settings-kicker">PREFERENCES</p><button class="settings-nav active" data-settings-section="appearance"><span>◐</span> Appearance</button><button class="settings-nav" data-settings-section="performance"><span>ϟ</span> Performance</button><button class="settings-nav" data-settings-section="notifications"><span>◉</span> Notifications</button><button class="settings-nav" data-settings-section="accessibility"><span>◎</span> Accessibility</button><button class="settings-nav" data-settings-section="system"><span>⌘</span> System</button></aside><div class="settings-main"><section class="settings-page" data-settings-page="appearance">'+heading("Appearance","Make NEXUS feel like your own.")+'<div class="settings-card"><div class="settings-card-heading"><h3>Desktop theme</h3><p>Choose the overall look of your workspace.</p></div><div class="theme-options"><button class="theme-choice" data-theme-choice="dark" type="button">Dark</button><button class="theme-choice" data-theme-choice="light" type="button">Light</button><button class="theme-choice" data-theme-choice="system" type="button">System</button></div><p class="settings-hint" id="themeStatus">Dark theme selected.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Accent colour</h3><p>Choose the highlight used across the interface.</p></div><div class="accent-options"><button class="accent-swatch" data-accent="#ffad7a" aria-label="Copper accent" title="Copper"></button><button class="accent-swatch" data-accent="#8b7cff" aria-label="Violet accent" title="Violet"></button><button class="accent-swatch" data-accent="#44c9e8" aria-label="Cyan accent" title="Cyan"></button><button class="accent-swatch" data-accent="#5ed3a3" aria-label="Emerald accent" title="Emerald"></button><button class="accent-swatch" data-accent="#ee82b6" aria-label="Rose accent" title="Rose"></button></div><p class="settings-hint" id="accentStatus">Copper is the default NEXUS accent.</p><div class="wallpaper-accent-suggestions"><div class="wallpaper-accent-heading"><strong>Wallpaper colour suggestions</strong><span>Automatically sampled from your wallpaper</span></div><div class="suggested-accent-options" id="suggestedAccentOptions" aria-label="Suggested accent colours"><span class="suggested-accent-empty">Choose a wallpaper to generate matching colours.</span></div><p class="settings-hint" id="suggestedAccentStatus" role="status">Suggestions will appear when you preview a wallpaper.</p></div></div><div class="settings-card wallpaper-card"><div class="settings-card-heading"><h3>Desktop wallpaper</h3><p>Choose a photographic background for your workspace. Images are served by Unsplash.</p></div><div class="wallpaper-filters" role="group" aria-label="Wallpaper categories"><button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button><button class="wallpaper-filter" data-wallpaper-filter="nature" type="button">Nature</button><button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space</button><button class="wallpaper-filter" data-wallpaper-filter="architecture" type="button">Architecture</button></div><div class="wallpaper-grid" id="wallpaperGrid"><button class="wallpaper-option" type="button" data-wallpaper="mountain-night" data-category="nature" aria-label="Apply mountain night wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Starry sky above a mountain range"><span>Mountain Night</span></button><button class="wallpaper-option" type="button" data-wallpaper="alpine" data-category="nature" aria-label="Apply alpine landscape wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Dramatic alpine mountain peaks"><span>Alpine</span></button><button class="wallpaper-option" type="button" data-wallpaper="forest" data-category="nature" aria-label="Apply forest wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Sunlight through a green forest"><span>Forest</span></button><button class="wallpaper-option" type="button" data-wallpaper="cosmos" data-category="space" aria-label="Apply cosmos wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Colourful deep space nebula"><span>Cosmos</span></button><button class="wallpaper-option" type="button" data-wallpaper="city" data-category="architecture" aria-label="Apply city wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="City skyline at dusk"><span>City Lights</span></button><button class="wallpaper-option" type="button" data-wallpaper="modern" data-category="architecture" aria-label="Apply architecture wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Modern architectural structure"><span>Architecture</span></button><div class="custom-wallpaper-import">
  <div class="custom-wallpaper-copy"><strong>Use your own image</strong><small>Choose a JPEG, PNG or WebP image up to 8 MB. Your image stays on this device.</small></div>
  <input id="customWallpaperFile" class="custom-wallpaper-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose a custom wallpaper image">
  <button class="action-button custom-wallpaper-button" id="chooseCustomWallpaper" type="button">Import image</button>
@@ -228,6 +228,7 @@ if(app==="settings"){
    pendingCustomUrl=candidateUrl;pendingCustomWallpaper=file;
    $("#wallpaperPreviewTitle").textContent=file.name;
    $("#wallpaperPreviewImage").src=candidateUrl;
+   suggestWallpaperAccents(candidateUrl);
    $("#wallpaperPreviewImage").alt="Preview of your imported image";
    $("#wallpaperPreviewCaption").textContent="Preview only — your current wallpaper will remain until you apply this image.";
    $("#applyWallpaperPreview").textContent="Save and apply";
@@ -255,13 +256,79 @@ if(app==="settings"){
  applyWallpaper(savedWallpaper);
  let pendingWallpaper=null;
  const previewDialog=$("#wallpaperPreviewDialog");
- function closeWallpaperPreview(){if(previewDialog.open)previewDialog.close();pendingWallpaper=null;pendingCustomWallpaper=null;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}}
+ function closeWallpaperPreview(){if(previewDialog.open)previewDialog.close();pendingWallpaper=null;pendingCustomWallpaper=null;accentSuggestionToken++;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}}
+ let accentSuggestionToken=0;
+ function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),delta=max-min;
+  let h=0,sat=0,l=(max+min)/2;
+  if(delta){sat=delta/(1-Math.abs(2*l-1));switch(max){case r:h=((g-b)/delta)%6;break;case g:h=(b-r)/delta+2;break;default:h=(r-g)/delta+4;}h*=60;if(h<0)h+=360;}
+  return {h,s:sat,l};
+ }
+ function hslToHex(h,sat,l){
+  const chroma=(1-Math.abs(2*l-1))*sat,x=chroma*(1-Math.abs((h/60)%2-1)),m=l-chroma/2;
+  let rgb=h<60?[chroma,x,0]:h<120?[x,chroma,0]:h<180?[0,chroma,x]:h<240?[0,x,chroma]:h<300?[x,0,chroma]:[chroma,0,x];
+  return "#"+rgb.map(value=>Math.round((value+m)*255).toString(16).padStart(2,"0")).join("");
+ }
+ function sampleWallpaperHue(image){
+  const canvas=document.createElement("canvas");canvas.width=48;canvas.height=48;
+  const context=canvas.getContext("2d",{willReadFrequently:true});
+  if(!context)throw new Error("Colour sampling is unavailable.");
+  context.drawImage(image,0,0,48,48);
+  const pixels=context.getImageData(0,0,48,48).data;
+  const bins=new Array(24).fill(0);
+  for(let i=0;i<pixels.length;i+=16){
+   if(pixels[i+3]<180)continue;
+   const {h,s,l}=rgbToHsl(pixels[i],pixels[i+1],pixels[i+2]);
+   if(s<.2||l<.12||l>.88)continue;
+   bins[Math.floor(h/15)%24]+=s*(.5+Math.min(l,1-l));
+  }
+  const strongest=bins.indexOf(Math.max(...bins));
+  if(strongest<0||bins[strongest]===0)throw new Error("No clear accent colour was found.");
+  return strongest*15+7.5;
+ }
+ function renderWallpaperAccentSuggestions(hue){
+  const options=[{shift:0,label:"Main match"},{shift:28,label:"Warm harmony"},{shift:-28,label:"Cool harmony"}];
+  const container=$("#suggestedAccentOptions");container.innerHTML="";
+  options.forEach(option=>{
+   const color=hslToHex((hue+option.shift+360)%360,.68,.62);
+   const button=document.createElement("button");
+   button.type="button";button.className="suggested-accent-swatch";
+   button.dataset.suggestedAccent=color;button.style.setProperty("--suggested-color",color);
+   button.title=option.label+" "+color;button.setAttribute("aria-label",option.label+" accent "+color);
+   button.setAttribute("aria-pressed",String(localStorage.getItem("nexus-accent")===color));
+   if(localStorage.getItem("nexus-accent")===color)button.classList.add("selected");
+   button.addEventListener("click",()=>setAccent(color));
+   const label=document.createElement("span");label.textContent=option.label;
+   button.append(label);container.append(button);
+  });
+  $("#suggestedAccentStatus").textContent="Choose a suggestion to apply it. Your current accent stays until you select one.";
+ }
+ function suggestWallpaperAccents(source){
+  const token=++accentSuggestionToken;
+  $("#suggestedAccentOptions").innerHTML='<span class="suggested-accent-empty">Analysing wallpaper colours…</span>';
+  $("#suggestedAccentStatus").textContent="Sampling the image locally in your browser.";
+  const image=new Image();
+  if(!source.startsWith("blob:")&&!source.startsWith("data:"))image.crossOrigin="anonymous";
+  image.onload=()=>{
+   if(token!==accentSuggestionToken)return;
+   try{renderWallpaperAccentSuggestions(sampleWallpaperHue(image));}
+   catch(error){$("#suggestedAccentOptions").innerHTML='<span class="suggested-accent-empty">Could not sample this image. Try a custom image or another wallpaper.</span>';$("#suggestedAccentStatus").textContent="The image host may block local colour sampling; your wallpaper is unaffected.";}
+  };
+  image.onerror=()=>{
+   if(token!==accentSuggestionToken)return;
+   $("#suggestedAccentOptions").innerHTML='<span class="suggested-accent-empty">Colour suggestions are unavailable for this image.</span>';
+   $("#suggestedAccentStatus").textContent="Your wallpaper preview still works normally.";
+  };
+  image.src=source;
+ }
  function openWallpaperPreview(id){
   const item=$('[data-wallpaper="'+id+'"]');if(!item||!wallpaperCatalog[id])return;
   pendingWallpaper=id;pendingCustomWallpaper=null;
   $("#applyWallpaperPreview").textContent="Apply wallpaper";
   $("#wallpaperPreviewTitle").textContent=item.querySelector("span").textContent;
   $("#wallpaperPreviewImage").src=wallpaperCatalog[id];
+  suggestWallpaperAccents(wallpaperCatalog[id]);
   $("#wallpaperPreviewImage").alt=item.querySelector("img").alt;
   $("#wallpaperPreviewCaption").textContent=id===localStorage.getItem("nexus-wallpaper")?"This is your currently applied wallpaper.":"Preview only — your desktop will not change until you apply it.";
   if(!previewDialog.open)previewDialog.showModal();
@@ -305,6 +372,7 @@ if(app==="settings"){
    swatch.classList.toggle("selected",selected);
    swatch.setAttribute("aria-pressed",String(selected));
   });
+  $("[data-suggested-accent]").forEach(button=>{const selected=button.dataset.suggestedAccent===value;button.classList.toggle("selected",selected);button.setAttribute("aria-pressed",String(selected));});
   $("#accentStatus").textContent="Accent colour updated.";
  }
  $("[data-accent]").forEach(swatch=>swatch.onclick=()=>setAccent(swatch.dataset.accent));
