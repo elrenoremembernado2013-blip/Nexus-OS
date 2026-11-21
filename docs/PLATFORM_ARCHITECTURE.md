@@ -7,7 +7,7 @@
 | First target architecture | x86_64 (AMD64) |
 | Display protocol | Wayland |
 | Legacy application compatibility | XWayland is part of the planned desktop stack |
-| First validation target | QEMU virtual machine before physical hardware |
+| First validation target | QEMU virtual machine before physical hardware |\n| First firmware target | UEFI using OVMF in QEMU; legacy BIOS can be evaluated later |\n| Bootloader | GRUB for the first Ubuntu-based image |\n| Init/service manager | systemd, matching the Ubuntu base |
 | Main desktop base | Ubuntu 26.04 LTS minimal/server base, customised by NEXUS |
 | Experimental image path | Keep the existing Buildroot external tree for small appliance-style experiments |
 
@@ -30,7 +30,7 @@ Official references:
 - Ubuntu 26.04 LTS release notes and support lifespan: https://documentation.ubuntu.com/release-notes/26.04/
 - Ubuntu release lifecycle: https://ubuntu.com/about/release-cycle
 
-## Role of Buildroot
+## First VM boot profile\n\nThe initial virtual-machine target will use **QEMU x86_64 with UEFI firmware (OVMF), a virtual disk, and virtio devices where practical**. GRUB will provide the first bootloader path, and systemd will remain the service manager supplied by Ubuntu. This deliberately follows the selected base rather than introducing a second boot or service stack prematurely.\n\nThese are first-bring-up defaults, not a claim that a NEXUS image already boots. The exact QEMU command, firmware package, image format, and checksum must be recorded alongside the first successful boot test. Legacy BIOS and broader hardware support can be evaluated after the UEFI path is repeatable.\n\n## Role of Buildroot
 
 The existing NEXUS Buildroot external tree will be retained as a separate experimental path for:
 - very small recovery or diagnostic images;
@@ -64,7 +64,7 @@ Steam support must be tested rather than inferred from CPU architecture or Wayla
 
 ## Decisions still needed
 
-- [ ] BIOS, UEFI, or both for the first boot target.
+- [x] First boot target: UEFI in QEMU (OVMF); legacy BIOS can be evaluated later.\n- [x] First bootloader: GRUB.\n- [x] Init/service manager: systemd from Ubuntu.
 - [ ] Exact Ubuntu 26.04 point-release image and checksum to pin.
 - [ ] Init/service manager and update/rollback model.
 - [ ] Production Wayland compositor and native shell toolkit.
