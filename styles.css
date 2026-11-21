@@ -62,3 +62,34 @@
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+
+/* Notifications live inside the Control Centre */
+.notification-heading{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ margin-bottom:9px;
+}
+.notification-heading h3{margin:0;font-size:13px}
+.clear-notifications{
+ border:1px solid var(--line);
+ border-radius:9px;
+ padding:6px 9px;
+ background:rgba(255,255,255,.06);
+ color:var(--muted);
+ font:inherit;
+ font-size:10px;
+ cursor:pointer;
+}
+.clear-notifications:hover{color:var(--text);background:rgba(255,255,255,.11)}
+.notification-empty{
+ padding:13px;
+ border:1px solid var(--line);
+ border-radius:12px;
+ background:rgba(255,255,255,.035);
+ color:var(--muted);
+}
+.notification-empty p{margin:0 0 4px;font-size:12px;color:var(--text)}
+.notification-empty small{font-size:10px}
