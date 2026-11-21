@@ -42,7 +42,7 @@ See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the Steam compatibi
 
 - [x] Create a separate NEXUS Buildroot external-tree scaffold.
 - [x] Choose and document x86_64 and Wayland as the first platform direction.
-- [ ] Choose the first QEMU machine and firmware mode.
+- [x] Choose the first QEMU firmware mode: UEFI/OVMF.\n- [x] Choose GRUB as the first bootloader and systemd as the init/service manager.
 - [x] Select Ubuntu 26.04 LTS minimal/server as the recommended main desktop base.
 - [x] Retain Buildroot for separate minimal-image experiments, not the primary gaming desktop.
 - [ ] Validate XWayland and Steam runtime requirements in the Ubuntu-based test environment.
