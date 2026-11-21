@@ -6,7 +6,7 @@ You are the implementation engineer for NEXUS OS. Work directly in this reposito
 Build a lightweight, secure, customizable desktop environment designed to run smoothly on older computers. Current files are a browser prototype; do not misrepresent it as a bootable operating system or as native hardware control.
 
 ## Design
-- Premium, cinematic, minimalist dark UI with glass panels, restrained violet/cyan accents, real non-AI photographic wallpapers, and careful typography.
+- Premium, cinematic, minimalist dark UI with glass panels, warm copper/orange accents with optional cool theme variants, real non-AI photographic wallpapers, and careful typography.
 - Keep UI uncluttered and responsive.
 - Add a lightweight mode that reduces blur, shadows, animation and unnecessary work.
 - Respect prefers-reduced-motion and keyboard navigation.
@@ -24,7 +24,7 @@ Build a lightweight, secure, customizable desktop environment designed to run sm
 
 ## Current next tasks
 1. Review existing desktop/window code and correct bugs first.
-2. Finish window manager behavior: focus/z-order, drag, resize, minimise, maximise/restore, edge snap; ensure snap/maximise states can restore cleanly.
+2. Review and test the updated window manager: focus/z-order, drag, resize, minimise, maximise/restore, edge snap; ensure snap/maximise states can restore cleanly. Check for syntax errors and pointer edge cases.
 3. Replace calculator's dynamic Function-based expression evaluation with a safe parser that supports basic arithmetic only.
 4. Improve keyboard accessibility, escape-to-close panels, and reduced motion.
 5. Keep notifications integrated in Control Centre.
