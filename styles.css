@@ -132,3 +132,50 @@
  .slider-control input{width:min(38vw,132px)}
  .tile{min-height:96px}
 }
+
+
+/* NEXUS Settings app */
+.settings-layout{display:grid;grid-template-columns:178px minmax(0,1fr);gap:24px;min-height:100%;margin:-2px}
+.settings-sidebar{border-right:1px solid var(--line);padding:8px 14px 8px 0}
+.settings-kicker{font-size:9px;letter-spacing:1.8px;color:var(--muted);margin:0 0 12px 10px;font-weight:700}
+.settings-nav{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;margin:3px 0;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--muted);font:inherit;font-size:12px;text-align:left;cursor:pointer}
+.settings-nav span{width:18px;text-align:center;font-size:15px;color:var(--text)}
+.settings-nav:hover{background:rgba(255,255,255,.055);color:var(--text)}
+.settings-nav.active{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--text)}
+.settings-main{min-width:0;max-width:720px;padding:7px 4px 20px 0}
+.settings-main .content-title{font-size:23px}
+.settings-main .content-sub{margin-bottom:20px}
+.settings-card{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035);padding:16px;margin:0 0 13px}
+.settings-card-heading h3{font-size:13px;margin:0 0 5px}
+.settings-card-heading p,.settings-hint{font-size:11px;color:var(--muted);line-height:1.5;margin:0}
+.accent-options{display:flex;gap:11px;margin:15px 0 10px}
+.accent-swatch{width:27px;height:27px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:var(--swatch);cursor:pointer;position:relative}
+.accent-swatch[data-accent="#ffad7a"]{background:#ffad7a}
+.accent-swatch[data-accent="#8b7cff"]{background:#8b7cff}
+.accent-swatch[data-accent="#44c9e8"]{background:#44c9e8}
+.accent-swatch[data-accent="#5ed3a3"]{background:#5ed3a3}
+.accent-swatch[data-accent="#ee82b6"]{background:#ee82b6}
+.accent-swatch.selected{outline:2px solid var(--accent);outline-offset:3px}
+.setting-row{gap:18px}
+.setting-row strong{display:block;font-size:12px;font-weight:600;color:var(--text)}
+.setting-row small{display:block;color:var(--muted);font-size:10px;margin-top:4px;line-height:1.45}
+.settings-range{display:flex;align-items:center;gap:10px}
+.settings-range input{width:130px;accent-color:var(--accent)}
+.settings-range output{width:42px;text-align:right;font-size:10px;color:var(--text);font-variant-numeric:tabular-nums}
+.switch-button{min-width:55px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font-size:11px;cursor:pointer}
+.switch-button.enabled{background:color-mix(in srgb,var(--accent) 23%,transparent);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.settings-row-note{padding-top:12px;color:var(--muted);font-size:10px;line-height:1.55}
+.system-info>div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);font-size:11px}
+.system-info>div:last-child{border:0}
+.system-info span{color:var(--muted)}
+.system-info strong{font-weight:500}
+.settings-main :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-width:620px){
+ .settings-layout{grid-template-columns:1fr;gap:14px}
+ .settings-sidebar{display:flex;gap:5px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:0 0 9px}
+ .settings-kicker{display:none}
+ .settings-nav{width:auto;white-space:nowrap;padding:9px 10px;flex-shrink:0}
+ .settings-nav span{display:none}
+ .settings-main{padding:0}
+ .settings-range input{width:min(28vw,110px)}
+}
