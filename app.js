@@ -225,7 +225,7 @@ if(app==="settings"){
     $("#customWallpaperStatus").textContent="This image has invalid or unusually large dimensions.";return;
    }
    if(pendingCustomUrl)URL.revokeObjectURL(pendingCustomUrl);
-   pendingCustomUrl=candidateUrl;pendingCustomWallpaper=file;
+   pendingCustomUrl=candidateUrl;pendingCustomWallpaper=file;pendingAccent=null;
    $("#wallpaperPreviewTitle").textContent=file.name;
    $("#wallpaperPreviewImage").src=candidateUrl;
    suggestWallpaperAccents(candidateUrl);
@@ -256,7 +256,8 @@ if(app==="settings"){
  applyWallpaper(savedWallpaper);
  let pendingWallpaper=null;
  const previewDialog=$("#wallpaperPreviewDialog");
- function closeWallpaperPreview(){if(previewDialog.open)previewDialog.close();pendingWallpaper=null;pendingCustomWallpaper=null;accentSuggestionToken++;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}}
+ function closeWallpaperPreview(){if(previewDialog.open)previewDialog.close();pendingWallpaper=null;pendingCustomWallpaper=null;pendingAccent=null;accentSuggestionToken++;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}}
+ let pendingAccent=null;
  let accentSuggestionToken=0;
  function rgbToHsl(r,g,b){
   r/=255;g/=255;b/=255;
@@ -296,13 +297,21 @@ if(app==="settings"){
    button.type="button";button.className="suggested-accent-swatch";
    button.dataset.suggestedAccent=color;button.style.setProperty("--suggested-color",color);
    button.title=option.label+" "+color;button.setAttribute("aria-label",option.label+" accent "+color);
-   button.setAttribute("aria-pressed",String(localStorage.getItem("nexus-accent")===color));
-   if(localStorage.getItem("nexus-accent")===color)button.classList.add("selected");
-   button.addEventListener("click",()=>setAccent(color));
+   button.setAttribute("aria-pressed",String(pendingAccent===color));
+   if(pendingAccent===color)button.classList.add("selected");
+   button.addEventListener("click",()=>{
+    pendingAccent=color;
+    container.querySelectorAll("[data-suggested-accent]").forEach(option=>{
+     const selected=option.dataset.suggestedAccent===color;
+     option.classList.toggle("selected",selected);
+     option.setAttribute("aria-pressed",String(selected));
+    });
+    $("#suggestedAccentStatus").textContent="Accent selected for this preview. Apply wallpaper to save it, or Cancel to discard it.";
+   });
    const label=document.createElement("span");label.textContent=option.label;
    button.append(label);container.append(button);
   });
-  $("#suggestedAccentStatus").textContent="Choose a suggestion to apply it. Your current accent stays until you select one.";
+  $("#suggestedAccentStatus").textContent="Choose a colour to preview it. It will only be saved if you apply the wallpaper.";
  }
  function suggestWallpaperAccents(source){
   const token=++accentSuggestionToken;
@@ -313,7 +322,7 @@ if(app==="settings"){
   image.onload=()=>{
    if(token!==accentSuggestionToken)return;
    try{renderWallpaperAccentSuggestions(sampleWallpaperHue(image));}
-   catch(error){$("#suggestedAccentOptions").innerHTML='<span class="suggested-accent-empty">Could not sample this image. Try a custom image or another wallpaper.</span>';$("#suggestedAccentStatus").textContent="The image host may block local colour sampling; your wallpaper is unaffected.";}
+   catch(error){console.warn("NEXUS wallpaper colour sampling failed:",error);const blocked=error&&error.name==="SecurityError";$("#suggestedAccentOptions").innerHTML='<span class="suggested-accent-empty">Could not sample this image. Try a custom image or another wallpaper.</span>';$("#suggestedAccentStatus").textContent=blocked?"Browser security blocked pixel access (SecurityError/CORS). Try importing the image locally.":"Colour sampling failed; your wallpaper and current accent are unaffected.";}
   };
   image.onerror=()=>{
    if(token!==accentSuggestionToken)return;
@@ -324,7 +333,7 @@ if(app==="settings"){
  }
  function openWallpaperPreview(id){
   const item=$('[data-wallpaper="'+id+'"]');if(!item||!wallpaperCatalog[id])return;
-  pendingWallpaper=id;pendingCustomWallpaper=null;
+  pendingWallpaper=id;pendingCustomWallpaper=null;pendingAccent=null;
   $("#applyWallpaperPreview").textContent="Apply wallpaper";
   $("#wallpaperPreviewTitle").textContent=item.querySelector("span").textContent;
   $("#wallpaperPreviewImage").src=wallpaperCatalog[id];
@@ -337,7 +346,7 @@ if(app==="settings"){
  $("[data-wallpaper]").forEach(item=>item.onclick=()=>openWallpaperPreview(item.dataset.wallpaper));
  $("[data-preview-close]").forEach(button=>button.onclick=closeWallpaperPreview);
  previewDialog.addEventListener("click",event=>{if(event.target===previewDialog)closeWallpaperPreview()});
- previewDialog.addEventListener("close",()=>{pendingWallpaper=null;pendingCustomWallpaper=null;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}$("#applyWallpaperPreview").textContent="Apply wallpaper";});
+ previewDialog.addEventListener("close",()=>{pendingWallpaper=null;pendingCustomWallpaper=null;pendingAccent=null;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}$("#applyWallpaperPreview").textContent="Apply wallpaper";});
  $("#applyWallpaperPreview").onclick=async()=>{
   const chosen=pendingWallpaper;
   const customFile=pendingCustomWallpaper;
@@ -355,6 +364,7 @@ if(app==="settings"){
    $("#wallpaperStatus").textContent="Applied: "+chosenItem.querySelector("span").textContent;
    $("#applyWallpaperPreview").textContent="Apply wallpaper";
   }
+  if(pendingAccent)setAccent(pendingAccent);
   closeWallpaperPreview();
  };
  $("[data-wallpaper-filter]").forEach(filter=>filter.onclick=()=>{
