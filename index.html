@@ -13,7 +13,7 @@
       <div class="brand"><span class="brand-mark">N</span><span>NEXUS</span></div>
       <div class="top-center" id="clock">--:--</div>
       <div class="top-actions">
-        <button class="top-icon" aria-label="Notifications" id="notificationButton">◉</button>
+        <button class="top-icon" aria-label="Open Control Centre notifications" id="notificationButton" title="Notifications">◉</button>
         <button class="status-pill" id="controlButton"><span>⌁</span> Control Centre <span class="chevron">⌄</span></button>
       </div>
     </header>
@@ -49,11 +49,11 @@
       </div>
       <div class="slider-row"><label for="brightness">Brightness</label><input id="brightness" type="range" min="45" max="100" value="100"></div>
       <div class="slider-row"><label for="volume">Volume</label><input id="volume" type="range" min="0" max="100" value="65"></div>
-      <div class="panel-foot">These controls are simulated in this web prototype.</div>
-    </div>
-    <div class="panel notification-panel hidden" id="notificationPanel">
-      <div class="panel-heading"><div><h2>Notifications</h2><p id="notificationSub">You're all caught up.</p></div><button class="close-btn" data-close="notificationPanel">×</button></div>
-      <div class="empty-state"><span>◌</span><p>No new notifications</p><small>Updates will appear here.</small></div>
+      <section class="notification-section" id="controlNotifications" aria-labelledby="notificationHeading">
+        <div class="notification-heading"><h3 id="notificationHeading">Notifications</h3><button class="clear-notifications" id="clearNotifications" type="button">Clear</button></div>
+        <div id="notificationList" aria-live="polite"><div class="notification-empty"><p>You're all caught up.</p><small>Notifications will appear here.</small></div></div>
+      </section>
+      <div class="panel-foot">Quick settings and notifications are prototype-only; native system integration is planned.</div>
     </div>
     <section class="launcher hidden" id="launcher">
       <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
