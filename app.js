@@ -35,7 +35,35 @@ if(app==="browser")$("#browserGo").onclick=()=>{let url=$("#browserUrl").value.t
 if(app==="terminal"){const run=()=>{const inp=$("#terminalInput"),out=$("#terminalOut"),cmd=inp.value.trim().toLowerCase();const responses={help:"Demo commands: help, date, clear, about, apps, status",date:new Date().toString(),about:"NEXUS OS desktop prototype. No shell access.",apps:"Files, Browser, Notes, Terminal, Gaming Hub, System Monitor, Settings, Calculator",status:"Prototype status: UI active. System telemetry unavailable."};if(cmd==="clear")out.textContent="";else out.textContent+="\n> "+cmd+"\n"+(responses[cmd]||"Unknown demo command. Try help.");inp.value="";out.scrollTop=out.scrollHeight};$("#terminalSend").onclick=run;$("#terminalInput").onkeydown=e=>{if(e.key==="Enter")run()}}
 if(app==="calculator"){let exp="";const display=$("#calcDisplay");$$("[data-calc]").forEach(b=>b.onclick=()=>{const k=b.dataset.calc;if(k==="C"){exp="";display.value="0"}else if(k==="="){try{const safe=exp.replace(/[÷×−]/g,m=>({"÷":"/","×":"*","−":"-"}[m]));if(!/^[0-9+\-*/.() ]+$/.test(safe))throw 0;display.value=String(Function('"use strict";return ('+safe+')')());exp=display.value}catch{display.value="Error";exp=""}}else{exp+=({"÷":"/","×":"*","−":"-"}[k]||k);display.value=exp}})}
 }
-$("#windowClose").onclick=()=>win.classList.add("hidden");$("#windowMin").onclick=()=>win.classList.add("hidden");$("#windowMax").onclick=()=>{maximized=!maximized;win.classList.toggle("maximized",maximized)};
+// Basic desktop window manager: drag, focus, and edge snap.
+let zCounter=10;
+function focusWindow(){win.style.zIndex=String(++zCounter)}
+win.addEventListener("pointerdown",focusWindow);
+const titlebar=win.querySelector(".window-titlebar");
+let dragging=null;
+titlebar.addEventListener("pointerdown",e=>{
+ if(e.target.closest(".window-control"))return;
+ if(maximized){maximized=false;win.classList.remove("maximized");win.style.left=e.clientX+"px";win.style.top=e.clientY+"px";win.style.transform="none";}
+ const r=win.getBoundingClientRect();
+ dragging={dx:e.clientX-r.left,dy:e.clientY-r.top};
+ titlebar.setPointerCapture(e.pointerId);
+});
+titlebar.addEventListener("pointermove",e=>{
+ if(!dragging)return;
+ const w=win.offsetWidth,h=win.offsetHeight;
+ const left=Math.max(0,Math.min(innerWidth-w,e.clientX-dragging.dx));
+ const top=Math.max(56,Math.min(innerHeight-h-65,e.clientY-dragging.dy));
+ win.style.left=left+"px";win.style.top=top+"px";win.style.transform="none";
+});
+titlebar.addEventListener("pointerup",e=>{
+ if(!dragging)return;dragging=null;
+ const x=e.clientX;
+ if(x<=12){win.style.left="8px";win.style.top="60px";win.style.width="calc(50vw - 12px)";win.style.height="calc(100vh - 90px)";win.style.transform="none";win.classList.add("snapped-left")}
+ else if(x>=innerWidth-12){win.style.left="calc(50vw + 4px)";win.style.top="60px";win.style.width="calc(50vw - 12px)";win.style.height="calc(100vh - 90px)";win.style.transform="none";win.classList.add("snapped-right")}
+ else win.classList.remove("snapped-left","snapped-right");
+});
+titlebar.addEventListener("dblclick",e=>{if(e.target.closest(".window-control"))return;maximized=!maximized;win.classList.toggle("maximized",maximized);win.style.left="";win.style.top="";win.style.width="";win.style.height="";win.style.transform="";win.classList.remove("snapped-left","snapped-right")});
+\n$("#windowClose").onclick=()=>win.classList.add("hidden");$("#windowMin").onclick=()=>win.classList.add("hidden");$("#windowMax").onclick=()=>{maximized=!maximized;win.classList.toggle("maximized",maximized)};
 $("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
 $$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
 const savedAccent=localStorage.getItem("nexus-accent");if(savedAccent)document.documentElement.style.setProperty("--accent",savedAccent);
