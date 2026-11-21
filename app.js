@@ -37,26 +37,27 @@ if(app==="calculator"){
  let exp="";
  const display=$("#calcDisplay");
  function evaluateExpression(input){
-  const tokens=input.match(/\\d+(?:\\.\\d+)?|[()+\\-*/]/g)||[];
-  if(tokens.join("")!==input.replace(/\\s/g,""))throw Error("Invalid expression");
+  const tokens=input.match(/\d+(?:\.\d+)?|[()+\-*/]/g)||[];
+  if(tokens.join("")!==input.replace(/\s/g,""))throw Error("Invalid expression");
   let pos=0;
   function primary(){
    const t=tokens[pos++];
    if(t==="("){const v=addSub();if(tokens[pos++]!==")")throw Error("Missing )");return v}
    if(t==="+"||t==="-"){const v=primary();return t==="-"?-v:v}
-   if(!t||!/^\\d+(?:\\.\\d+)?$/.test(t))throw Error("Expected number");
+   if(!t||!/^\d+(?:\.\d+)?$/.test(t))throw Error("Expected number");
    return Number(t);
   }
   function mulDiv(){let v=primary();while(tokens[pos]==="*"||tokens[pos]==="/"){const op=tokens[pos++],rhs=primary();if(op==="/"&&rhs===0)throw Error("Division by zero");v=op==="*"?v*rhs:v/rhs}return v}
   function addSub(){let v=mulDiv();while(tokens[pos]==="+"||tokens[pos]==="-"){const op=tokens[pos++],rhs=mulDiv();v=op==="+"?v+rhs:v-rhs}return v}
   const result=addSub();if(pos!==tokens.length||!Number.isFinite(result))throw Error("Invalid result");return result;
  }
- $("[data-calc]").forEach(b=>b.onclick=()=>{
+ $$("[data-calc]").forEach(b=>b.onclick=()=>{
   const k=b.dataset.calc;
   if(k==="C"){exp="";display.value="0"}
   else if(k==="="){try{display.value=String(evaluateExpression(exp));exp=display.value}catch{display.value="Error";exp=""}}
   else{exp+=({"÷":"/","×":"*","−":"-"}[k]||k);display.value=exp}
  });
+}
 }
 }
 // Basic desktop window manager: drag, focus, and edge snap.
