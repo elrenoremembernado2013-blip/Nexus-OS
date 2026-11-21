@@ -9,7 +9,7 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 - Notifications entry integrated into Control Centre
 - Mock Files app
 - Notes with browser-local autosave
-- Settings: accent, blur, lightweight mode
+- Settings: organised Appearance, Performance, Notifications, Accessibility and System sections with browser-local preferences
 - Browser launcher (opens valid HTTP/HTTPS links in a new tab)
 - Safe Terminal simulation (demo commands only)
 - Gaming Hub preview
@@ -20,7 +20,7 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 Open `index.html` in a modern browser.
 
 ## Prototype limitations
-Quick settings, monitoring, Files and Terminal are simulated. The Browser opens websites in separate tabs. Notes and accent preferences use local browser storage. Native Linux integration will be required for hardware controls, real file access, system monitoring and Steam/Proton support.
+Quick settings, monitoring, Files and Terminal are simulated. The Browser opens websites in separate tabs. Notes and desktop preferences use local browser storage. Native Linux integration will be required for hardware controls, real file access, system monitoring and Steam/Proton support.
 
 ## Roadmap
 1. Stabilize desktop shell and accessibility.
