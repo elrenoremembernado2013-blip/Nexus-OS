@@ -62,7 +62,6 @@ if(app==="calculator"){
 }
 // Desktop window manager: stable drag, focus, snap, maximise and restore.
 let zCounter=10;
-let maximized=false;
 let snapped=null;
 let restoreRect=null;
 let dragging=null;
