@@ -42,18 +42,18 @@
     <div class="panel control-panel hidden" id="controlPanel">
       <div class="panel-heading"><div><h2>Control Centre</h2><p>Quick settings</p></div><button class="close-btn" data-close="controlPanel">×</button></div>
       <div class="toggle-grid">
-        <button class="tile active" data-toggle="wifi"><span>⌁</span><b>Wi-Fi</b><small>Prototype toggle</small></button>
-        <button class="tile" data-toggle="bluetooth"><span>ᛒ</span><b>Bluetooth</b><small>Prototype toggle</small></button>
-        <button class="tile" data-toggle="dnd"><span>◐</span><b>Do Not Disturb</b><small>Notifications</small></button>
-        <button class="tile" data-toggle="power"><span>ϟ</span><b>Power Saver</b><small>Visual mode</small></button>
+        <button class="tile active" data-toggle="wifi" aria-pressed="true"><span>⌁</span><b>Wi-Fi</b><small>On · preview</small></button>
+        <button class="tile" data-toggle="bluetooth" aria-pressed="false"><span>ᛒ</span><b>Bluetooth</b><small>Off · preview</small></button>
+        <button class="tile" data-toggle="dnd" aria-pressed="false"><span>◐</span><b>Do Not Disturb</b><small>Off · preview</small></button>
+        <button class="tile" data-toggle="power" aria-pressed="false"><span>ϟ</span><b>Power Saver</b><small>Off · preview</small></button>
       </div>
-      <div class="slider-row"><label for="brightness">Brightness</label><input id="brightness" type="range" min="45" max="100" value="100"></div>
-      <div class="slider-row"><label for="volume">Volume</label><input id="volume" type="range" min="0" max="100" value="65"></div>
+      <div class="slider-row"><label for="brightness">Brightness</label><div class="slider-control"><input id="brightness" type="range" min="35" max="100" value="100"><output id="brightnessValue" for="brightness">100%</output></div></div>
+      <div class="slider-row"><label for="volume">Volume</label><div class="slider-control"><input id="volume" type="range" min="0" max="100" value="65"><output id="volumeValue" for="volume">65%</output></div></div>
       <section class="notification-section" id="controlNotifications" aria-labelledby="notificationHeading">
         <div class="notification-heading"><h3 id="notificationHeading">Notifications</h3><button class="clear-notifications" id="clearNotifications" type="button">Clear</button></div>
         <div id="notificationList" aria-live="polite"><div class="notification-empty"><p>You're all caught up.</p><small>Notifications will appear here.</small></div></div>
       </section>
-      <div class="panel-foot">Quick settings and notifications are prototype-only; native system integration is planned.</div>
+      <div class="panel-foot">Preview controls only — hardware settings are not connected in this browser build.</div>
     </div>
     <section class="launcher hidden" id="launcher">
       <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
