@@ -25,6 +25,10 @@ function applyControlToggle(button, enabled){
  localStorage.setItem("nexus-control-"+key,String(enabled));
  if(key==="power")desktop.classList.toggle("lightweight",enabled);
 }
+function setControlPreference(key,enabled){
+ const button=$('[data-toggle="'+key+'"]');
+ if(button)applyControlToggle(button,enabled);
+}
 $("[data-toggle]").forEach(button=>{
  const key=button.dataset.toggle;
  const saved=localStorage.getItem("nexus-control-"+key);
@@ -67,7 +71,7 @@ function appView(app){
 const heading=(t,s)=>'<h2 class="content-title">'+t+'</h2><p class="content-sub">'+s+'</p>';
 if(app==="files")return heading("Files","A simple workspace preview.")+'<div class=card-grid><div class=content-card><h3>Home</h3><p>Personal files and folders</p></div><div class=content-card><h3>Documents</h3><p>Saved documents</p></div><div class=content-card><h3>Downloads</h3><p>Downloaded items</p></div><div class=content-card><h3>Pictures</h3><p>Images and wallpapers</p></div></div><p class=content-sub style=margin-top:20px>This is a mock file browser. It does not access your computer’s files yet.</p>';
 if(app==="notes")return heading("Notes","Your notes are saved locally in this browser.")+'<textarea class="note-area" id="notesText" placeholder="Write something…"></textarea><div style="display:flex;justify-content:space-between;margin-top:10px"><small class=content-sub id=notesStatus>Autosave ready</small><button class=action-button id=clearNotes>Clear note</button></div>';
-if(app==="settings")return heading("Personalisation","Adjust your desktop look.")+'<div class=setting-row><span>Accent colour</span><select id=accentSelect><option value="#8b7cff">Violet</option><option value="#44c9e8">Cyan</option><option value="#5ed3a3">Emerald</option><option value="#e7a56d">Amber</option><option value="#ee82b6">Rose</option></select></div><div class=setting-row><span>Glass blur</span><input id=blurSelect type=range min=0 max=30 value=20></div><div class=setting-row><span>Reduce motion</span><button class=action-button id=motionToggle>Toggle</button></div><div class=setting-row><span>Lightweight mode</span><button class=action-button id=lightToggle>Toggle</button></div><div class=content-card style=margin-top:18px><h3>Privacy note</h3><p>Settings are local UI preferences. This prototype has no OS-level privileges.</p></div>';
+if(app==="settings")return '<div class="settings-layout"><aside class="settings-sidebar" aria-label="Settings categories"><p class="settings-kicker">PREFERENCES</p><button class="settings-nav active" data-settings-section="appearance"><span>◐</span> Appearance</button><button class="settings-nav" data-settings-section="performance"><span>ϟ</span> Performance</button><button class="settings-nav" data-settings-section="notifications"><span>◉</span> Notifications</button><button class="settings-nav" data-settings-section="accessibility"><span>◎</span> Accessibility</button><button class="settings-nav" data-settings-section="system"><span>⌘</span> System</button></aside><div class="settings-main"><section class="settings-page" data-settings-page="appearance">'+heading("Appearance","Make NEXUS feel like your own.")+'<div class="settings-card"><div class="settings-card-heading"><h3>Accent colour</h3><p>Choose the highlight used across the interface.</p></div><div class="accent-options"><button class="accent-swatch" data-accent="#ffad7a" aria-label="Copper accent" title="Copper"></button><button class="accent-swatch" data-accent="#8b7cff" aria-label="Violet accent" title="Violet"></button><button class="accent-swatch" data-accent="#44c9e8" aria-label="Cyan accent" title="Cyan"></button><button class="accent-swatch" data-accent="#5ed3a3" aria-label="Emerald accent" title="Emerald"></button><button class="accent-swatch" data-accent="#ee82b6" aria-label="Rose accent" title="Rose"></button></div><p class="settings-hint" id="accentStatus">Copper is the default NEXUS accent.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Glass effects</h3><p>Adjust the transparency and blur of panels.</p></div><div class="setting-row"><div><strong>Glass blur</strong><small>Lower values use fewer visual effects.</small></div><div class="settings-range"><input id="blurSelect" type="range" min="0" max="28" value="18"><output id="blurValue">18 px</output></div></div></div></section><section class="settings-page hidden" data-settings-page="performance">'+heading("Performance","Choose how much visual effect the desktop uses.")+'<div class="settings-card"><div class="setting-row"><div><strong>Lightweight mode</strong><small>Reduce blur and shadows throughout the desktop.</small></div><button class="switch-button" id="lightToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">This changes prototype visuals only. Real CPU and memory optimisation requires the native NEXUS services.</div></div></section><section class="settings-page hidden" data-settings-page="notifications">'+heading("Notifications","Control how alerts are presented.")+'<div class="settings-card"><div class="setting-row"><div><strong>Do Not Disturb</strong><small>Quiet notification alerts while enabled.</small></div><button class="switch-button" id="dndToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">Notification delivery is a prototype feature. System-wide notification control is planned.</div></div></section><section class="settings-page hidden" data-settings-page="accessibility">'+heading("Accessibility","Make the interface more comfortable to use.")+'<div class="settings-card"><div class="setting-row"><div><strong>Reduce motion</strong><small>Limit animated transitions and movement.</small></div><button class="switch-button" id="motionToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">The system also respects your browser’s reduced-motion preference.</div></div></section><section class="settings-page hidden" data-settings-page="system">'+heading("System","NEXUS OS prototype information and preferences.")+'<div class="settings-card system-info"><div><span>Product</span><strong>NEXUS OS</strong></div><div><span>Version</span><strong>Desktop Prototype 0.2</strong></div><div><span>Platform</span><strong>Browser preview</strong></div></div><div class="settings-card"><div class="settings-card-heading"><h3>Reset preferences</h3><p>Restore the appearance and quick-setting preferences to their defaults.</p></div><button class="action-button" id="resetPreferences">Reset all preferences</button><p class="settings-hint">Your Notes content will not be deleted.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Privacy and security</h3><p>Preferences are stored locally in this browser. This prototype does not have operating-system privileges or access to hardware controls.</p></div></div></section></div></div>';
 if(app==="gaming")return heading("Gaming Hub","Discover your games and tune the experience.")+'<div class=card-grid><div class=content-card><h3>Steam</h3><p>Native Steam support is planned for the Linux-based future. This browser demo cannot launch Steam.</p></div><div class=content-card><h3>Performance</h3><p>Lightweight mode and reduced effects are available in Settings.</p></div><div class=content-card><h3>Controller</h3><p>Controller setup is a planned system feature.</p></div></div>';
 if(app==="monitor")return heading("System Monitor","Prototype metrics, not real hardware telemetry.")+'<div class=card-grid><div class=content-card><h3>Memory</h3><p>Demo meter — no actual RAM data is being read.</p><div style="height:8px;background:#333;border-radius:10px;margin-top:12px"><div style="height:8px;width:42%;background:var(--accent);border-radius:10px"></div></div></div><div class=content-card><h3>Storage</h3><p>Demo meter — storage usage is not connected.</p></div><div class=content-card><h3>CPU</h3><p>Telemetry integration planned for native Linux backend.</p></div></div>';
 if(app==="browser")return heading("Browser","Safe browser interface mockup.")+'<div class=browser-address><input id=browserUrl value="https://example.com" aria-label="URL"><button class=action-button id=browserGo>Open</button></div><div class=content-card style=margin-top:14px><h3>Browser preview</h3><p class=content-sub id=browserMsg>External pages are not loaded inside this demo. Use Open to visit a site in a new tab.</p></div>';
@@ -77,7 +81,67 @@ return heading(appNames[app],"Application preview");
 }
 function wireApp(app){
 if(app==="notes"){const n=$("#notesText");n.value=localStorage.getItem("nexus-note")||"";n.oninput=()=>{localStorage.setItem("nexus-note",n.value);$("#notesStatus").textContent="Saved locally"};$("#clearNotes").onclick=()=>{n.value="";localStorage.removeItem("nexus-note");$("#notesStatus").textContent="Cleared"}}
-if(app==="settings"){$("#accentSelect").onchange=e=>{document.documentElement.style.setProperty("--accent",e.target.value);localStorage.setItem("nexus-accent",e.target.value)};$("#blurSelect").oninput=e=>{document.documentElement.style.setProperty("--blur",e.target.value+"px");localStorage.setItem("nexus-blur",e.target.value)};$("#motionToggle").onclick=()=>{document.body.classList.toggle("reduced-motion");notify("Motion preference toggled (prototype)")};$("#lightToggle").onclick=()=>{desktop.classList.toggle("lightweight");document.documentElement.style.setProperty("--blur",desktop.classList.contains("lightweight")?"3px":"20px");notify("Lightweight mode toggled")}}
+if(app==="settings"){
+ const savedAccent=localStorage.getItem("nexus-accent")||"#ffad7a";
+ const savedBlur=localStorage.getItem("nexus-blur")||"18";
+ function setAccent(value){
+  document.documentElement.style.setProperty("--accent",value);
+  localStorage.setItem("nexus-accent",value);
+  $("[data-accent]").forEach(swatch=>{
+   const selected=swatch.dataset.accent===value;
+   swatch.classList.toggle("selected",selected);
+   swatch.setAttribute("aria-pressed",String(selected));
+  });
+  $("#accentStatus").textContent="Accent colour updated.";
+ }
+ $("[data-accent]").forEach(swatch=>swatch.onclick=()=>setAccent(swatch.dataset.accent));
+ setAccent(savedAccent);
+ const blur=$("#blurSelect"),blurValue=$("#blurValue");
+ blur.value=savedBlur;
+ function setBlur(){
+  document.documentElement.style.setProperty("--blur",blur.value+"px");
+  blurValue.value=blur.value+" px";
+  blurValue.textContent=blur.value+" px";
+  localStorage.setItem("nexus-blur",blur.value);
+ }
+ blur.oninput=setBlur;setBlur();
+ function setSwitch(button,enabled,onChange){
+  button.setAttribute("aria-checked",String(enabled));
+  button.classList.toggle("enabled",enabled);
+  button.textContent=enabled?"On":"Off";
+  button.onclick=()=>{const next=button.getAttribute("aria-checked")!=="true";onChange(next);setSwitch(button,next,onChange)};
+ }
+ setSwitch($("#lightToggle"),controlState.power,enabled=>setControlPreference("power",enabled));
+ setSwitch($("#dndToggle"),controlState.dnd,enabled=>setControlPreference("dnd",enabled));
+ const motionSaved=localStorage.getItem("nexus-reduced-motion")==="true";
+ function setMotion(enabled){
+  document.body.classList.toggle("reduced-motion",enabled);
+  localStorage.setItem("nexus-reduced-motion",String(enabled));
+ }
+ setMotion(motionSaved);
+ setSwitch($("#motionToggle"),motionSaved,setMotion);
+ $("[data-settings-section]").forEach(button=>button.onclick=()=>{
+  const section=button.dataset.settingsSection;
+  $("[data-settings-section]").forEach(item=>item.classList.toggle("active",item===button));
+  $("[data-settings-page]").forEach(page=>page.classList.toggle("hidden",page.dataset.settingsPage!==section));
+ });
+ $("#resetPreferences").onclick=()=>{
+  if(!window.confirm("Reset NEXUS appearance and quick-setting preferences? Your Notes will be kept."))return;
+  ["nexus-accent","nexus-blur","nexus-reduced-motion","nexus-brightness","nexus-volume",
+   "nexus-control-wifi","nexus-control-bluetooth","nexus-control-dnd","nexus-control-power"].forEach(key=>localStorage.removeItem(key));
+  document.documentElement.style.setProperty("--accent","#ffad7a");
+  document.documentElement.style.setProperty("--blur","18px");
+  document.body.classList.remove("reduced-motion");
+  brightness.value="100";volume.value="65";updateBrightness();updateVolume();
+  Object.entries(controlDefaults).forEach(([key,value])=>setControlPreference(key,value));
+  setAccent("#ffad7a");blur.value="18";setBlur();
+  setMotion(false);
+  setSwitch($("#lightToggle"),false,enabled=>setControlPreference("power",enabled));
+  setSwitch($("#dndToggle"),false,enabled=>setControlPreference("dnd",enabled));
+  setSwitch($("#motionToggle"),false,setMotion);
+  notify("NEXUS preferences restored");
+ };
+}
 if(app==="browser")$("#browserGo").onclick=()=>{let url=$("#browserUrl").value.trim();if(!/^https?:\/\//i.test(url))url="https://"+url;try{const u=new URL(url);if(!["http:","https:"].includes(u.protocol))throw 0;window.open(u.href,"_blank","noopener");$("#browserMsg").textContent="Opened external site in a new tab."}catch{$("#browserMsg").textContent="Please enter a valid HTTP or HTTPS address."}};
 if(app==="terminal"){const run=()=>{const inp=$("#terminalInput"),out=$("#terminalOut"),cmd=inp.value.trim().toLowerCase();const responses={help:"Demo commands: help, date, clear, about, apps, status",date:new Date().toString(),about:"NEXUS OS desktop prototype. No shell access.",apps:"Files, Browser, Notes, Terminal, Gaming Hub, System Monitor, Settings, Calculator",status:"Prototype status: UI active. System telemetry unavailable."};if(cmd==="clear")out.textContent="";else out.textContent+="\n> "+cmd+"\n"+(responses[cmd]||"Unknown demo command. Try help.");inp.value="";out.scrollTop=out.scrollHeight};$("#terminalSend").onclick=run;$("#terminalInput").onkeydown=e=>{if(e.key==="Enter")run()}}
 if(app==="calculator"){
@@ -222,5 +286,5 @@ $("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$( ".dock
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
 $("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
 $$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
-const savedAccent=localStorage.getItem("nexus-accent");if(savedAccent)document.documentElement.style.setProperty("--accent",savedAccent);const savedBlur=localStorage.getItem("nexus-blur");if(savedBlur)document.documentElement.style.setProperty("--blur",savedBlur+"px");
+const savedAccent=localStorage.getItem("nexus-accent");document.documentElement.style.setProperty("--accent",savedAccent||"#ffad7a");const savedBlur=localStorage.getItem("nexus-blur");document.documentElement.style.setProperty("--blur",(savedBlur||"18")+"px");if(localStorage.getItem("nexus-reduced-motion")==="true")document.body.classList.add("reduced-motion");
 })();
