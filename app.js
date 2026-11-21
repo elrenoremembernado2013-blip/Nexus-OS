@@ -1,6 +1,20 @@
 (() => {
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const desktop=$("#desktop"), control=$("#controlPanel"), launcher=$("#launcher"), win=$("#appWindow"), title=$("#windowTitle"), content=$("#windowContent"), toast=$("#toast");
+const wallpaperCatalog={
+ "mountain-night":"https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&fit=crop&w=2400&q=85",
+ "alpine":"https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2400&q=85",
+ "forest":"https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2400&q=85",
+ "cosmos":"https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2400&q=85",
+ "city":"https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2400&q=85",
+ "modern":"https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=2400&q=85"
+};
+function setDesktopWallpaper(id,persist=true){
+ const image=wallpaperCatalog[id];if(!image)return false;
+ desktop.style.backgroundImage='linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url("'+image+'")';
+ if(persist)localStorage.setItem("nexus-wallpaper",id);
+ return true;
+}
 let activeApp=null, toastTimer, maximized=false;
 const appNames={files:"Files",browser:"Browser",notes:"Notes",terminal:"Terminal",gaming:"Gaming Hub",monitor:"System Monitor",settings:"Settings",calculator:"Calculator"};
 function clock(){const d=new Date();$("#clock").textContent=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
@@ -82,18 +96,8 @@ return heading(appNames[app],"Application preview");
 function wireApp(app){
 if(app==="notes"){const n=$("#notesText");n.value=localStorage.getItem("nexus-note")||"";n.oninput=()=>{localStorage.setItem("nexus-note",n.value);$("#notesStatus").textContent="Saved locally"};$("#clearNotes").onclick=()=>{n.value="";localStorage.removeItem("nexus-note");$("#notesStatus").textContent="Cleared"}}
 if(app==="settings"){
- const wallpaperCatalog={
-  "mountain-night":"https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&fit=crop&w=2400&q=85",
-  "alpine":"https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2400&q=85",
-  "forest":"https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2400&q=85",
-  "cosmos":"https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2400&q=85",
-  "city":"https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2400&q=85",
-  "modern":"https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=2400&q=85"
- };
- function applyWallpaper(id){
-  const image=wallpaperCatalog[id];if(!image)return;
-  desktop.style.backgroundImage="linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url(\""+image+"\")";
-  localStorage.setItem("nexus-wallpaper",id);
+ function applyWallpaper(id,persist=true){
+  if(!setDesktopWallpaper(id,persist))return;
   $("[data-wallpaper]").forEach(item=>{const selected=item.dataset.wallpaper===id;item.classList.toggle("selected",selected);item.setAttribute("aria-pressed",String(selected));});
   $("#wallpaperStatus").textContent="Applied: "+$("#wallpaperGrid [data-wallpaper=\""+id+"\"] span").textContent;
  }
@@ -174,7 +178,7 @@ if(app==="settings"){
   document.documentElement.style.setProperty("--accent","#ffad7a");
   document.documentElement.style.setProperty("--blur","18px");
   desktop.classList.remove("theme-light");
-  desktop.style.backgroundImage="";
+  applyWallpaper("alpine",false);
   localStorage.setItem("nexus-theme","dark");
   document.body.classList.remove("reduced-motion");
   brightness.value="100";volume.value="65";updateBrightness();updateVolume();
@@ -331,5 +335,6 @@ $("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$( ".dock
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
 $("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
 $$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
+setDesktopWallpaper(localStorage.getItem("nexus-wallpaper")||"alpine",false);
 const savedAccent=localStorage.getItem("nexus-accent");document.documentElement.style.setProperty("--accent",savedAccent||"#ffad7a");const savedBlur=localStorage.getItem("nexus-blur");document.documentElement.style.setProperty("--blur",(savedBlur||"18")+"px");if(localStorage.getItem("nexus-reduced-motion")==="true")document.body.classList.add("reduced-motion");
 })();
