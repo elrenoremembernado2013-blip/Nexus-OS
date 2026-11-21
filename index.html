@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>NEXUS OS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="desktop" id="desktop">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">N</span><span>NEXUS</span></div>
+      <div class="top-center" id="clock">--:--</div>
+      <div class="top-actions">
+        <button class="top-icon" aria-label="Notifications" id="notificationButton">◉</button>
+        <button class="status-pill" id="controlButton"><span>⌁</span> Control Centre <span class="chevron">⌄</span></button>
+      </div>
+    </header>
+    <section class="desktop-welcome">
+      <p class="eyebrow">PERSONAL WORKSPACE</p>
+      <h1>Good evening.</h1>
+      <p class="welcome-sub">A quieter space to get things done.</p>
+    </section>
+    <div class="desktop-shortcuts" id="shortcuts">
+      <button class="shortcut" data-app="files"><span class="shortcut-icon">▤</span><span>Files</span></button>
+      <button class="shortcut" data-app="notes"><span class="shortcut-icon">✎</span><span>Notes</span></button>
+      <button class="shortcut" data-app="settings"><span class="shortcut-icon">⚙</span><span>Settings</span></button>
+      <button class="shortcut" data-app="gaming"><span class="shortcut-icon">⌘</span><span>Gaming</span></button>
+    </div>
+    <div class="dock-wrap"><nav class="dock" aria-label="Application dock">
+      <button class="dock-app launcher-app" id="launcherButton" title="App launcher">◈</button>
+      <span class="dock-separator"></span>
+      <button class="dock-app" data-app="files" title="Files">▤</button>
+      <button class="dock-app" data-app="browser" title="Browser">◉</button>
+      <button class="dock-app" data-app="notes" title="Notes">✎</button>
+      <button class="dock-app" data-app="terminal" title="Terminal">⌘</button>
+      <button class="dock-app" data-app="gaming" title="Gaming Hub">🎮</button>
+      <span class="dock-separator"></span>
+      <button class="dock-app" data-app="settings" title="Settings">⚙</button>
+    </nav></div>
+    <div class="panel control-panel hidden" id="controlPanel">
+      <div class="panel-heading"><div><h2>Control Centre</h2><p>Quick settings</p></div><button class="close-btn" data-close="controlPanel">×</button></div>
+      <div class="toggle-grid">
+        <button class="tile active" data-toggle="wifi"><span>⌁</span><b>Wi-Fi</b><small>Prototype toggle</small></button>
+        <button class="tile" data-toggle="bluetooth"><span>ᛒ</span><b>Bluetooth</b><small>Prototype toggle</small></button>
+        <button class="tile" data-toggle="dnd"><span>◐</span><b>Do Not Disturb</b><small>Notifications</small></button>
+        <button class="tile" data-toggle="power"><span>ϟ</span><b>Power Saver</b><small>Visual mode</small></button>
+      </div>
+      <div class="slider-row"><label for="brightness">Brightness</label><input id="brightness" type="range" min="45" max="100" value="100"></div>
+      <div class="slider-row"><label for="volume">Volume</label><input id="volume" type="range" min="0" max="100" value="65"></div>
+      <div class="panel-foot">These controls are simulated in this web prototype.</div>
+    </div>
+    <div class="panel notification-panel hidden" id="notificationPanel">
+      <div class="panel-heading"><div><h2>Notifications</h2><p id="notificationSub">You're all caught up.</p></div><button class="close-btn" data-close="notificationPanel">×</button></div>
+      <div class="empty-state"><span>◌</span><p>No new notifications</p><small>Updates will appear here.</small></div>
+    </div>
+    <section class="launcher hidden" id="launcher">
+      <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
+      <div class="app-grid" id="appGrid">
+        <button class="app-item" data-app="files"><span>▤</span>Files</button><button class="app-item" data-app="browser"><span>◉</span>Browser</button>
+        <button class="app-item" data-app="notes"><span>✎</span>Notes</button><button class="app-item" data-app="terminal"><span>⌘</span>Terminal</button>
+        <button class="app-item" data-app="gaming"><span>🎮</span>Gaming Hub</button><button class="app-item" data-app="monitor"><span>▥</span>System Monitor</button>
+        <button class="app-item" data-app="settings"><span>⚙</span>Settings</button><button class="app-item" data-app="calculator"><span>＋</span>Calculator</button>
+      </div>
+    </section>
+    <section class="window hidden" id="appWindow" aria-live="polite">
+      <div class="window-titlebar"><div class="window-controls"><button class="window-control close" id="windowClose" aria-label="Close">×</button><button class="window-control minimize" id="windowMin" aria-label="Minimize">−</button></div><span id="windowTitle">Application</span><button class="window-control maximize" id="windowMax" aria-label="Maximize">□</button></div>
+      <div class="window-content" id="windowContent"></div>
+    </section>
+    <div class="toast hidden" id="toast"></div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
