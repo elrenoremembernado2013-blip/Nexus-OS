@@ -111,3 +111,24 @@
 }
 .dock-app.minimized{opacity:.58}
 .dock-app.minimized::after{width:3px;height:3px;opacity:.65}
+
+
+/* Control Centre refinement */
+.slider-control{display:flex;align-items:center;gap:10px;min-width:0}
+.slider-control input{width:132px;accent-color:var(--accent)}
+.slider-control output{width:36px;text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:var(--text)}
+.tile{min-height:104px;transition:background .18s,border-color .18s,transform .18s}
+.tile:active{transform:scale(.985)}
+.tile:focus-visible,.clear-notifications:focus-visible,.close-btn:focus-visible,
+.top-icon:focus-visible,.status-pill:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.desktop.lightweight .panel,.desktop.lightweight .launcher,.desktop.lightweight .window,
+.desktop.lightweight .topbar,.desktop.lightweight .dock{
+ backdrop-filter:blur(4px);
+ box-shadow:0 12px 32px rgba(0,0,0,.28);
+}
+.desktop.lightweight .dock-app,.desktop.lightweight .tile{transition:none}
+@media(max-width:600px){
+ .slider-control{flex:1;justify-content:flex-end}
+ .slider-control input{width:min(38vw,132px)}
+ .tile{min-height:96px}
+}
