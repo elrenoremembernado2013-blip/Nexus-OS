@@ -459,3 +459,5 @@
  .custom-wallpaper-import{grid-template-columns:1fr}
  .custom-wallpaper-button,.custom-wallpaper-remove{grid-column:1;grid-row:auto}
 }
+
+.custom-wallpaper-remove[hidden]{display:none!important}
