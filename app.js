@@ -193,7 +193,7 @@ if(app==="settings"){
  async function restoreCustomWallpaper(){
   try{
    if(startupCustomWallpaperUrl){customWallpaperUrl=startupCustomWallpaperUrl;startupCustomWallpaperUrl=null;}
-   const blob=customWallpaperUrl?customWallpaperBlob:await readCustomWallpaper();
+   const blob=await readCustomWallpaper();
    if(!blob)return;
    if(!["image/jpeg","image/png","image/webp"].includes(blob.type))return;
    const url=customWallpaperUrl||URL.createObjectURL(blob);
