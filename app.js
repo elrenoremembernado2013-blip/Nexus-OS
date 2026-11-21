@@ -133,8 +133,16 @@ if(app==="settings"){
  setSwitch($("#motionToggle"),motionSaved,setMotion);
  $("[data-settings-section]").forEach(button=>button.onclick=()=>{
   const section=button.dataset.settingsSection;
-  $("[data-settings-section]").forEach(item=>item.classList.toggle("active",item===button));
-  $("[data-settings-page]").forEach(page=>page.classList.toggle("hidden",page.dataset.settingsPage!==section));
+  $("[data-settings-section]").forEach(item=>{
+   const selected=item===button;
+   item.classList.toggle("active",selected);
+   if(selected)item.setAttribute("aria-current","page");else item.removeAttribute("aria-current");
+  });
+  $("[data-settings-page]").forEach(page=>{
+   const selected=page.dataset.settingsPage===section;
+   page.classList.toggle("hidden",!selected);
+   if(selected){page.classList.remove("settings-enter");void page.offsetWidth;page.classList.add("settings-enter");}
+  });
  });
  $("#resetPreferences").onclick=()=>{
   if(!window.confirm("Reset NEXUS appearance and quick-setting preferences? Your Notes will be kept."))return;
