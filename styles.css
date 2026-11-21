@@ -416,3 +416,26 @@
 .desktop.theme-light .wallpaper-filter.active{color:var(--text);background:color-mix(in srgb,var(--accent) 18%,white)}
 @media(max-width:620px){.wallpaper-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wallpaper-option{aspect-ratio:1.4/1}.wallpaper-footer{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.wallpaper-option,.wallpaper-option img,.wallpaper-filter{transition:none}.wallpaper-option:hover{transform:none}.wallpaper-option:hover img{transform:none}}
+
+/* Wallpaper preview dialog */
+.wallpaper-preview-dialog{
+ width:min(760px,calc(100vw - 32px));max-width:760px;max-height:calc(100vh - 36px);
+ padding:0;border:1px solid rgba(255,255,255,.2);border-radius:22px;
+ color:var(--text);background:rgba(20,23,32,.88);
+ box-shadow:0 28px 90px rgba(0,0,0,.58);backdrop-filter:blur(28px) saturate(145%);
+}
+.wallpaper-preview-dialog::backdrop{background:rgba(4,7,14,.68);backdrop-filter:blur(7px)}
+.wallpaper-preview-shell{padding:20px}
+.wallpaper-preview-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.wallpaper-preview-heading .settings-kicker{margin:0 0 5px}
+.wallpaper-preview-heading h3{margin:0;font-size:18px;font-weight:650}
+.preview-close{width:34px;height:34px;border:1px solid rgba(255,255,255,.14);border-radius:50%;background:rgba(255,255,255,.07);color:var(--text);font-size:22px;cursor:pointer}
+.wallpaper-preview-image{display:block;width:100%;max-height:min(55vh,440px);aspect-ratio:16/9;object-fit:cover;border-radius:14px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.04)}
+.wallpaper-preview-caption{margin:12px 0;color:var(--muted);font-size:12px;line-height:1.5}
+.wallpaper-preview-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}
+.wallpaper-preview-actions .action-button{min-width:112px}
+.wallpaper-preview-actions .preview-apply{background:var(--accent);color:#17151a;border-color:transparent;font-weight:700}
+.wallpaper-preview-actions .preview-cancel{background:rgba(255,255,255,.07)}
+.desktop.theme-light .wallpaper-preview-dialog{background:rgba(247,247,250,.94);border-color:rgba(30,30,40,.16)}
+@media(max-width:520px){.wallpaper-preview-shell{padding:14px}.wallpaper-preview-actions{flex-direction:column-reverse}.wallpaper-preview-actions .action-button{width:100%}}
+@media(prefers-reduced-motion:reduce){.wallpaper-preview-dialog{scroll-behavior:auto}}
