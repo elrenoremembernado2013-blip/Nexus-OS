@@ -85,7 +85,13 @@ function appView(app){
 const heading=(t,s)=>'<h2 class="content-title">'+t+'</h2><p class="content-sub">'+s+'</p>';
 if(app==="files")return heading("Files","A simple workspace preview.")+'<div class=card-grid><div class=content-card><h3>Home</h3><p>Personal files and folders</p></div><div class=content-card><h3>Documents</h3><p>Saved documents</p></div><div class=content-card><h3>Downloads</h3><p>Downloaded items</p></div><div class=content-card><h3>Pictures</h3><p>Images and wallpapers</p></div></div><p class=content-sub style=margin-top:20px>This is a mock file browser. It does not access your computer’s files yet.</p>';
 if(app==="notes")return heading("Notes","Your notes are saved locally in this browser.")+'<textarea class="note-area" id="notesText" placeholder="Write something…"></textarea><div style="display:flex;justify-content:space-between;margin-top:10px"><small class=content-sub id=notesStatus>Autosave ready</small><button class=action-button id=clearNotes>Clear note</button></div>';
-if(app==="settings")return '<div class="settings-layout"><aside class="settings-sidebar" aria-label="Settings categories"><p class="settings-kicker">PREFERENCES</p><button class="settings-nav active" data-settings-section="appearance"><span>◐</span> Appearance</button><button class="settings-nav" data-settings-section="performance"><span>ϟ</span> Performance</button><button class="settings-nav" data-settings-section="notifications"><span>◉</span> Notifications</button><button class="settings-nav" data-settings-section="accessibility"><span>◎</span> Accessibility</button><button class="settings-nav" data-settings-section="system"><span>⌘</span> System</button></aside><div class="settings-main"><section class="settings-page" data-settings-page="appearance">'+heading("Appearance","Make NEXUS feel like your own.")+'<div class="settings-card"><div class="settings-card-heading"><h3>Desktop theme</h3><p>Choose the overall look of your workspace.</p></div><div class="theme-options"><button class="theme-choice" data-theme-choice="dark" type="button">Dark</button><button class="theme-choice" data-theme-choice="light" type="button">Light</button><button class="theme-choice" data-theme-choice="system" type="button">System</button></div><p class="settings-hint" id="themeStatus">Dark theme selected.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Accent colour</h3><p>Choose the highlight used across the interface.</p></div><div class="accent-options"><button class="accent-swatch" data-accent="#ffad7a" aria-label="Copper accent" title="Copper"></button><button class="accent-swatch" data-accent="#8b7cff" aria-label="Violet accent" title="Violet"></button><button class="accent-swatch" data-accent="#44c9e8" aria-label="Cyan accent" title="Cyan"></button><button class="accent-swatch" data-accent="#5ed3a3" aria-label="Emerald accent" title="Emerald"></button><button class="accent-swatch" data-accent="#ee82b6" aria-label="Rose accent" title="Rose"></button></div><p class="settings-hint" id="accentStatus">Copper is the default NEXUS accent.</p></div><div class="settings-card wallpaper-card"><div class="settings-card-heading"><h3>Desktop wallpaper</h3><p>Choose a photographic background for your workspace. Images are served by Unsplash.</p></div><div class="wallpaper-filters" role="group" aria-label="Wallpaper categories"><button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button><button class="wallpaper-filter" data-wallpaper-filter="nature" type="button">Nature</button><button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space</button><button class="wallpaper-filter" data-wallpaper-filter="architecture" type="button">Architecture</button></div><div class="wallpaper-grid" id="wallpaperGrid"><button class="wallpaper-option" type="button" data-wallpaper="mountain-night" data-category="nature" aria-label="Apply mountain night wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Starry sky above a mountain range"><span>Mountain Night</span></button><button class="wallpaper-option" type="button" data-wallpaper="alpine" data-category="nature" aria-label="Apply alpine landscape wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Dramatic alpine mountain peaks"><span>Alpine</span></button><button class="wallpaper-option" type="button" data-wallpaper="forest" data-category="nature" aria-label="Apply forest wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Sunlight through a green forest"><span>Forest</span></button><button class="wallpaper-option" type="button" data-wallpaper="cosmos" data-category="space" aria-label="Apply cosmos wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Colourful deep space nebula"><span>Cosmos</span></button><button class="wallpaper-option" type="button" data-wallpaper="city" data-category="architecture" aria-label="Apply city wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="City skyline at dusk"><span>City Lights</span></button><button class="wallpaper-option" type="button" data-wallpaper="modern" data-category="architecture" aria-label="Apply architecture wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Modern architectural structure"><span>Architecture</span></button></div><div class="wallpaper-footer"><p class="settings-hint" id="wallpaperStatus">Choose a wallpaper to see a larger preview before applying it.</p><a href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer">Unsplash licence</a></div><dialog class="wallpaper-preview-dialog" id="wallpaperPreviewDialog" aria-labelledby="wallpaperPreviewTitle"><div class="wallpaper-preview-shell"><div class="wallpaper-preview-heading"><div><p class="settings-kicker">DESKTOP PREVIEW</p><h3 id="wallpaperPreviewTitle">Wallpaper preview</h3></div><button class="preview-close" type="button" data-preview-close aria-label="Close preview">×</button></div><img id="wallpaperPreviewImage" class="wallpaper-preview-image" alt="Large preview of the selected wallpaper"><p class="wallpaper-preview-caption" id="wallpaperPreviewCaption">This will become your desktop background.</p><div class="wallpaper-preview-actions"><button class="action-button preview-cancel" type="button" data-preview-close>Cancel</button><button class="action-button preview-apply" id="applyWallpaperPreview" type="button">Apply wallpaper</button></div></div></dialog></div><div class="settings-card"><div class="settings-card-heading"><h3>Glass effects</h3><p>Adjust the transparency and blur of panels.</p></div><div class="setting-row"><div><strong>Glass blur</strong><small>Lower values use fewer visual effects.</small></div><div class="settings-range"><input id="blurSelect" type="range" min="0" max="28" value="18"><output id="blurValue">18 px</output></div></div></div></section><section class="settings-page hidden" data-settings-page="performance">'+heading("Performance","Choose how much visual effect the desktop uses.")+'<div class="settings-card"><div class="setting-row"><div><strong>Lightweight mode</strong><small>Reduce blur and shadows throughout the desktop.</small></div><button class="switch-button" id="lightToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">This changes prototype visuals only. Real CPU and memory optimisation requires the native NEXUS services.</div></div></section><section class="settings-page hidden" data-settings-page="notifications">'+heading("Notifications","Control how alerts are presented.")+'<div class="settings-card"><div class="setting-row"><div><strong>Do Not Disturb</strong><small>Quiet notification alerts while enabled.</small></div><button class="switch-button" id="dndToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">Notification delivery is a prototype feature. System-wide notification control is planned.</div></div></section><section class="settings-page hidden" data-settings-page="accessibility">'+heading("Accessibility","Make the interface more comfortable to use.")+'<div class="settings-card"><div class="setting-row"><div><strong>Reduce motion</strong><small>Limit animated transitions and movement.</small></div><button class="switch-button" id="motionToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">The system also respects your browser’s reduced-motion preference.</div></div></section><section class="settings-page hidden" data-settings-page="system">'+heading("System","NEXUS OS prototype information and preferences.")+'<div class="settings-card system-info"><div><span>Product</span><strong>NEXUS OS</strong></div><div><span>Version</span><strong>Desktop Prototype 0.2</strong></div><div><span>Platform</span><strong>Browser preview</strong></div></div><div class="settings-card"><div class="settings-card-heading"><h3>Reset preferences</h3><p>Restore the appearance and quick-setting preferences to their defaults.</p></div><button class="action-button" id="resetPreferences">Reset all preferences</button><p class="settings-hint">Your Notes content will not be deleted.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Privacy and security</h3><p>Preferences are stored locally in this browser. This prototype does not have operating-system privileges or access to hardware controls.</p></div></div></section></div></div>';
+if(app==="settings")return '<div class="settings-layout"><aside class="settings-sidebar" aria-label="Settings categories"><p class="settings-kicker">PREFERENCES</p><button class="settings-nav active" data-settings-section="appearance"><span>◐</span> Appearance</button><button class="settings-nav" data-settings-section="performance"><span>ϟ</span> Performance</button><button class="settings-nav" data-settings-section="notifications"><span>◉</span> Notifications</button><button class="settings-nav" data-settings-section="accessibility"><span>◎</span> Accessibility</button><button class="settings-nav" data-settings-section="system"><span>⌘</span> System</button></aside><div class="settings-main"><section class="settings-page" data-settings-page="appearance">'+heading("Appearance","Make NEXUS feel like your own.")+'<div class="settings-card"><div class="settings-card-heading"><h3>Desktop theme</h3><p>Choose the overall look of your workspace.</p></div><div class="theme-options"><button class="theme-choice" data-theme-choice="dark" type="button">Dark</button><button class="theme-choice" data-theme-choice="light" type="button">Light</button><button class="theme-choice" data-theme-choice="system" type="button">System</button></div><p class="settings-hint" id="themeStatus">Dark theme selected.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Accent colour</h3><p>Choose the highlight used across the interface.</p></div><div class="accent-options"><button class="accent-swatch" data-accent="#ffad7a" aria-label="Copper accent" title="Copper"></button><button class="accent-swatch" data-accent="#8b7cff" aria-label="Violet accent" title="Violet"></button><button class="accent-swatch" data-accent="#44c9e8" aria-label="Cyan accent" title="Cyan"></button><button class="accent-swatch" data-accent="#5ed3a3" aria-label="Emerald accent" title="Emerald"></button><button class="accent-swatch" data-accent="#ee82b6" aria-label="Rose accent" title="Rose"></button></div><p class="settings-hint" id="accentStatus">Copper is the default NEXUS accent.</p></div><div class="settings-card wallpaper-card"><div class="settings-card-heading"><h3>Desktop wallpaper</h3><p>Choose a photographic background for your workspace. Images are served by Unsplash.</p></div><div class="wallpaper-filters" role="group" aria-label="Wallpaper categories"><button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button><button class="wallpaper-filter" data-wallpaper-filter="nature" type="button">Nature</button><button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space</button><button class="wallpaper-filter" data-wallpaper-filter="architecture" type="button">Architecture</button></div><div class="wallpaper-grid" id="wallpaperGrid"><button class="wallpaper-option" type="button" data-wallpaper="mountain-night" data-category="nature" aria-label="Apply mountain night wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Starry sky above a mountain range"><span>Mountain Night</span></button><button class="wallpaper-option" type="button" data-wallpaper="alpine" data-category="nature" aria-label="Apply alpine landscape wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Dramatic alpine mountain peaks"><span>Alpine</span></button><button class="wallpaper-option" type="button" data-wallpaper="forest" data-category="nature" aria-label="Apply forest wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Sunlight through a green forest"><span>Forest</span></button><button class="wallpaper-option" type="button" data-wallpaper="cosmos" data-category="space" aria-label="Apply cosmos wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Colourful deep space nebula"><span>Cosmos</span></button><button class="wallpaper-option" type="button" data-wallpaper="city" data-category="architecture" aria-label="Apply city wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="City skyline at dusk"><span>City Lights</span></button><button class="wallpaper-option" type="button" data-wallpaper="modern" data-category="architecture" aria-label="Apply architecture wallpaper"><img loading="lazy" src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&amp;fit=crop&amp;w=520&amp;q=75" alt="Modern architectural structure"><span>Architecture</span></button><div class="custom-wallpaper-import">
+ <div class="custom-wallpaper-copy"><strong>Use your own image</strong><small>Choose a JPEG, PNG or WebP image up to 8 MB. Your image stays on this device.</small></div>
+ <input id="customWallpaperFile" class="custom-wallpaper-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose a custom wallpaper image">
+ <button class="action-button custom-wallpaper-button" id="chooseCustomWallpaper" type="button">Import image</button>
+ <button class="action-button custom-wallpaper-remove" id="removeCustomWallpaper" type="button" hidden>Remove custom image</button>
+ <p class="settings-hint custom-wallpaper-status" id="customWallpaperStatus" role="status">No custom wallpaper imported.</p>
+</div></div><div class="wallpaper-footer"><p class="settings-hint" id="wallpaperStatus">Choose a wallpaper to see a larger preview before applying it.</p><a href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer">Unsplash licence</a></div><dialog class="wallpaper-preview-dialog" id="wallpaperPreviewDialog" aria-labelledby="wallpaperPreviewTitle"><div class="wallpaper-preview-shell"><div class="wallpaper-preview-heading"><div><p class="settings-kicker">DESKTOP PREVIEW</p><h3 id="wallpaperPreviewTitle">Wallpaper preview</h3></div><button class="preview-close" type="button" data-preview-close aria-label="Close preview">×</button></div><img id="wallpaperPreviewImage" class="wallpaper-preview-image" alt="Large preview of the selected wallpaper"><p class="wallpaper-preview-caption" id="wallpaperPreviewCaption">This will become your desktop background.</p><div class="wallpaper-preview-actions"><button class="action-button preview-cancel" type="button" data-preview-close>Cancel</button><button class="action-button preview-apply" id="applyWallpaperPreview" type="button">Apply wallpaper</button></div></div></dialog></div><div class="settings-card"><div class="settings-card-heading"><h3>Glass effects</h3><p>Adjust the transparency and blur of panels.</p></div><div class="setting-row"><div><strong>Glass blur</strong><small>Lower values use fewer visual effects.</small></div><div class="settings-range"><input id="blurSelect" type="range" min="0" max="28" value="18"><output id="blurValue">18 px</output></div></div></div></section><section class="settings-page hidden" data-settings-page="performance">'+heading("Performance","Choose how much visual effect the desktop uses.")+'<div class="settings-card"><div class="setting-row"><div><strong>Lightweight mode</strong><small>Reduce blur and shadows throughout the desktop.</small></div><button class="switch-button" id="lightToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">This changes prototype visuals only. Real CPU and memory optimisation requires the native NEXUS services.</div></div></section><section class="settings-page hidden" data-settings-page="notifications">'+heading("Notifications","Control how alerts are presented.")+'<div class="settings-card"><div class="setting-row"><div><strong>Do Not Disturb</strong><small>Quiet notification alerts while enabled.</small></div><button class="switch-button" id="dndToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">Notification delivery is a prototype feature. System-wide notification control is planned.</div></div></section><section class="settings-page hidden" data-settings-page="accessibility">'+heading("Accessibility","Make the interface more comfortable to use.")+'<div class="settings-card"><div class="setting-row"><div><strong>Reduce motion</strong><small>Limit animated transitions and movement.</small></div><button class="switch-button" id="motionToggle" type="button" role="switch" aria-checked="false">Off</button></div><div class="settings-row-note">The system also respects your browser’s reduced-motion preference.</div></div></section><section class="settings-page hidden" data-settings-page="system">'+heading("System","NEXUS OS prototype information and preferences.")+'<div class="settings-card system-info"><div><span>Product</span><strong>NEXUS OS</strong></div><div><span>Version</span><strong>Desktop Prototype 0.2</strong></div><div><span>Platform</span><strong>Browser preview</strong></div></div><div class="settings-card"><div class="settings-card-heading"><h3>Reset preferences</h3><p>Restore the appearance and quick-setting preferences to their defaults.</p></div><button class="action-button" id="resetPreferences">Reset all preferences</button><p class="settings-hint">Your Notes content will not be deleted.</p></div><div class="settings-card"><div class="settings-card-heading"><h3>Privacy and security</h3><p>Preferences are stored locally in this browser. This prototype does not have operating-system privileges or access to hardware controls.</p></div></div></section></div></div>';
 if(app==="gaming")return heading("Gaming Hub","Discover your games and tune the experience.")+'<div class=card-grid><div class=content-card><h3>Steam</h3><p>Native Steam support is planned for the Linux-based future. This browser demo cannot launch Steam.</p></div><div class=content-card><h3>Performance</h3><p>Lightweight mode and reduced effects are available in Settings.</p></div><div class=content-card><h3>Controller</h3><p>Controller setup is a planned system feature.</p></div></div>';
 if(app==="monitor")return heading("System Monitor","Prototype metrics, not real hardware telemetry.")+'<div class=card-grid><div class=content-card><h3>Memory</h3><p>Demo meter — no actual RAM data is being read.</p><div style="height:8px;background:#333;border-radius:10px;margin-top:12px"><div style="height:8px;width:42%;background:var(--accent);border-radius:10px"></div></div></div><div class=content-card><h3>Storage</h3><p>Demo meter — storage usage is not connected.</p></div><div class=content-card><h3>CPU</h3><p>Telemetry integration planned for native Linux backend.</p></div></div>';
 if(app==="browser")return heading("Browser","Safe browser interface mockup.")+'<div class=browser-address><input id=browserUrl value="https://example.com" aria-label="URL"><button class=action-button id=browserGo>Open</button></div><div class=content-card style=margin-top:14px><h3>Browser preview</h3><p class=content-sub id=browserMsg>External pages are not loaded inside this demo. Use Open to visit a site in a new tab.</p></div>';
@@ -101,14 +107,132 @@ if(app==="settings"){
   $("[data-wallpaper]").forEach(item=>{const selected=item.dataset.wallpaper===id;item.classList.toggle("selected",selected);item.setAttribute("aria-pressed",String(selected));});
   $("#wallpaperStatus").textContent="Applied: "+$("#wallpaperGrid [data-wallpaper=\""+id+"\"] span").textContent;
  }
+ const customWallpaperKey="custom";
+ let customWallpaperBlob=null;
+ let customWallpaperUrl=null;
+ let pendingCustomWallpaper=null;
+ let pendingCustomUrl=null;
+ function openWallpaperDatabase(){
+  return new Promise((resolve,reject)=>{
+   if(!("indexedDB" in window)){reject(new Error("Local image storage is not supported in this browser."));return;}
+   const request=indexedDB.open("nexus-wallpaper-store",1);
+   request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains("wallpapers"))db.createObjectStore("wallpapers");};
+   request.onsuccess=()=>resolve(request.result);
+   request.onerror=()=>reject(new Error("Could not open local wallpaper storage."));
+  });
+ }
+ async function readCustomWallpaper(){
+  const db=await openWallpaperDatabase();
+  return new Promise((resolve,reject)=>{
+   const tx=db.transaction("wallpapers","readonly");
+   const request=tx.objectStore("wallpapers").get(customWallpaperKey);
+   request.onsuccess=()=>{resolve(request.result||null);db.close();};
+   request.onerror=()=>{db.close();reject(new Error("Could not read the saved custom wallpaper."));};
+  });
+ }
+ async function saveCustomWallpaper(blob){
+  const db=await openWallpaperDatabase();
+  return new Promise((resolve,reject)=>{
+   const tx=db.transaction("wallpapers","readwrite");
+   tx.objectStore("wallpapers").put(blob,customWallpaperKey);
+   tx.oncomplete=()=>{db.close();resolve();};
+   tx.onerror=()=>{db.close();reject(new Error("Could not save the custom wallpaper."));};
+   tx.onabort=()=>{db.close();reject(new Error("Saving the custom wallpaper was cancelled."));};
+  });
+ }
+ async function deleteCustomWallpaper(){
+  const db=await openWallpaperDatabase();
+  return new Promise((resolve,reject)=>{
+   const tx=db.transaction("wallpapers","readwrite");
+   tx.objectStore("wallpapers").delete(customWallpaperKey);
+   tx.oncomplete=()=>{db.close();resolve();};
+   tx.onerror=()=>{db.close();reject(new Error("Could not remove the saved custom wallpaper."));};
+   tx.onabort=()=>{db.close();reject(new Error("Removing the custom wallpaper was cancelled."));};
+  });
+ }
+ function releaseCustomWallpaperUrls(){
+  if(customWallpaperUrl){URL.revokeObjectURL(customWallpaperUrl);customWallpaperUrl=null;}
+  if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}
+ }
+ function setCustomWallpaper(blob,url){
+  if(customWallpaperUrl&&customWallpaperUrl!==url)URL.revokeObjectURL(customWallpaperUrl);
+  customWallpaperBlob=blob;customWallpaperUrl=url;
+  desktop.style.backgroundImage='linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url("'+url+'")';
+  localStorage.setItem("nexus-wallpaper","custom");
+  $("[data-wallpaper]").forEach(item=>{item.classList.remove("selected");item.setAttribute("aria-pressed","false");});
+  $("#wallpaperStatus").textContent="Applied: Custom wallpaper";
+  $("#customWallpaperStatus").textContent="Your custom wallpaper is saved on this device.";
+  $("#removeCustomWallpaper").hidden=false;
+ }
+ async function restoreCustomWallpaper(){
+  try{
+   const blob=await readCustomWallpaper();
+   if(!blob)return;
+   if(!["image/jpeg","image/png","image/webp"].includes(blob.type))return;
+   const url=URL.createObjectURL(blob);
+   customWallpaperBlob=blob;customWallpaperUrl=url;
+   if(localStorage.getItem("nexus-wallpaper")==="custom"){
+    desktop.style.backgroundImage='linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url("'+url+'")';
+    $("#wallpaperStatus").textContent="Applied: Custom wallpaper";
+   }
+   $("#customWallpaperStatus").textContent="A custom wallpaper is saved on this device.";
+   $("#removeCustomWallpaper").hidden=false;
+  }catch(error){$("#customWallpaperStatus").textContent=error.message;}
+ }
+ const customInput=$("#customWallpaperFile");
+ $("#chooseCustomWallpaper").onclick=()=>customInput.click();
+ customInput.onchange=async()=>{
+  const file=customInput.files&&customInput.files[0];customInput.value="";
+  if(!file)return;
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)){
+   $("#customWallpaperStatus").textContent="Unsupported image. Please choose JPEG, PNG or WebP.";return;
+  }
+  if(file.size>8*1024*1024){
+   $("#customWallpaperStatus").textContent="That image is larger than 8 MB. Choose a smaller file.";return;
+  }
+  const candidateUrl=URL.createObjectURL(file);
+  const image=new Image();
+  image.onload=()=>{
+   if(!image.naturalWidth||!image.naturalHeight||image.naturalWidth>12000||image.naturalHeight>12000){
+    URL.revokeObjectURL(candidateUrl);
+    $("#customWallpaperStatus").textContent="This image has invalid or unusually large dimensions.";return;
+   }
+   if(pendingCustomUrl)URL.revokeObjectURL(pendingCustomUrl);
+   pendingCustomUrl=candidateUrl;pendingCustomWallpaper=file;
+   $("#wallpaperPreviewTitle").textContent=file.name;
+   $("#wallpaperPreviewImage").src=candidateUrl;
+   $("#wallpaperPreviewImage").alt="Preview of your imported image";
+   $("#wallpaperPreviewCaption").textContent="Preview only — your current wallpaper will remain until you apply this image.";
+   $("#applyWallpaperPreview").textContent="Save and apply";
+   $("#customWallpaperStatus").textContent="Image ready to preview: "+file.name;
+   if(!previewDialog.open)previewDialog.showModal();
+   $("#applyWallpaperPreview").focus();
+  };
+  image.onerror=()=>{URL.revokeObjectURL(candidateUrl);$("#customWallpaperStatus").textContent="The selected file could not be read as a valid image.";};
+  image.src=candidateUrl;
+ };
+ $("#removeCustomWallpaper").onclick=async()=>{
+  try{
+   await deleteCustomWallpaper();
+   const wasApplied=localStorage.getItem("nexus-wallpaper")==="custom";
+   if(wasApplied){localStorage.removeItem("nexus-wallpaper");setDesktopWallpaper("alpine",false);localStorage.setItem("nexus-wallpaper","alpine");}
+   if(customWallpaperUrl){URL.revokeObjectURL(customWallpaperUrl);customWallpaperUrl=null;}
+   customWallpaperBlob=null;
+   $("#removeCustomWallpaper").hidden=true;
+   $("#customWallpaperStatus").textContent="Custom wallpaper removed from this device.";
+   $("#wallpaperStatus").textContent=wasApplied?"Applied: Alpine":"Your current wallpaper is unchanged.";
+  }catch(error){$("#customWallpaperStatus").textContent=error.message;}
+ };
+ restoreCustomWallpaper();
  const savedWallpaper=localStorage.getItem("nexus-wallpaper")||"alpine";
  applyWallpaper(savedWallpaper);
  let pendingWallpaper=null;
  const previewDialog=$("#wallpaperPreviewDialog");
- function closeWallpaperPreview(){if(previewDialog.open)previewDialog.close();pendingWallpaper=null;}
+ function closeWallpaperPreview(){if(previewDialog.open)previewDialog.close();pendingWallpaper=null;pendingCustomWallpaper=null;if(pendingCustomUrl){URL.revokeObjectURL(pendingCustomUrl);pendingCustomUrl=null;}}
  function openWallpaperPreview(id){
   const item=$('[data-wallpaper="'+id+'"]');if(!item||!wallpaperCatalog[id])return;
-  pendingWallpaper=id;
+  pendingWallpaper=id;pendingCustomWallpaper=null;
+  $("#applyWallpaperPreview").textContent="Apply wallpaper";
   $("#wallpaperPreviewTitle").textContent=item.querySelector("span").textContent;
   $("#wallpaperPreviewImage").src=wallpaperCatalog[id];
   $("#wallpaperPreviewImage").alt=item.querySelector("img").alt;
@@ -122,7 +246,21 @@ if(app==="settings"){
  previewDialog.addEventListener("close",()=>{pendingWallpaper=null});
  $("#applyWallpaperPreview").onclick=()=>{
   const chosen=pendingWallpaper;
-  if(chosen){applyWallpaper(chosen);const chosenItem=$('[data-wallpaper="'+chosen+'"]');$("#wallpaperStatus").textContent="Applied: "+chosenItem.querySelector("span").textContent;}
+  const customFile=pendingCustomWallpaper;
+  const customUrl=pendingCustomUrl;
+  if(customFile&&customUrl){
+   try{
+    await saveCustomWallpaper(customFile);
+    pendingCustomUrl=null;
+    setCustomWallpaper(customFile,customUrl);
+    $("#applyWallpaperPreview").textContent="Apply wallpaper";
+   }catch(error){$("#customWallpaperStatus").textContent=error.message;return;}
+  }else if(chosen){
+   applyWallpaper(chosen);
+   const chosenItem=$('[data-wallpaper="'+chosen+'"]');
+   $("#wallpaperStatus").textContent="Applied: "+chosenItem.querySelector("span").textContent;
+   $("#applyWallpaperPreview").textContent="Apply wallpaper";
+  }
   closeWallpaperPreview();
  };
  $("[data-wallpaper-filter]").forEach(filter=>filter.onclick=()=>{
