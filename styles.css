@@ -93,3 +93,21 @@
 }
 .notification-empty p{margin:0 0 4px;font-size:12px;color:var(--text)}
 .notification-empty small{font-size:10px}
+
+
+/* Dock indicators for running and minimised applications */
+.dock-app{position:relative}
+.dock-app.running::after{
+ content:"";
+ position:absolute;
+ left:50%;
+ bottom:-5px;
+ width:4px;
+ height:4px;
+ border-radius:50%;
+ background:var(--accent);
+ transform:translateX(-50%);
+ box-shadow:0 0 8px color-mix(in srgb,var(--accent) 65%,transparent);
+}
+.dock-app.minimized{opacity:.58}
+.dock-app.minimized::after{width:3px;height:3px;opacity:.65}
