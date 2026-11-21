@@ -10,7 +10,8 @@ function closePanels(){control.classList.add("hidden");launcher.classList.add("h
 $("#controlButton").onclick=()=>{launcher.classList.add("hidden");control.classList.toggle("hidden")};
 $("#notificationButton").onclick=()=>{launcher.classList.add("hidden");control.classList.remove("hidden");control.scrollIntoView({block:"nearest"})};
 $("#launcherButton").onclick=()=>{control.classList.add("hidden");launcher.classList.toggle("hidden");$("#appSearch").focus()};
-$$("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.add("hidden"));
+$("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.add("hidden"));
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){control.classList.add("hidden");launcher.classList.add("hidden");if(!win.classList.contains("hidden")){win.classList.add("hidden");activeApp=null}}});
 $$("[data-toggle]").forEach(b=>b.onclick=()=>{b.classList.toggle("active");notify(b.querySelector("b").textContent+" toggled (prototype)")});
 $("#brightness").oninput=e=>desktop.style.filter="brightness("+e.target.value/100+")";
 $("#volume").oninput=e=>notify("Volume level: "+e.target.value+"% (visual prototype)");
@@ -59,36 +60,86 @@ if(app==="calculator"){
  });
 }
 }
-}
-// Basic desktop window manager: drag, focus, and edge snap.
+// Desktop window manager: stable drag, focus, snap, maximise and restore.
 let zCounter=10;
+let maximized=false;
+let snapped=null;
+let restoreRect=null;
+let dragging=null;
 function focusWindow(){win.style.zIndex=String(++zCounter)}
+function clearWindowGeometry(){
+ win.classList.remove("maximized","snapped-left","snapped-right");
+ win.style.left="";win.style.top="";win.style.width="";win.style.height="";win.style.transform="";
+}
+function saveRestoreRect(){
+ const r=win.getBoundingClientRect();
+ restoreRect={left:r.left,top:r.top,width:r.width,height:r.height};
+}
+function restoreWindow(){
+ clearWindowGeometry();
+ if(restoreRect){
+  win.style.left=restoreRect.left+"px";win.style.top=restoreRect.top+"px";
+  win.style.width=restoreRect.width+"px";win.style.height=restoreRect.height+"px";
+  win.style.transform="none";
+ }
+ maximized=false;snapped=null;
+}
+function maximizeWindow(){
+ if(!maximized&&!snapped)saveRestoreRect();
+ clearWindowGeometry();
+ win.classList.add("maximized");
+ maximized=true;snapped=null;
+}
+function snapWindow(side){
+ if(!maximized&&!snapped)saveRestoreRect();
+ clearWindowGeometry();
+ win.classList.add(side==="left"?"snapped-left":"snapped-right");
+ win.style.left=side==="left"?"8px":"calc(50vw + 4px)";
+ win.style.top="60px";win.style.width="calc(50vw - 12px)";
+ win.style.height="calc(100vh - 90px)";win.style.transform="none";
+ snapped=side;maximized=false;
+}
 win.addEventListener("pointerdown",focusWindow);
 const titlebar=win.querySelector(".window-titlebar");
-let dragging=null;
 titlebar.addEventListener("pointerdown",e=>{
- if(e.target.closest(".window-control"))return;
- if(maximized){maximized=false;win.classList.remove("maximized");win.style.left=e.clientX+"px";win.style.top=e.clientY+"px";win.style.transform="none";}
+ if(e.target.closest(".window-control")||e.button!==0)return;
+ if(maximized||snapped){
+  const old=restoreRect;
+  clearWindowGeometry();maximized=false;snapped=null;
+  if(old){
+   const ratio=Math.min(1,Math.max(.15,(e.clientX-old.left)/old.width));
+   win.style.width=old.width+"px";win.style.height=old.height+"px";
+   win.style.left=(e.clientX-old.width*ratio)+"px";
+   win.style.top=Math.max(56,e.clientY-18)+"px";
+  }
+ }
  const r=win.getBoundingClientRect();
- dragging={dx:e.clientX-r.left,dy:e.clientY-r.top};
+ dragging={dx:e.clientX-r.left,dy:e.clientY-r.top,pointerId:e.pointerId};
  titlebar.setPointerCapture(e.pointerId);
 });
 titlebar.addEventListener("pointermove",e=>{
- if(!dragging)return;
+ if(!dragging||dragging.pointerId!==e.pointerId)return;
  const w=win.offsetWidth,h=win.offsetHeight;
- const left=Math.max(0,Math.min(innerWidth-w,e.clientX-dragging.dx));
- const top=Math.max(56,Math.min(innerHeight-h-65,e.clientY-dragging.dy));
- win.style.left=left+"px";win.style.top=top+"px";win.style.transform="none";
+ win.style.left=Math.max(0,Math.min(innerWidth-w,e.clientX-dragging.dx))+"px";
+ win.style.top=Math.max(56,Math.min(innerHeight-h-65,e.clientY-dragging.dy))+"px";
+ win.style.transform="none";
 });
-titlebar.addEventListener("pointerup",e=>{
- if(!dragging)return;dragging=null;
- const x=e.clientX;
- if(x<=12){win.style.left="8px";win.style.top="60px";win.style.width="calc(50vw - 12px)";win.style.height="calc(100vh - 90px)";win.style.transform="none";win.classList.add("snapped-left")}
- else if(x>=innerWidth-12){win.style.left="calc(50vw + 4px)";win.style.top="60px";win.style.width="calc(50vw - 12px)";win.style.height="calc(100vh - 90px)";win.style.transform="none";win.classList.add("snapped-right")}
- else win.classList.remove("snapped-left","snapped-right");
+function finishDrag(e){
+ if(!dragging)return;
+ dragging=null;
+ if(e.clientX<=14)snapWindow("left");
+ else if(e.clientX>=innerWidth-14)snapWindow("right");
+ else{win.classList.remove("snapped-left","snapped-right");snapped=null}
+}
+titlebar.addEventListener("pointerup",finishDrag);
+titlebar.addEventListener("pointercancel",()=>{dragging=null});
+titlebar.addEventListener("dblclick",e=>{
+ if(e.target.closest(".window-control"))return;
+ if(maximized||snapped)restoreWindow();else maximizeWindow();
 });
-titlebar.addEventListener("dblclick",e=>{if(e.target.closest(".window-control"))return;maximized=!maximized;win.classList.toggle("maximized",maximized);win.style.left="";win.style.top="";win.style.width="";win.style.height="";win.style.transform="";win.classList.remove("snapped-left","snapped-right")});
-\n$("#windowClose").onclick=()=>win.classList.add("hidden");$("#windowMin").onclick=()=>win.classList.add("hidden");$("#windowMax").onclick=()=>{maximized=!maximized;win.classList.toggle("maximized",maximized)};
+$("#windowClose").onclick=()=>{win.classList.add("hidden");activeApp=null};
+$("#windowMin").onclick=()=>{win.classList.add("hidden");notify("Window minimised")};
+$("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
 $("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
 $$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
 const savedAccent=localStorage.getItem("nexus-accent");if(savedAccent)document.documentElement.style.setProperty("--accent",savedAccent);const savedBlur=localStorage.getItem("nexus-blur");if(savedBlur)document.documentElement.style.setProperty("--blur",savedBlur+"px");
