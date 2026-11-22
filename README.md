@@ -10,6 +10,7 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 - File Manager with an explicit user-selected folder, browsing, search, preview, create, rename, copy, move and delete where supported by the browser
 - Software Centre catalogue with search and categories
 - System Monitor interface that clearly reports unavailable native telemetry
+- Explicit native-service capability boundary that rejects unavailable integrations instead of fabricating values
 - Notes with browser-local autosave
 - Settings: appearance, wallpaper, accent, glass, performance, notifications, accessibility, system information and native-integration status pages
 - Browser launcher (opens valid HTTP/HTTPS links in a new tab)

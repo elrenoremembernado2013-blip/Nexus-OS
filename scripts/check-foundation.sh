@@ -20,4 +20,11 @@ grep -Fq 'gpgv --keyring' scripts/download-ubuntu.sh
 grep -Fq 'sha256sum' scripts/download-ubuntu.sh
 grep -Fq 'if=pflash' scripts/launch-qemu.sh
 grep -Fq 'NEXUS_RAM_MB' scripts/launch-qemu.sh
+grep -Fq 'NexusNativeServices' apps/native-services.js
+grep -Fq 'NativeIntegrationUnavailableError' apps/native-services.js
+grep -Fq 'native-services.js' index.html
+if grep -R -n -E '(^|[^[:alnum:]_])(eval|Function)[[:space:]]*\(' app.js apps >/dev/null 2>&1; then
+  printf 'Unexpected eval() or Function() usage in executable prototype code\n' >&2
+  exit 1
+fi
 printf 'PASS expected files, generated-output exclusions, signed-checksum, and UEFI/QEMU wiring\n'

@@ -24,6 +24,8 @@ File access is never requested on startup. The user selects a directory through 
 
 ## Future native boundary
 
+`apps/native-services.js` provides the browser-side native integration boundary. It is a capability registry: services start unavailable, integrations must be registered explicitly by the native host, and calls fail with `NativeIntegrationUnavailableError` instead of returning simulated values. The registry does not execute browser commands or dynamically evaluate native code.
+
 The Linux desktop should expose narrowly scoped, permission-aware services to app frontends for file portals, package operations, system telemetry, network/audio/display controls and notifications. This prototype deliberately does not choose a toolkit or invent a browser-to-host bridge; the desktop toolkit and service protocol remain open platform decisions in `PLATFORM_ARCHITECTURE.md`.
 
 ## Verification limits
