@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Validate browser-prototype JavaScript syntax and local asset/script references.
 set -euo pipefail
-ROOT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 command -v node >/dev/null 2>&1 || {
@@ -10,8 +10,8 @@ command -v node >/dev/null 2>&1 || {
 }
 
 mapfile -t JS_FILES < <(find app.js apps -type f -name '*.js' -print | sort)
-(("\${#JS_FILES[@]}" > 0)) || { echo "No JavaScript files found." >&2; exit 1; }
-for file in "\${JS_FILES[@]}"; do
+[[ ${#JS_FILES[@]} -gt 0 ]] || { echo "No JavaScript files found." >&2; exit 1; }
+for file in "${JS_FILES[@]}"; do
   node --check "$file"
   printf 'PASS JavaScript syntax: %s\n' "$file"
 done
