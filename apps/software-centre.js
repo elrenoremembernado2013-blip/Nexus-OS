@@ -26,6 +26,15 @@
     return element;
   }
 
+  function makeIcon(path, className = "app-icon-image") {
+    const image = node("img", className);
+    image.src = path;
+    image.alt = "";
+    image.decoding = "async";
+    image.setAttribute("aria-hidden", "true");
+    return image;
+  }
+
   function render() {
     const navGroups = [
       { title: "Discover", items: [["home", "Home"], ["discover", "Discover"]] },
@@ -132,8 +141,9 @@
     function makeAppCard(application, compact = false) {
       const card = node("article", compact ? "store-app-card compact" : "store-app-card");
       const header = node("div", "store-app-card-header");
-      const icon = node("span", `store-app-icon icon-${application.category.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`, application.icon);
+      const icon = node("span", `store-app-icon icon-${application.category.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`);
       icon.setAttribute("aria-hidden", "true");
+      icon.append(makeIcon(application.icon));
       const identity = node("div", "store-app-identity");
       identity.append(node("h4", "", application.name), node("p", "", `${application.developer} · ${application.category}`));
       const favorite = node("button", `store-favorite${catalog.isWishlisted(application.id) ? " selected" : ""}`, catalog.isWishlisted(application.id) ? "♥" : "♡");
@@ -227,7 +237,7 @@
       actions.append(details, primary);
       const art = node("div", "store-feature-art");
       art.setAttribute("aria-hidden", "true");
-      const glyph = node("span", "store-feature-glyph", application.icon);
+      const glyph = makeIcon(application.icon, "store-feature-glyph");
       const label = node("span", "store-feature-art-label", "NEXUS ORIGINAL");
       art.append(glyph, label);
       banner.append(copy, actions, art);
@@ -381,7 +391,8 @@
       if (!installed.length) wrapper.append(makeAppGrid([]));
       installed.forEach(application => {
         const row = node("article", "store-library-row");
-        const icon = node("span", "store-app-icon", application.icon);
+        const icon = node("span", "store-app-icon");
+        icon.append(makeIcon(application.icon));
         const copy = node("div", "store-library-copy");
         copy.append(node("strong", "", application.name), node("small", "", application.installedByDefault ? "Included with the desktop" : "Added to this browser's launcher"));
         const open = node("button", "action-button", "Open");
@@ -432,7 +443,9 @@
           const application = getApplication(operation.applicationId);
           if (!application) return;
           const row = node("article", "store-operation-row");
-          row.append(node("span", "store-app-icon", application.icon));
+          const icon = node("span", "store-app-icon");
+          icon.append(makeIcon(application.icon));
+          row.append(icon);
           const copy = node("div", "store-operation-copy");
           copy.append(node("strong", "", `${application.name} · ${operation.kind === "add" ? "Added" : "Removed"}`), node("small", "", operation.detail));
           const completed = node("span", "store-operation-status", "Complete");
@@ -482,7 +495,8 @@
       }
       const wrapper = node("div", "store-page store-detail");
       const identity = node("div", "store-detail-identity");
-      const icon = node("span", "store-app-icon store-detail-icon", application.icon);
+      const icon = node("span", "store-app-icon store-detail-icon");
+      icon.append(makeIcon(application.icon));
       const copy = node("div", "store-detail-copy");
       copy.append(node("p", "store-eyebrow", application.type), node("h3", "", application.name), node("p", "", `${application.developer} · ${application.category}`));
       identity.append(icon, copy);
@@ -511,7 +525,7 @@
       const main = node("div", "store-detail-main");
       main.append(node("p", "store-detail-description", application.description));
       const preview = node("div", "store-preview-placeholder");
-      preview.append(node("span", "", application.icon), node("strong", "", "No screenshots supplied"), node("small", "", "This listing does not use mock product imagery."));
+      preview.append(makeIcon(application.icon, "store-preview-icon"), node("strong", "", "No screenshots supplied"), node("small", "", "This listing does not use mock product imagery."));
       main.append(preview);
       const releaseHeading = node("h4", "", "Release notes");
       main.append(releaseHeading, node("p", "store-detail-notes", application.releaseNotes));

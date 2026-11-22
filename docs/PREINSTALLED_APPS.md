@@ -30,6 +30,10 @@ The Store includes routes for Home, Discover, Apps, Games, Categories, Collectio
 
 The optional `apps/calendar.js` module supports month navigation, date selection, event creation and deletion with browser-local persistence. It does not provide account sync, reminders, notifications or native calendar integration. If Calendar is removed from the launcher, its event data remains available if it is added again later.
 
+## Local application icons
+
+`assets/icons/` contains the original SVG icons used by the desktop shortcuts, dock, launcher and every Store listing. These files are part of the repository and load locally; the external Steam listing uses a generic game-platform icon rather than Valve artwork. App names remain the accessible labels, so decorative icon images have empty alternative text.
+
 ## Future native boundary
 
 `apps/native-services.js` provides the browser-side native integration boundary. It is a capability registry: services start unavailable, integrations must be registered explicitly by the native host, and calls fail with `NativeIntegrationUnavailableError` instead of returning simulated values. The registry does not execute browser commands or dynamically evaluate native code.

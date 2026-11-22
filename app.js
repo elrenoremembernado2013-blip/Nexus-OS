@@ -68,9 +68,12 @@ function renderLauncher(){
   button.className="app-item";
   button.dataset.app=app.launchTarget;
   button.style.display=(app.name+" "+app.launcherName+" "+app.category).toLocaleLowerCase().includes(term)?"flex":"none";
-  const icon=document.createElement("span");
-  icon.textContent=app.icon;
+  const icon=document.createElement("img");
+  icon.className="app-icon-img";
+  icon.src=app.icon;
+  icon.alt="";
   icon.setAttribute("aria-hidden","true");
+  icon.decoding="async";
   button.append(icon,document.createTextNode(app.launcherName||app.name));
   grid.append(button);
  });
