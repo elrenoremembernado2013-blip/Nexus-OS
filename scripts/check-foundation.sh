@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Lightweight static checks for foundation scripts, configuration, and prototype code.
 set -euo pipefail
-ROOT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 for script in scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh; do
