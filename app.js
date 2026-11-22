@@ -42,11 +42,39 @@ async function restoreCustomWallpaperAtStartup(){
  }catch(error){console.warn("NEXUS custom wallpaper restore:",error);}
 }
 let activeApp=null, toastTimer, maximized=false;
-const appNames={files:"Files",browser:"Browser",notes:"Notes",terminal:"Terminal",gaming:"Gaming Hub",monitor:"System Monitor",settings:"Settings",calculator:"Calculator"};
+const appNames=Object.fromEntries(window.NexusApplicationCatalog.getAll()
+ .filter(app=>app.launchTarget)
+ .map(app=>[app.launchTarget,app.launcherName||app.name]));
 window.NexusAppRegistry.list().forEach(app=>{appNames[app.id]=app.name});
 function clock(){const d=new Date();$("#clock").textContent=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
 clock();setInterval(clock,30000);
 function notify(msg){toast.textContent=msg;toast.classList.remove("hidden");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.add("hidden"),2200)}
+function renderLauncher(){
+ const grid=$("#appGrid");
+ if(!grid)return;
+ const term=$("#appSearch").value.trim().toLocaleLowerCase();
+ const apps=window.NexusApplicationCatalog.getLauncherApps();
+ grid.replaceChildren();
+ if(!apps.length){
+  const empty=document.createElement("p");
+  empty.className="launcher-empty";
+  empty.textContent="No apps available in the launcher.";
+  grid.append(empty);
+  return;
+ }
+ apps.forEach(app=>{
+  const button=document.createElement("button");
+  button.type="button";
+  button.className="app-item";
+  button.dataset.app=app.launchTarget;
+  button.style.display=(app.name+" "+app.launcherName+" "+app.category).toLocaleLowerCase().includes(term)?"flex":"none";
+  const icon=document.createElement("span");
+  icon.textContent=app.icon;
+  icon.setAttribute("aria-hidden","true");
+  button.append(icon,document.createTextNode(app.launcherName||app.name));
+  grid.append(button);
+ });
+}
 function closePanels(){control.classList.add("hidden");launcher.classList.add("hidden")}
 $("#controlButton").onclick=()=>{launcher.classList.add("hidden");control.classList.toggle("hidden")};
 $("#notificationButton").onclick=()=>{launcher.classList.add("hidden");control.classList.remove("hidden");$("#controlNotifications").scrollIntoView({block:"nearest",behavior:document.body.classList.contains("reduced-motion")?"auto":"smooth"})};
@@ -91,7 +119,7 @@ function updateBrightness(){
 brightness.oninput=updateBrightness;
 updateBrightness();
 $("#volumeValue").textContent="Unavailable";
-$$("[data-app]").forEach(b=>b.addEventListener("click",()=>{
+$$("[data-app]:not(.app-item)").forEach(b=>b.addEventListener("click",()=>{
  const app=b.dataset.app;
  if(b.classList.contains("dock-app")&&activeApp===app){
   if(win.classList.contains("hidden")){win.classList.remove("hidden");$( ".dock-app[data-app='"+app+"']")?.classList.remove("minimized");focusWindow()}
@@ -101,7 +129,24 @@ $$("[data-app]").forEach(b=>b.addEventListener("click",()=>{
  }
  openApp(app);
 }));
-function openApp(app){if(!appNames[app])return;if(activeApp){window.NexusAppRegistry.unmountApp(activeApp);$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.remove("running","minimized"))}activeApp=app;clearWindowGeometry();restoreRect=null;snapped=null;closePanels();launcher.classList.add("hidden");win.classList.remove("hidden");maximized=false;$("#windowMax").setAttribute("aria-label","Maximize");title.textContent=appNames[app];content.innerHTML=appView(app);if(app==="settings")window.NexusAppRegistry.enhanceSettings(content);wireApp(app);$$( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});focusWindow()}
+function openApp(app){
+ if(!appNames[app]||!window.NexusApplicationCatalog.isTargetInstalled(app)){
+  notify("This app is not installed in the NEXUS launcher.");
+  return;
+ }
+ if(activeApp){
+  window.NexusAppRegistry.unmountApp(activeApp);
+  $$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.remove("running","minimized"));
+ }
+ activeApp=app;
+ clearWindowGeometry();restoreRect=null;snapped=null;closePanels();launcher.classList.add("hidden");
+ win.classList.remove("hidden");maximized=false;$("#windowMax").setAttribute("aria-label","Maximize");
+ title.textContent=appNames[app];content.innerHTML=appView(app);content.scrollTop=0;
+ if(app==="settings")window.NexusAppRegistry.enhanceSettings(content);
+ wireApp(app);
+ $$( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});
+ focusWindow();
+}
 function appView(app){
 const heading=(t,s)=>'<h2 class="content-title">'+t+'</h2><p class="content-sub">'+s+'</p>';
 const registered=window.NexusAppRegistry.get(app);
@@ -121,7 +166,7 @@ if(app==="calculator")return heading("Calculator","Basic calculator.")+'<div cla
 return heading(appNames[app],"Application preview");
 }
 function wireApp(app){
-if(window.NexusAppRegistry.mountApp(app,content,{notify}))return;
+if(window.NexusAppRegistry.mountApp(app,content,{notify,launchApp:openApp}))return;
 if(app==="notes"){const n=$("#notesText");n.value=localStorage.getItem("nexus-note")||"";n.oninput=()=>{localStorage.setItem("nexus-note",n.value);$("#notesStatus").textContent="Saved locally"};$("#clearNotes").onclick=()=>{n.value="";localStorage.removeItem("nexus-note");$("#notesStatus").textContent="Cleared"}}
 if(app==="settings"){
  function applyWallpaper(id,persist=true){
@@ -593,8 +638,20 @@ titlebar.addEventListener("dblclick",e=>{
 $("#windowClose").onclick=()=>{win.classList.add("hidden");if(activeApp){window.NexusAppRegistry.unmountApp(activeApp);$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.remove("running","minimized"))}activeApp=null};
 $("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.add("minimized"))}notify("Window minimised")};
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
-$("#appSearch").oninput=e=>{const term=e.target.value.toLowerCase();$$(".app-item").forEach(item=>item.style.display=item.textContent.toLowerCase().includes(term)?"flex":"none")};
-$$(".app-item").forEach(item=>item.onclick=()=>openApp(item.dataset.app));
+$("#appSearch").oninput=renderLauncher;
+$("#appGrid").addEventListener("click",event=>{
+ const item=event.target.closest(".app-item[data-app]");
+ if(item)openApp(item.dataset.app);
+});
+window.NexusApplicationCatalog.subscribe(()=>{
+ renderLauncher();
+ if(activeApp&&!window.NexusApplicationCatalog.isTargetInstalled(activeApp)){
+  window.NexusAppRegistry.unmountApp(activeApp);
+  win.classList.add("hidden");
+  activeApp=null;
+ }
+});
+renderLauncher();
 if(localStorage.getItem("nexus-wallpaper")==="custom"){restoreCustomWallpaperAtStartup();}else{setDesktopWallpaper(localStorage.getItem("nexus-wallpaper")||"alpine",false);}
 const savedAccent=localStorage.getItem("nexus-accent");document.documentElement.style.setProperty("--accent",savedAccent||"#ffad7a");const savedBlur=localStorage.getItem("nexus-blur");document.documentElement.style.setProperty("--blur",(savedBlur||"18")+"px");if(localStorage.getItem("nexus-reduced-motion")==="true")document.body.classList.add("reduced-motion");
 const savedTheme=localStorage.getItem("nexus-theme")||"dark";const systemPrefersLight=window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches;desktop.classList.toggle("theme-light",savedTheme==="light"||(savedTheme==="system"&&systemPrefersLight));

@@ -57,12 +57,7 @@
     </div>
     <section class="launcher hidden" id="launcher">
       <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
-      <div class="app-grid" id="appGrid">
-        <button class="app-item" data-app="files"><span>▤</span>File Manager</button><button class="app-item" data-app="browser"><span>◉</span>Browser</button>
-        <button class="app-item" data-app="notes"><span>✎</span>Notes</button><button class="app-item" data-app="terminal"><span>⌘</span>Terminal</button>
-        <button class="app-item" data-app="gaming"><span>🎮</span>Gaming Hub</button><button class="app-item" data-app="monitor"><span>▥</span>System Monitor</button>
-        <button class="app-item" data-app="software"><span>◈</span>Software Centre</button><button class="app-item" data-app="settings"><span>⚙</span>Settings</button><button class="app-item" data-app="calculator"><span>＋</span>Calculator</button>
-      </div>
+      <div class="app-grid" id="appGrid" aria-label="Installed applications"></div>
     </section>
     <section class="window hidden" id="appWindow" aria-live="polite">
       <div class="window-titlebar"><div class="window-controls"><button class="window-control close" id="windowClose" aria-label="Close">×</button><button class="window-control minimize" id="windowMin" aria-label="Minimize">−</button></div><span id="windowTitle">Application</span><button class="window-control maximize" id="windowMax" aria-label="Maximize">□</button></div>
@@ -73,6 +68,8 @@
   <script src="apps/app-registry.js"></script>
   <script src="apps/native-services.js"></script>
   <script src="apps/files.js"></script>
+  <script src="apps/calendar.js"></script>
+  <script src="apps/store-catalog.js"></script>
   <script src="apps/software-centre.js"></script>
   <script src="apps/system-monitor.js"></script>
   <script src="apps/settings-sections.js"></script>
