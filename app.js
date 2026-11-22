@@ -641,6 +641,47 @@ titlebar.addEventListener("dblclick",e=>{
 $("#windowClose").onclick=()=>{win.classList.add("hidden");if(activeApp){window.NexusAppRegistry.unmountApp(activeApp);$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.remove("running","minimized"))}activeApp=null};
 $("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.add("minimized"))}notify("Window minimised")};
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
+function closeActiveWindow(){
+ if(win.classList.contains("hidden"))return;
+ win.classList.add("hidden");
+ if(activeApp){
+  window.NexusAppRegistry.unmountApp(activeApp);
+  $(".dock-app[data-app='"+activeApp+"']").forEach(b=>b.classList.remove("running","minimized"));
+ }
+ activeApp=null;
+}
+function minimizeActiveWindow(){
+ if(win.classList.contains("hidden"))return;
+ win.classList.add("hidden");
+ if(activeApp)$(".dock-app[data-app='"+activeApp+"']").forEach(b=>b.classList.add("minimized"));
+ notify("Window minimised");
+}
+titlebar.title="Drag to move · Double-click to maximise · Alt+F9 minimise · Alt+F10 maximise · Alt+F4 close · Ctrl+Alt+←/→ snap";
+$("#windowClose").title="Close app (Alt+F4)";
+$("#windowMin").title="Minimise app (Alt+F9)";
+$("#windowMax").title="Maximise or restore (Alt+F10)";
+document.addEventListener("keydown",event=>{
+ if(win.classList.contains("hidden"))return;
+ if(event.altKey&&!event.ctrlKey&&!event.shiftKey&&event.key==="F4"){
+  event.preventDefault();closeActiveWindow();return;
+ }
+ if(event.altKey&&!event.ctrlKey&&!event.shiftKey&&event.key==="F9"){
+  event.preventDefault();minimizeActiveWindow();return;
+ }
+ if(event.altKey&&!event.ctrlKey&&!event.shiftKey&&event.key==="F10"){
+  event.preventDefault();if(maximized||snapped)restoreWindow();else maximizeWindow();return;
+ }
+ if(event.ctrlKey&&event.altKey&&!event.shiftKey&&event.key==="ArrowLeft"){
+  event.preventDefault();snapWindow("left");return;
+ }
+ if(event.ctrlKey&&event.altKey&&!event.shiftKey&&event.key==="ArrowRight"){
+  event.preventDefault();snapWindow("right");return;
+ }
+ if(event.ctrlKey&&event.altKey&&!event.shiftKey&&event.key==="ArrowDown"){
+  event.preventDefault();restoreWindow();return;
+ }
+});
+
 $("#appSearch").oninput=renderLauncher;
 $("#appGrid").addEventListener("click",event=>{
  const item=event.target.closest(".app-item[data-app]");
