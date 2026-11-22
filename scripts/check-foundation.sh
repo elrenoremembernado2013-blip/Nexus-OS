@@ -23,6 +23,7 @@ grep -Fq 'NEXUS_RAM_MB' scripts/launch-qemu.sh
 grep -Fq 'NexusNativeServices' apps/native-services.js
 grep -Fq 'NativeIntegrationUnavailableError' apps/native-services.js
 grep -Fq 'native-services.js' index.html
+grep -Fq -- '--dry-run' scripts/launch-qemu.sh
 if grep -R -n -E '(^|[^[:alnum:]_])(eval|Function)[[:space:]]*\(' app.js apps >/dev/null 2>&1; then
   printf 'Unexpected eval() or Function() usage in executable prototype code\n' >&2
   exit 1

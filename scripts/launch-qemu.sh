@@ -13,10 +13,12 @@ CPUS="${NEXUS_CPUS:-4}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-40G}"
 ACCEL="${NEXUS_QEMU_ACCEL:-tcg}"
 QEMU="${QEMU_SYSTEM_X86_64:-qemu-system-x86_64}"
+DRY_RUN=false
 
 usage() {
   cat <<'USAGE'
 Usage: bash scripts/launch-qemu.sh
+       bash scripts/launch-qemu.sh --dry-run
 
 Environment configuration:
   NEXUS_RAM_MB=4096          guest memory in MiB
@@ -35,11 +37,23 @@ USAGE
 }
 
 if [[ "${1:-}" == --help || "${1:-}" == -h ]]; then usage; exit 0; fi
+if [[ "${1:-}" == --dry-run ]]; then DRY_RUN=true; shift; fi
 [[ $# -eq 0 ]] || { usage >&2; exit 2; }
 [[ "$RAM_MB" =~ ^[1-9][0-9]*$ ]] || { echo 'NEXUS_RAM_MB must be a positive integer.' >&2; exit 2; }
 [[ "$CPUS" =~ ^[1-9][0-9]*$ ]] || { echo 'NEXUS_CPUS must be a positive integer.' >&2; exit 2; }
 [[ "$DISK_SIZE" =~ ^[1-9][0-9]*[MGT]$ ]] || { echo 'NEXUS_DISK_SIZE must be a positive integer plus M, G, or T.' >&2; exit 2; }
 [[ "$ACCEL" == tcg || "$ACCEL" == kvm ]] || { echo 'NEXUS_QEMU_ACCEL must be tcg or kvm.' >&2; exit 2; }
+if [[ "$DRY_RUN" == true ]]; then
+  printf 'DRY RUN - NEXUS QEMU profile\n'
+  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\n' \
+    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL"
+  if [[ -f "$ISO_PATH" ]]; then
+    printf 'Boot media: present (%s)\n' "$ISO_PATH"
+  else
+    printf 'Boot media: not present; disk boot (%s)\n' "$ISO_PATH"
+  fi
+  exit 0
+fi
 command -v "$QEMU" >/dev/null 2>&1 || { printf 'Missing QEMU executable: %s\n' "$QEMU" >&2; exit 1; }
 command -v qemu-img >/dev/null 2>&1 || { echo 'Missing qemu-img (install qemu-utils).' >&2; exit 1; }
 

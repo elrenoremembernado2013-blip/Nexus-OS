@@ -44,8 +44,6 @@ OUTPUT_DIR="$(cd -- "$OUTPUT_DIR" && pwd)"
 CHECKSUMS="$OUTPUT_DIR/SHA256SUMS"
 SIGNATURE="$OUTPUT_DIR/SHA256SUMS.gpg"
 ISO_PATH="$OUTPUT_DIR/$ISO_NAME"
-TMP_CHECKSUMS="$(mktemp "$OUTPUT_DIR/.nexus-checksum.XXXXXX")"
-trap 'rm -f -- "$TMP_CHECKSUMS"' EXIT
 
 curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/SHA256SUMS" -o "$CHECKSUMS"
 curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/SHA256SUMS.gpg" -o "$SIGNATURE"

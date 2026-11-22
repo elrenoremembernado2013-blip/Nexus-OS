@@ -50,6 +50,15 @@ The script also supports `--output-dir`, `--base-url` (HTTPS only), `--iso-name`
 bash scripts/launch-qemu.sh
 ```
 
+To inspect a VM profile on a host that does not yet have QEMU or OVMF installed:
+
+```sh
+bash scripts/launch-qemu.sh --dry-run
+```
+
+The dry run validates RAM, CPU, disk, accelerator and boot-media values without
+creating a disk, locating firmware or starting a VM.
+
 The script creates an ignored qcow2 disk if needed, keeps writable OVMF variables under `build/qemu/`, and attaches the installer ISO when present. Complete the Ubuntu installer interactively; the script does not automate installation or configure the installed guest. On subsequent launches it boots from the disk if the ISO is not present (if the ISO remains, it boots the installer first).
 
 Configure resources without editing scripts:
