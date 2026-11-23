@@ -12,6 +12,13 @@ RAM_MB="${NEXUS_RAM_MB:-4096}"
 CPUS="${NEXUS_CPUS:-4}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-40G}"
 ACCEL="${NEXUS_QEMU_ACCEL:-tcg}"
+if [[ -n "${NEXUS_QEMU_DISPLAY:-}" ]]; then
+  DISPLAY_BACKEND="$NEXUS_QEMU_DISPLAY"
+elif [[ "$(uname -s)" == Darwin ]]; then
+  DISPLAY_BACKEND=cocoa
+else
+  DISPLAY_BACKEND=gtk
+fi
 QEMU="${QEMU_SYSTEM_X86_64:-qemu-system-x86_64}"
 DRY_RUN=false
 
@@ -25,6 +32,7 @@ Environment configuration:
   NEXUS_CPUS=4               virtual CPU count
   NEXUS_DISK_SIZE=40G        new qcow2 disk capacity (M, G, or T suffix)
   NEXUS_QEMU_ACCEL=tcg        QEMU accelerator (tcg or host-supported kvm)
+  NEXUS_QEMU_DISPLAY=BACKEND  display backend (defaults to cocoa on macOS, gtk elsewhere)
   NEXUS_ISO_PATH=PATH         installer ISO; omit the file to boot the disk only
   NEXUS_DISK_PATH=PATH        guest qcow2 disk location
   OVMF_CODE=PATH              UEFI firmware code image
@@ -59,11 +67,12 @@ command -v qemu-img >/dev/null 2>&1 || { echo 'Missing qemu-img (install qemu-ut
 
 find_firmware_pair() {
   local code vars
-  for code in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/edk2/x64/OVMF_CODE.4m.fd /usr/share/edk2/x64/OVMF_CODE.fd; do
+  for code in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/edk2/x64/OVMF_CODE.4m.fd /usr/share/edk2/x64/OVMF_CODE.fd /opt/homebrew/share/qemu/edk2-x86_64-code.fd /usr/local/share/qemu/edk2-x86_64-code.fd; do
     [[ -r "$code" ]] || continue
     case "$code" in
       *_4M.fd) vars="${code%CODE_4M.fd}VARS_4M.fd" ;;
       *.4m.fd) vars="${code%CODE.4m.fd}VARS.4m.fd" ;;
+      *edk2-x86_64-code.fd) vars="${code%edk2-x86_64-code.fd}edk2-i386-vars.fd" ;;
       *) vars="${code%CODE.fd}VARS.fd" ;;
     esac
     if [[ -r "$vars" ]]; then printf '%s\n%s\n' "$code" "$vars"; return 0; fi
@@ -72,9 +81,10 @@ find_firmware_pair() {
 }
 
 if [[ -z "${OVMF_CODE:-}" || -z "${OVMF_VARS:-}" ]]; then
-  mapfile -t FIRMWARE_PAIR < <(find_firmware_pair) || true
+  FIRMWARE_PAIR=()
+  while IFS= read -r firmware_path; do FIRMWARE_PAIR+=("$firmware_path"); done < <(find_firmware_pair)
   if ((${#FIRMWARE_PAIR[@]} != 2)); then
-    echo 'Could not find a matching OVMF code/variables pair. Install ovmf or set OVMF_CODE and OVMF_VARS.' >&2
+    echo 'Could not find a matching OVMF code/variables pair. Install ovmf (Linux), use Homebrew QEMU (macOS), or set OVMF_CODE and OVMF_VARS.' >&2
     exit 1
   fi
   OVMF_CODE="${OVMF_CODE:-${FIRMWARE_PAIR[0]}}"
@@ -95,7 +105,7 @@ ARGS=(-machine "q35,accel=$ACCEL" -cpu max -smp "$CPUS" -m "$RAM_MB"
   -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE"
   -drive "if=pflash,format=raw,unit=1,file=$VARS_PATH"
   -drive "file=$DISK_PATH,if=virtio,format=qcow2" -netdev user,id=n0 -device virtio-net-pci,netdev=n0
-  -device virtio-vga -display gtk)
+  -device virtio-vga -display "$DISPLAY_BACKEND")
 if [[ -f "$ISO_PATH" ]]; then
   ARGS+=(-cdrom "$ISO_PATH" -boot order=d)
 else
