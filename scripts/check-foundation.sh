@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
@@ -16,8 +16,8 @@ done
 
 grep -Fqx '/build/' .gitignore
 grep -Fqx '*.qcow2' .gitignore
-grep -Fq 'gpgv --keyring' scripts/download-ubuntu.sh
-grep -Fq 'sha256sum' scripts/download-ubuntu.sh
+grep -Fq 'VALIDSIG' scripts/download-linux-mint.sh
+grep -Fq 'sha256sum' scripts/download-linux-mint.sh
 grep -Fq 'if=pflash' scripts/launch-qemu.sh
 grep -Fq 'NEXUS_RAM_MB' scripts/launch-qemu.sh
 grep -Fq 'NexusNativeServices' apps/native-services.js
