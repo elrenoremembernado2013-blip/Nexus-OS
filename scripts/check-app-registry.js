@@ -34,7 +34,7 @@ registry.unmountApp("lifecycle-test");
 assert.deepEqual(calls.slice(-1), ["cleanup:B"]);
 assert.equal(registry.unmountRoot(rootB), false);
 
-assert.throws(() => registry.register({ id: "invalid id" }), TypeError);
+assert.throws(() => registry.register({ id: "invalid id" }), /NEXUS app requires/);
 assert.throws(() => registry.register({ id: "lifecycle-test", name: "Duplicate", render() {}, mount() {} }), /already registered/);
 assert.equal(registry.mountApp("unknown-app", {}, {}), false);
 console.log("PASS app registry independent-instance lifecycle tests");
