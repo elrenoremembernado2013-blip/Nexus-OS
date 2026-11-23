@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Launch the Ubuntu installer or installed guest using QEMU with UEFI firmware.
+# Launch the Linux Mint installer or installed guest using QEMU with UEFI firmware.
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build"
 DOWNLOAD_DIR="${NEXUS_DOWNLOAD_DIR:-$BUILD_DIR/downloads}"
 VM_STATE_DIR="$BUILD_DIR/qemu"
-ISO_PATH="${NEXUS_ISO_PATH:-$DOWNLOAD_DIR/ubuntu-26.04.1-live-server-amd64.iso}"
-DISK_PATH="${NEXUS_DISK_PATH:-$BUILD_DIR/images/nexus-ubuntu-26.04.1.qcow2}"
+ISO_PATH="${NEXUS_ISO_PATH:-$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso}"
+DISK_PATH="${NEXUS_DISK_PATH:-$BUILD_DIR/images/nexus-mint-22.3.qcow2}"
 RAM_MB="${NEXUS_RAM_MB:-4096}"
 CPUS="${NEXUS_CPUS:-4}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-40G}"
