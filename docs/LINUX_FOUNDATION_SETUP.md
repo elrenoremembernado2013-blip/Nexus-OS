@@ -1,50 +1,57 @@
 # NEXUS Linux foundation setup (Milestone 1)
 
-This milestone establishes verified Ubuntu installation media and a local QEMU/UEFI workflow. **It does not build a NEXUS operating-system image.** The ISO is the official Ubuntu 26.04.1 LTS Server installer; installing it in the VM produces a stock Ubuntu guest, not a NEXUS-branded/customized OS. No QEMU boot result is claimed here.
+This milestone establishes verified Linux Mint 22.3 Xfce installation media and a local QEMU/UEFI workflow. **It does not build a NEXUS operating-system image.** Installing the ISO in a VM produces a stock Mint guest, not a NEXUS-branded or customized OS. No Chromebook boot result is claimed.
 
 ## Target and layout
 
-- Target: x86_64; Ubuntu 26.04.1 LTS Server minimal installation as the initial base.
-- Physical reference device: HP Chromebook x360 14b-cb0 (MADOO), Celeron N4500, 4 GB RAM, 32 GB eMMC. Its storage and memory are constraints for the future native image; no NEXUS boot on this device is claimed.
-- Qualification note: Ubuntu 26.04 Desktop calls for 6 GB RAM and 25 GB free storage for a comfortable experience. Do not treat the stock Desktop image as a fit for this 4 GB target. The current minimal/server base plus a NEXUS session remains a candidate only until its actual memory and storage use are measured on the device.
-- Guest direction: Wayland, GRUB, systemd; UEFI firmware via OVMF in QEMU.
-- `scripts/`: ISO verification, QEMU launch, static checks.
-- `linux/config/`: reviewed design defaults; not yet consumed by an image build.
-- `nexus-br2-external/`: retained separately for experimental Buildroot work; it is not the primary Ubuntu foundation.
+- Base candidate: Linux Mint 22.3 Xfce, built on Ubuntu 24.04 LTS (Noble).
+- Physical reference device: HP Chromebook x360 14b-cb0 (MADOO), Intel Celeron N4500, 4 GB RAM, 32 GB eMMC.
+- Mint lists 4 GB RAM as recommended and 20 GB disk as the minimum. The target has limited storage headroom; measure free space after installation and updates.
+- Ubuntu 26.04 Desktop lists 6 GB RAM and 25 GB free storage for a comfortable experience. This is why Mint Xfce is the current desktop choice. The exact complete NEXUS memory and storage use still needs testing.
+- Guest direction: X11, Xfce, Xfwm4, GRUB, systemd; UEFI firmware via OVMF in QEMU.
+- `scripts/`: media verification, QEMU launch, and static checks.
+- `linux/config/`: declarative design defaults; not yet consumed by an image build.
+- `nexus-br2-external/`: retained separately for experimental Buildroot work; it is not the primary desktop.
 - `build/`: local downloads, VM state, and disk images; ignored by Git.
 
 ## Host dependencies
 
-On an Ubuntu/Debian-like x86_64 development host, install:
+On Ubuntu, Debian, or Linux Mint, install:
 
 ```sh
 sudo apt update
-sudo apt install bash coreutils curl gpgv ubuntu-keyring qemu-system-x86 qemu-utils ovmf
+sudo apt install bash coreutils curl gnupg qemu-system-x86 qemu-utils ovmf
 ```
 
-Roles: `curl` downloads release files over HTTPS; `gpgv` validates the signed checksum manifest; `ubuntu-keyring` supplies the archive trust anchors; `coreutils` supplies `sha256sum`; `qemu-system-x86` runs the guest; `qemu-utils` supplies `qemu-img`; `ovmf` supplies UEFI firmware. `bash` runs scripts. The automated checks use Bash and standard utilities. On macOS, install Homebrew, then run `brew install qemu node`; the project launcher uses QEMU’s Cocoa display backend and the x86-64 EDK II firmware shipped with Homebrew QEMU. Node.js is available for future tooling and is not required by the current foundation scripts. Optional `shellcheck` may be used for additional linting but is not required by the supplied check script.
+The Mint downloader needs `curl`, `gpg`, and either `sha256sum` or macOS `shasum`. QEMU uses `qemu-img` and an OVMF UEFI firmware pair.
 
-For accelerated KVM, a Linux host also needs a working `/dev/kvm` and user permissions. TCG is the script default and requires no KVM access, but may be slow; on Apple Silicon, x86-64 guests use TCG emulation. The launcher defaults to Cocoa display on macOS and GTK elsewhere. On macOS, Homebrew QEMU provides the x86-64 UEFI code and variables files. If firmware is installed in a nonstandard location, set both `OVMF_CODE` and `OVMF_VARS` to a matching pair.
+On macOS with Homebrew:
 
-## Download and verify official media
+```sh
+brew install qemu gnupg
+```
+
+Homebrew QEMU on Apple Silicon provides the Cocoa display backend, x86-64 EDK II firmware, and TCG emulation. x86-64 guest emulation can be slow. Node.js is available for future tooling but is not required by this foundation workflow.
+
+For accelerated KVM on Linux, the host needs a working `/dev/kvm` and user permissions. The launch script defaults to TCG for portability. It defaults to Cocoa display on macOS and GTK elsewhere; set `NEXUS_QEMU_DISPLAY` to override the backend.
+
+## Download and verify Linux Mint media
 
 From the repository root:
 
 ```sh
-bash scripts/download-ubuntu.sh
+bash scripts/download-linux-mint.sh
 ```
 
-By default this downloads `ubuntu-26.04.1-live-server-amd64.iso`, `SHA256SUMS`, and `SHA256SUMS.gpg` from `https://releases.ubuntu.com/26.04/` into ignored `build/downloads/`. The script first verifies the manifest signature with the installed Ubuntu archive keyring (`gpgv`), then compares the ISO digest with the matching entry in that authenticated manifest. It deliberately contains no hardcoded ISO checksum. If the named release artifacts or directory are unavailable, do not substitute a guessed URL or digest; check Ubuntu's official release index and update the version/path only after confirming the published signed files.
+The script downloads the pinned `linuxmint-22.3-xfce-64bit.iso` and its `sha256sum.txt` and `sha256sum.txt.gpg` files from the Linux Mint stable 22.3 mirror into ignored `build/downloads/`. It imports the Linux Mint ISO signing key into a temporary GnuPG home, checks the full published fingerprint `27DEB15644C6B3CF3BD7D291300F846BA25BAE09`, verifies the signed manifest, and compares the ISO digest with the matching manifest entry. The key fingerprint and verification steps follow the [Linux Mint ISO verification guide](https://linuxmint.com/verify.php).
 
-Optional overrides:
+Optional output directory:
 
 ```sh
-NEXUS_DOWNLOAD_DIR="$HOME/nexus-media" \
-UBUNTU_ARCHIVE_KEYRING=/usr/share/keyrings/ubuntu-archive-keyring.gpg \
-  bash scripts/download-ubuntu.sh
+NEXUS_DOWNLOAD_DIR="$HOME/nexus-media" bash scripts/download-linux-mint.sh
 ```
 
-The script also supports `--output-dir`, `--base-url` (HTTPS only), `--iso-name`, and `--keyring`. Use official Ubuntu release infrastructure for actual trusted media.
+The Ubuntu media script remains available for an explicit Ubuntu alternative, but it is not the default foundation path.
 
 ## Create and launch the QEMU VM
 
@@ -52,27 +59,26 @@ The script also supports `--output-dir`, `--base-url` (HTTPS only), `--iso-name`
 bash scripts/launch-qemu.sh
 ```
 
-To inspect a VM profile on a host that does not yet have QEMU or OVMF installed:
+To inspect the profile without creating a disk, locating firmware, or starting a VM:
 
 ```sh
 bash scripts/launch-qemu.sh --dry-run
 ```
 
-The dry run validates RAM, CPU, disk, accelerator and boot-media values without
-creating a disk, locating firmware or starting a VM.
+The default 4 GiB guest RAM and 40 GiB virtual disk are for a VM on the development host. They are not a profile for running QEMU on the Chromebook's 4 GB/32 GB hardware. A sparse 40 GiB virtual disk also does not mean the Chromebook has 40 GiB available.
 
-The current 4 GiB RAM and 40 GiB virtual disk defaults describe a VM on the development host (for example, the Mac used to prepare this project). They are not Chromebook requirements or a profile for running QEMU on the 4 GB reference device. The Mac-side VM checks the generic Ubuntu/QEMU workflow only; it does not validate Chromebook firmware, drivers, performance, or NEXUS bootability.
+On macOS, the QEMU launch script uses Homebrew's x86-64 UEFI firmware and Cocoa display backend. It runs the x86-64 VM under TCG on Apple Silicon. A successful Mac VM test checks only the generic installer/QEMU workflow; it does not validate MADOO firmware, Chromebook hardware drivers, NEXUS bootability, or performance on the physical device.
 
-The script creates an ignored qcow2 disk if needed, keeps writable OVMF variables under `build/qemu/`, and attaches the installer ISO when present. Complete the Ubuntu installer interactively; the script does not automate installation or configure the installed guest. On subsequent launches it boots from the disk if the ISO is not present (if the ISO remains, it boots the installer first).
+The script creates a qcow2 virtual disk if needed, keeps writable UEFI variables under ignored `build/qemu/`, and attaches the Mint installer ISO when present. Complete the installer interactively in the VM. The script does not automate installation or configure NEXUS. When the ISO remains present, the VM boots the installer first; move or rename it to boot from an installed guest.
 
-Configure resources without editing scripts:
+Configure VM resources without editing scripts:
 
 ```sh
-NEXUS_RAM_MB=6144 NEXUS_CPUS=4 NEXUS_DISK_SIZE=48G \
-NEXUS_QEMU_ACCEL=kvm bash scripts/launch-qemu.sh
+NEXUS_RAM_MB=4096 NEXUS_CPUS=2 NEXUS_DISK_SIZE=32G \
+NEXUS_QEMU_ACCEL=tcg bash scripts/launch-qemu.sh
 ```
 
-Supported disk capacity syntax is a positive integer followed by `M`, `G`, or `T`. The disk capacity is applied only when the virtual disk is first created; changing the variable does not resize an existing disk. To use a non-default media/disk location set `NEXUS_ISO_PATH` and/or `NEXUS_DISK_PATH`. The launch script is interactive and should not be run in unattended CI without a display configuration. On macOS, override the window backend with `NEXUS_QEMU_DISPLAY=BACKEND` if needed (for example, `cocoa`); on headless hosts, consult `qemu-system-x86_64 -display help` before selecting a backend.
+Change the VM disk capacity only when creating a new disk; changing the variable does not resize an existing one. For headless hosts, inspect `qemu-system-x86_64 -display help` and set `NEXUS_QEMU_DISPLAY` to a supported backend.
 
 ## Checks
 
@@ -80,13 +86,13 @@ Supported disk capacity syntax is a positive integer followed by `M`, `G`, or `T
 bash scripts/check-foundation.sh
 ```
 
-This checks shell syntax, required tracked files, Git ignore entries, and key safety/wiring patterns. It is not a full shell linter, image build, installer test, checksum verification run, or QEMU boot test. For a syntax-only check use `bash -n scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh` (or run the supplied checker). Record actual download verification and QEMU results separately when performed.
+This checks shell syntax, required tracked files, Git ignore entries, key media-verification and QEMU wiring, and the browser prototype checks. It is not a NEXUS image build, installer test, Chromebook hardware test, benchmark, or QEMU boot acceptance result. Record actual media verification and VM results separately.
 
 ## Reproducibility and security boundaries
 
-- Source media is version-named; its checksum is taken from the downloaded, signature-verified Ubuntu manifest. No digest is asserted in Git.
-- Reproducibility here means a repeatable acquisition and local VM procedure, not a reproducible customized OS build. Ubuntu media and packages can have lifecycle/mirror changes; record the exact ISO digest and host/tool versions in a future tested release record.
-- Generated downloads, VM disks, firmware variables and state live under ignored `build/`. Never commit guest state, private keys, credentials, or `.env` files.
-- OVMF firmware files come from the host distribution package and are not checked into this repository.
-- The guest install, partitioning, updates, Wayland session, compositor, GPU/audio setup, and security configuration remain manual/planned work. `linux/config/nexus-system.conf` is currently declarative only.
-- Buildroot remains an experimental external tree; this milestone does not add a Buildroot defconfig, kernel config, root filesystem, package set, or bootable Buildroot image.
+- The Mint media version and edition are pinned; the ISO digest comes from its signed manifest. No checksum is guessed or embedded.
+- This is repeatable media acquisition and a local VM procedure, not a reproducible customized NEXUS image build.
+- Generated downloads, VM disks, firmware variables, and guest state live under ignored `build/`. Never commit credentials, private keys, personal data, or guest state.
+- OVMF firmware comes from the host distribution or Homebrew QEMU and is not checked into this repository.
+- The native session, partitioning, device drivers, suspend/resume, security configuration, and Chromebook firmware changes remain planned work. `linux/config/nexus-system.conf` is declarative only.
+- Buildroot remains experimental; this milestone does not add a Buildroot defconfig, kernel config, root filesystem, package set, or bootable image.
