@@ -1,6 +1,15 @@
 (() => {
   const apps = new Map();
+  const mountedRoots = new Map();
   const settingsEnhancements = [];
+
+  function cleanupRoot(root) {
+    const instance = mountedRoots.get(root);
+    if (!instance) return false;
+    mountedRoots.delete(root);
+    if (typeof instance.cleanup === "function") instance.cleanup();
+    return true;
+  }
 
   window.NexusAppRegistry = {
     register(app) {
@@ -18,17 +27,18 @@
     },
     mountApp(id, root, context) {
       const app = apps.get(id);
-      if (!app) return false;
-      if (typeof app.cleanup === "function") app.cleanup();
+      if (!app || !root) return false;
+      cleanupRoot(root);
       const cleanup = app.mount(root, context);
-      app.cleanup = typeof cleanup === "function" ? cleanup : null;
+      mountedRoots.set(root, { id, cleanup: typeof cleanup === "function" ? cleanup : null });
       return true;
     },
+    unmountRoot(root) {
+      return cleanupRoot(root);
+    },
     unmountApp(id) {
-      const app = apps.get(id);
-      if (app && typeof app.cleanup === "function") {
-        app.cleanup();
-        app.cleanup = null;
+      for (const [root, instance] of mountedRoots) {
+        if (instance.id === id) cleanupRoot(root);
       }
     },
     registerSettingsEnhancement(enhancement) {
