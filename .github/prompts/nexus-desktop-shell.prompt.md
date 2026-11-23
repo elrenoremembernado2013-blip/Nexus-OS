@@ -1,6 +1,9 @@
 # Copilot Task — NEXUS OS desktop shell and window manager
 
-Work on the `nexus-foundation` branch. Read `.github/copilot-instructions.md` first.
+Work on the `nexus-linux-foundation` branch. Read `.github/copilot-instructions.md` first.
+
+## Scope
+This prompt covers the browser prototype only. The Linux-native prototype direction is documented in `docs/PLATFORM_ARCHITECTURE.md`; do not treat browser changes here as native desktop integration.
 
 ## Context
 The current browser prototype has a warm copper/orange accent, smoky charcoal glass surfaces, a photographic mountain wallpaper, a translucent dock, and floating application windows. Preserve this visual direction and existing apps.
