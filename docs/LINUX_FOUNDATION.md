@@ -1,65 +1,68 @@
 # NEXUS OS Linux Foundation
 
-## Status
+## Status and decision
 
-This is the initial, deliberately incomplete Buildroot external-tree scaffold. It is **not a bootable operating system** and is not yet ready to compile.
+The first full NEXUS desktop foundation is **Ubuntu 26.04 LTS minimal/server**. Linux Mint is a fallback only if a specific, documented blocker makes Ubuntu unsuitable; Mint is not a competing default or a parallel build target.
 
-The browser desktop prototype remains on this branch and is preserved unchanged.
+The current repository contains verified-media and QEMU helper scripts plus an initial Buildroot external-tree scaffold. The scripts can download official Ubuntu media, verify it against the signed checksum manifest, and launch a stock Ubuntu installer or guest. They do not create a customized NEXUS image. The Buildroot tree is experimental scaffolding and is not ready to build or boot. NEXUS is not yet a bootable OS.
 
-## Repository layout
+## Repository roles
 
-- `nexus-br2-external/`: NEXUS-owned Buildroot customizations.
-- `nexus-br2-external/external.desc`: Buildroot external-tree identity.
-- `nexus-br2-external/Config.in`: NEXUS Kconfig menu entry.
-- `nexus-br2-external/external.mk`: NEXUS package/build integration point.
-- `docs/LINUX_FOUNDATION.md`: architecture decisions and readiness checklist.
+- `scripts/download-ubuntu.sh`: acquire Ubuntu Server media and verify its signed checksum manifest.
+- `scripts/launch-qemu.sh`: run the installer or an installed Ubuntu guest using UEFI/OVMF.
+- `linux/config/`: declarative design defaults; not consumed by an image build.
+- `nexus-br2-external/`: separate Buildroot external-tree entry points for future lightweight experiments.
+- `docs/PLATFORM_ARCHITECTURE.md`: full platform, session, security, compatibility, and acceptance decisions.
 
-## Buildroot integration
+## Foundation decisions
 
-NEXUS uses Buildroot's `br2-external` mechanism so project-specific configuration and packages remain separate from upstream Buildroot. The external tree currently contains the required entry-point files only; it does not yet contain a defconfig, kernel configuration, board support, root filesystem overlay, or package recipes.
+1. **Primary base:** Ubuntu 26.04 LTS minimal/server, customized by NEXUS.
+2. **Fallback:** Linux Mint only after recording an Ubuntu blocker and evaluating the tradeoffs; do not maintain both as equal targets.
+3. **Target:** x86-64 PC/VM, UEFI firmware via OVMF in QEMU, and GRUB for initial boot.
+4. **Services:** Ubuntu's systemd; graphical login starts a per-user Wayland session. Production compositor and shell toolkit remain open.
+5. **Validation:** QEMU acceptance before physical-hardware claims. The existing QEMU script currently runs a stock Ubuntu guest.
+6. **Buildroot:** experimental lightweight/appliance or recovery-image path, not the primary general-purpose desktop.
+7. **Memory:** 128 MB idle is an aspiration only. No measurement or achievement is claimed.
 
-Official documentation: https://buildroot.org/downloads/manual/manual.html
+## Reproducibility requirements
 
-## Confirmed platform direction
+The signed-manifest check makes downloaded Ubuntu media verifiable, but does not make a customized NEXUS image reproducible. Before building such an image, pin and record the Ubuntu point-release artifact and checksum, package sources and versions, toolchain/build tools, kernel and boot components, desktop dependencies, and external source revisions. Use authenticated sources, immutable revisions or checksums, a clean documented build environment, and a recorded output digest. Compare independent clean builds before describing results as reproducible. Never publish guessed pins or checksums.
 
-1. **Primary target:** x86_64 PC/VM first.
-2. **Graphics protocol:** Wayland.
-3. **Compatibility:** plan for XWayland so X11 applications can run within the Wayland session.
-4. **First validation target:** QEMU before physical hardware.
+## QEMU acceptance gate
 
-See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the Steam compatibility requirements and the still-open base-distribution decision.
+Before calling a NEXUS image bootable, it must boot from a clean virtual disk through x86-64 UEFI/OVMF and GRUB, reach a usable Wayland session, exercise the declared virtio input/display/storage/network/audio devices, and shut down cleanly. Record the image digest, QEMU and OVMF versions, exact launch command, VM profile, and observed results. Verify standard-user access and elevation boundaries. These criteria are not yet met by the current stock-Ubuntu workflow.
 
-## Decisions required before a real defconfig
+## Services, session, and permissions
 
-1. **First boot target:** UEFI in QEMU using OVMF; evaluate legacy BIOS later.
-2. **Bootloader:** GRUB for the first Ubuntu-based image.
-3. **Init system:** systemd, matching Ubuntu's service model.
-4. **Native desktop:** choose the production Wayland compositor and shell toolkit. Weston may be used temporarily for bring-up, not assumed to be the final shell.
-5. **Buildroot release (if retained):** pin a verified stable release or commit and record its source checksum/commit.
-6. **RAM target:** treat 128 MB as an aspirational measurement target, not a promise. A graphical desktop and modern shell may require substantially more memory.
+Use systemd for system boot and service supervision. Run the graphical session and desktop apps under a standard user account, not root. Require authenticated elevation for administrative tasks; use dedicated service accounts and narrow device permissions where services need them. Prefer established D-Bus, portal, networking, audio, and device interfaces. Avoid broad privileges and unnecessary listening services. Keep Ubuntu's authenticated security update path enabled. The shell must not claim privileged hardware control until a permission-checked native service exists.
 
-## Readiness checklist
+## Updates and recovery
 
-- [x] Create a separate NEXUS Buildroot external-tree scaffold.
-- [x] Choose and document x86_64 and Wayland as the first platform direction.
-- [x] Choose the first QEMU firmware mode: UEFI/OVMF.
-- [x] Choose GRUB as the first bootloader and systemd as the init/service manager.
-- [x] Select Ubuntu 26.04 LTS minimal/server as the recommended main desktop base.
-- [x] Retain Buildroot for separate minimal-image experiments, not the primary gaming desktop.
-- [ ] Validate XWayland and Steam runtime requirements in the Ubuntu-based test environment.
-- [ ] Pin the upstream Buildroot source revision.
-- [ ] Add a minimal, reviewed defconfig.
-- [ ] Add kernel and root filesystem configuration.
-- [ ] Add reproducible build scripts and dependency documentation.
-- [ ] Build successfully in a clean environment.
-- [ ] Boot the resulting image in QEMU and record the exact command and result.
-- [ ] Measure idle memory with a documented metric and repeatable procedure.
-- [ ] Review security defaults before adding network-facing services.
+Use Ubuntu's authenticated package updates for the initial base. Before distributing a bootable image, document how user data is protected and how a failed update or disk problem can be recovered. Test a recovery path before promising rollback or atomic updates. Buildroot may be evaluated for a recovery environment, but no such environment currently exists. Do not add an unreviewed custom updater.
 
-## Safety and security principles
+## Desktop and compatibility boundary
 
-- Prefer least privilege and a minimal package set.
-- Keep build outputs outside tracked source directories.
-- Do not include secrets, credentials, or personal data in the repository.
-- Verify upstream source versions and checksums before pinning dependencies.
-- Keep the prototype's simulated controls clearly distinguished from real hardware controls.
+Ubuntu provides the kernel, drivers, libraries, system services, and package/update base; NEXUS provides the shell, desktop identity, applications, and permission-checked integrations. The browser prototype is not the native desktop and does not control the host.
+
+Steam/Proton, Wine, Waydroid, and Darling are future conditional integrations, each requiring a feasibility, security, maintenance, and feature-specific test before inclusion or compatibility claims. Steam/Proton additionally depends on tested multilib and graphics drivers, Vulkan/OpenGL, audio, D-Bus, and XWayland. Quantum is a future application, not part of the base OS or a delivered native feature.
+
+## Current readiness
+
+- [x] Ubuntu selected as the primary base; Mint specified as contingency only.
+- [x] x86-64, UEFI/OVMF, GRUB, systemd, and QEMU-first direction recorded.
+- [x] Buildroot scoped as experimental, separate lightweight image work.
+- [x] 128 MB idle described as an unverified aspiration.
+- [ ] Verify and pin exact Ubuntu media and build inputs for a custom image.
+- [ ] Select and prototype the production Wayland compositor, login flow, and shell toolkit.
+- [ ] Add reviewed image configuration and repeatable build tooling.
+- [ ] Build a custom image and meet the QEMU acceptance criteria.
+- [ ] Measure idle memory using a documented, repeatable method.
+- [ ] Test and document user-data recovery and update failure handling.
+- [ ] Evaluate compatibility integrations individually before making support claims.
+
+## Safety principles
+
+- Keep generated images, downloads, and VM state under ignored build output directories.
+- Never commit credentials, private keys, personal data, or guest state.
+- Verify upstream versions and checksums before pinning inputs.
+- Keep browser-preview behavior distinct from native OS functionality.
