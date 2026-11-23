@@ -10,7 +10,9 @@
   }
   function emit(type, win) {
     const event = { type, window: win ? snapshot(win) : null, activeId };
-    listeners.forEach(listener => listener(event));
+    listeners.forEach(listener => {
+      try { listener(event); } catch (error) { /* A subscriber must not break window state. */ }
+    });
   }
   function activate(id) {
     const win = windows.get(id);
@@ -75,7 +77,9 @@
       const win = windows.get(id);
       if (!win) return false;
       windows.delete(id);
-      if (typeof win.onClose === "function") win.onClose(snapshot(win));
+      if (typeof win.onClose === "function") {
+        try { win.onClose(snapshot(win)); } catch (error) { /* Closing must complete even if cleanup fails. */ }
+      }
       if (activeId === id) {
         activeId = null;
         const candidates = [...windows.values()].filter(item => item.state === "normal").sort((a, b) => b.zIndex - a.zIndex);
