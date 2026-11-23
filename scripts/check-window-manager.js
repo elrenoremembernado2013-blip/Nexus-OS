@@ -47,4 +47,11 @@ assert.throws(() => manager.open("invalid app", "Bad"), /valid app ID/);
 unsub();
 manager.open("notes", "after unsubscribe");
 assert.ok(!events.some(e => e.startsWith("open:nexus-window-4")));
+// A throwing event listener and close callback must not corrupt manager state.
+const throwingListener = () => { throw new Error("listener failure"); };
+manager.subscribe(throwingListener);
+const resilient = manager.open("notes", "Resilience check", { onClose: () => { throw new Error("cleanup failure"); } });
+assert.equal(manager.close(resilient), true);
+assert.equal(manager.get(resilient), null);
+assert.equal(manager.close(resilient), false);
 console.log("PASS NEXUS window manager core tests");
