@@ -17,6 +17,7 @@ for file in "${JS_FILES[@]}"; do
 done
 node scripts/check-app-registry.js
 node scripts/check-window-manager.js
+node scripts/check-terminal-preview.js
 
 python3 - <<'PY'
 from pathlib import Path
