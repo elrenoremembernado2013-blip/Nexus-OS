@@ -5,6 +5,7 @@ This milestone establishes verified Ubuntu installation media and a local QEMU/U
 ## Target and layout
 
 - Target: x86_64; Ubuntu 26.04.1 LTS Server minimal installation as the initial base.
+- Physical reference device: HP Chromebook x360 14b-cb0 (MADOO), Celeron N4500, 4 GB RAM, 32 GB eMMC. Its storage and memory are constraints for the future native image; no NEXUS boot on this device is claimed.
 - Guest direction: Wayland, GRUB, systemd; UEFI firmware via OVMF in QEMU.
 - `scripts/`: ISO verification, QEMU launch, static checks.
 - `linux/config/`: reviewed design defaults; not yet consumed by an image build.
@@ -58,6 +59,8 @@ bash scripts/launch-qemu.sh --dry-run
 
 The dry run validates RAM, CPU, disk, accelerator and boot-media values without
 creating a disk, locating firmware or starting a VM.
+
+The current 4 GiB RAM and 40 GiB virtual disk defaults describe a VM on the development host (for example, the Mac used to prepare this project). They are not Chromebook requirements or a profile for running QEMU on the 4 GB reference device. The Mac-side VM checks the generic Ubuntu/QEMU workflow only; it does not validate Chromebook firmware, drivers, performance, or NEXUS bootability.
 
 The script creates an ignored qcow2 disk if needed, keeps writable OVMF variables under `build/qemu/`, and attaches the installer ISO when present. Complete the Ubuntu installer interactively; the script does not automate installation or configure the installed guest. On subsequent launches it boots from the disk if the ISO is not present (if the ISO remains, it boots the installer first).
 
