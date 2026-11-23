@@ -12,6 +12,8 @@ The initial physical reference device is the **HP Chromebook x360 14b-cb0 (MADOO
 
 Design and test plans must treat 4 GB RAM and 32 GB storage as hard device constraints. Keep the base install and user data within the available storage, and measure memory on the physical device after the first native image boots. The 128 MB idle figure remains an aspiration only. The QEMU launch script's 4 GB guest RAM and 40 GB virtual disk defaults are for development-host testing; they do not describe a configuration to run on this Chromebook.
 
+Ubuntu 26.04 Desktop lists 6 GB RAM and 25 GB free storage for a comfortable experience, so the stock desktop is outside this device's RAM target. Ubuntu Server requirements vary by workload and start lower, but adding a graphical session changes that profile. Keep Ubuntu minimal/server as the base candidate and qualify the complete NEXUS session against this device's measured RAM and eMMC budget before calling Ubuntu suitable. If the selected desktop stack cannot fit with usable headroom, first evaluate a lighter Ubuntu session; consider Linux Mint only if Ubuntu has a documented blocker, as already decided.
+
 MADOO is listed by MrChromebox as supporting UEFI Full ROM firmware. This indicates a possible firmware path for a standard UEFI test, not that NEXUS has booted or that every Chromebook component is supported. Firmware modification, recovery, and device-specific driver validation remain separate prerequisites before installing to the Chromebook.
 
 ## Platform decisions
