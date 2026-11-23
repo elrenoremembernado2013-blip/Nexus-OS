@@ -38,7 +38,15 @@
       return [...windows.values()].sort((a, b) => a.zIndex - b.zIndex).map(snapshot);
     },
     getActive() {
-      return activeId ? snapshot(windows.get(activeId)) : null;
+      const win = activeId ? windows.get(activeId) : null;
+      return win ? snapshot(win) : null;
+    },
+    setTitle(id, title) {
+      const win = windows.get(id);
+      if (!win) return false;
+      win.title = String(title || win.appId);
+      emit("title", win);
+      return true;
     },
     focus(id) {
       return activate(id);
@@ -76,6 +84,11 @@
       win.state = "closed";
       emit("close", win);
       return true;
+    },
+    minimizeApp(appId) {
+      const ids = [...windows.values()].filter(win => win.appId === appId && win.state === "normal").map(win => win.id);
+      ids.forEach(id => this.minimize(id));
+      return ids.length;
     },
     closeApp(appId) {
       const ids = [...windows.values()].filter(win => win.appId === appId).map(win => win.id);
