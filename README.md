@@ -14,7 +14,7 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 - Notes with browser-local autosave
 - Settings: appearance, wallpaper, accent, glass, performance, notifications, accessibility, system information and native-integration status pages
 - Browser launcher (opens valid HTTP/HTTPS links in a new tab)
-- Safe Terminal simulation (demo commands only)
+- Terminal preview with an explicit unavailable-native-Bash state; no fake commands are executed
 - Gaming Hub preview
 - Basic calculator
 
@@ -33,3 +33,4 @@ The File Manager uses browser file-system permissions only after the user explic
 3. Implement settings persistence and safe local file permissions.
 4. Build a Linux-native backend and package the desktop.
 5. Integrate system monitoring, power controls and Steam/Proton through legitimate native interfaces.
+6. Implement the native Ubuntu GNU Bash terminal through a trusted PTY-backed session service; see [Native Terminal architecture](docs/NATIVE_TERMINAL.md).
