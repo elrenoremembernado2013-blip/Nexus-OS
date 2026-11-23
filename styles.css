@@ -821,3 +821,39 @@ body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after
 .window-titlebar:active{cursor:grabbing}
 .window-control:focus-visible,.dock-app:focus-visible,.app-item:focus-visible,.top-icon:focus-visible,.status-pill:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){.dock-app:hover{transform:none}}
+
+
+/* NEXUS Terminal — native Bash is deliberately unavailable in browser preview */
+.nexus-terminal{
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:15px;
+  background:rgba(8,10,17,.88);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 16px 38px rgba(0,0,0,.2);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.terminal-toolbar{
+  display:flex;align-items:center;gap:12px;min-height:39px;padding:0 13px;
+  border-bottom:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.035);
+}
+.terminal-leds{display:flex;gap:5px}
+.terminal-leds i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.28)}
+.terminal-toolbar-title{font-size:9px;letter-spacing:1.4px;color:#d8d7e4}
+.terminal-mode{margin-left:auto;padding:4px 7px;border:1px solid rgba(255,190,120,.25);border-radius:6px;color:#ffc18e;font-size:8px;letter-spacing:1px}
+.terminal-screen{min-height:205px;max-height:320px;overflow:auto;padding:17px 16px;color:#d9e5df;font-size:11px;line-height:1.75}
+.terminal-screen p{margin:0 0 5px}
+.terminal-welcome{font-size:13px;font-weight:650;color:#f2f0fa}
+.terminal-muted{color:#9ca9b7}
+.terminal-warning{color:#ffc18e}
+.terminal-prompt{margin-top:15px!important;color:#dfe7e2}
+.terminal-prompt span:first-child{color:#8ed9b1}
+.terminal-prompt span:nth-child(2){color:#8ec9e8}
+.terminal-caret{display:inline-block;width:7px;height:13px;margin-left:3px;vertical-align:-2px;background:#ffad7a;animation:nexus-terminal-blink 1s steps(2,start) infinite}
+.terminal-input{display:flex;align-items:center;gap:9px;margin:0 13px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+.terminal-input-prompt{color:#8ed9b1;font:12px ui-monospace,monospace}
+.terminal-input input{min-width:0;flex:1;background:transparent;border:0;outline:0;color:#f4f1fa;font:11px ui-monospace,monospace}
+.terminal-input input::placeholder{color:#858b9b}
+.terminal-input .action-button{font:10px ui-sans-serif,system-ui;padding:7px 11px}
+.terminal-footnote{margin:0;padding:0 13px 13px;color:#a5adba;font:9px/1.5 ui-sans-serif,system-ui}
+@keyframes nexus-terminal-blink{to{visibility:hidden}}
+@media(prefers-reduced-motion:reduce){.terminal-caret{animation:none}}
