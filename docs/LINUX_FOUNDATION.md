@@ -19,10 +19,16 @@ The current repository contains verified-media and QEMU helper scripts plus an i
 1. **Primary base:** Ubuntu 26.04 LTS minimal/server, customized by NEXUS.
 2. **Fallback:** Linux Mint only after recording an Ubuntu blocker and evaluating the tradeoffs; do not maintain both as equal targets.
 3. **Target:** x86-64 PC/VM, UEFI firmware via OVMF in QEMU, and GRUB for initial boot.
-4. **Services:** Ubuntu's systemd; graphical login starts a per-user Wayland session. Production compositor and shell toolkit remain open.
+4. **Desktop prototype:** KWin Wayland with the Plasma shell and Qt Quick/QML; start with a NEXUS theme/layout and one custom plasmoid. This is a selected spike baseline, pending QEMU and memory validation.
 5. **Validation:** QEMU acceptance before physical-hardware claims. The existing QEMU script currently runs a stock Ubuntu guest.
 6. **Buildroot:** experimental lightweight/appliance or recovery-image path, not the primary general-purpose desktop.
 7. **Memory:** 128 MB idle is an aspiration only. No measurement or achievement is claimed.
+
+## Desktop stack prototype baseline
+
+Use KWin on Wayland with the Plasma shell and Qt Quick/QML for the first native desktop spike. Customize Plasma's global theme and panel layout, then add one focused QML plasmoid. Keep the existing HTML/CSS/JavaScript desktop as a design reference; do not claim it is already native or directly reusable. This avoids writing a compositor and lets the spike test whether Plasma can express the NEXUS desktop while running on Ubuntu.
+
+The tradeoff is package and memory overhead versus a minimal compositor such as labwc. GNOME Shell/Mutter would follow Ubuntu's default desktop more closely but would couple NEXUS to GNOME extension behavior. The selection is only a prototype baseline. Check login, panel/launcher, QML widget, window operations, accessibility, logout, package versions, and memory in QEMU before keeping it as the production direction. No memory target is presumed met.
 
 ## Reproducibility requirements
 
@@ -53,7 +59,7 @@ Steam/Proton, Wine, Waydroid, and Darling are future conditional integrations, e
 - [x] Buildroot scoped as experimental, separate lightweight image work.
 - [x] 128 MB idle described as an unverified aspiration.
 - [ ] Verify and pin exact Ubuntu media and build inputs for a custom image.
-- [ ] Select and prototype the production Wayland compositor, login flow, and shell toolkit.
+- [ ] Prototype the KWin/Plasma/QML baseline in QEMU and measure its memory use before treating it as production-ready.
 - [ ] Add reviewed image configuration and repeatable build tooling.
 - [ ] Build a custom image and meet the QEMU acceptance criteria.
 - [ ] Measure idle memory using a documented, repeatable method.

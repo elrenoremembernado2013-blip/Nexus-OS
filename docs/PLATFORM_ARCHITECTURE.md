@@ -15,12 +15,30 @@ The Ubuntu installer/QEMU scripts currently create a stock Ubuntu guest. They do
 | Main architecture | x86-64 (AMD64) |
 | Firmware / boot | UEFI with OVMF in QEMU; GRUB as the initial bootloader |
 | Init and system services | Ubuntu's systemd |
-| Session | Wayland; compositor and production shell toolkit remain undecided |
+| Session | Wayland; prototype baseline is KWin with the Plasma shell and Qt Quick/QML |
 | X11 apps | XWayland planned and subject to acceptance tests |
 | First validation | QEMU virtual machine before physical hardware |
 | Experimental small image | Existing Buildroot external tree, separate from the primary desktop |
 
 These choices set a development direction, not a claim that a bootable NEXUS image exists.
+
+## Desktop stack prototype baseline
+
+For the first native desktop spike, use **KWin on Wayland with the KDE Plasma shell and Qt Quick/QML**. Customize the desktop first through a Plasma global theme, panel layout, and a small NEXUS QML plasmoid; keep KWin as the maintained compositor/window manager. Do not build a custom compositor or port every browser-prototype app as part of this spike.
+
+This is a prototype baseline, not a claim that a NEXUS desktop session has been installed or tested. It fits the current goal because Plasma already provides an integrated session, panels, launcher, task handling, and a supported extension and theming path that can carry the existing visual identity. Ubuntu lists Kubuntu as its KDE Plasma flavor, and KDE documents Plasma styles, panel layouts, widgets, and QML components. The Ubuntu base remains primary; this selects desktop components on that base.
+
+### Approaches considered
+
+- **KWin + Plasma + QML (recommended first spike):** integrated desktop services and mature customization points; the tradeoff is a larger package and memory footprint than a minimal compositor.
+- **GNOME Shell/Mutter + extensions:** closest to the default Ubuntu desktop stack, but NEXUS would depend heavily on Shell extension APIs and would have less separation from GNOME-specific behavior.
+- **labwc + standalone NEXUS shell:** potentially leaner and more independent, but NEXUS would need to assemble and maintain panels, launcher, notifications, task handling, session integration, and other desktop pieces itself.
+
+The repository's current desktop is static HTML/CSS/JavaScript. Treat it as the visual and interaction reference during the spike; it is not a native Qt app, and this decision does not imply an automatic code reuse path.
+
+### Prototype acceptance
+
+On a clean Ubuntu-based QEMU guest, the spike should demonstrate a login into the KWin/Plasma Wayland session, a NEXUS panel/launcher theme or layout, a custom QML widget, normal app-window focus/minimize/restore, keyboard navigation, reduced-motion behavior, and clean logout. Record installed package versions, VM resources, startup/idle memory, and any missing visual or behavior requirements. Compare memory with a documented baseline before deciding whether to keep the stack or revisit labwc. No 128 MB result is assumed.
 
 ## Why Ubuntu first
 
@@ -57,7 +75,7 @@ These are future acceptance criteria. The existing launch script starts a stock 
 
 Use Ubuntu's systemd for boot, service supervision, logging, device/session integration, and scheduled maintenance. Keep system services narrowly scoped and independently reviewable. The graphical login should start a per-user Wayland session; the chosen compositor owns display/input session coordination, while the NEXUS shell and applications run as the logged-in user.
 
-Use established system interfaces for D-Bus, networking, audio, portals, and device access. Do not let the shell impersonate privileged services or directly expose unrestricted host operations. The production compositor, display manager, audio stack, and shell toolkit remain decisions for a later working session prototype.
+Use established system interfaces for D-Bus, networking, audio, portals, and device access. Do not let the shell impersonate privileged services or directly expose unrestricted host operations. KWin/Plasma is the selected first prototype baseline; installation, integration, memory use, accessibility, and hardware behavior still require QEMU validation before it is treated as production-ready.
 
 ## Users and security
 
