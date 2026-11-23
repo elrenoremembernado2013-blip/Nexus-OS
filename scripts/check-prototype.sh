@@ -15,6 +15,7 @@ for file in "${JS_FILES[@]}"; do
   node --check "$file"
   printf 'PASS JavaScript syntax: %s\n' "$file"
 done
+node scripts/check-app-registry.js
 
 python3 - <<'PY'
 from pathlib import Path
