@@ -20,9 +20,9 @@ sudo apt update
 sudo apt install bash coreutils curl gpgv ubuntu-keyring qemu-system-x86 qemu-utils ovmf
 ```
 
-Roles: `curl` downloads release files over HTTPS; `gpgv` validates the signed checksum manifest; `ubuntu-keyring` supplies the archive trust anchors; `coreutils` supplies `sha256sum`; `qemu-system-x86` runs the guest; `qemu-utils` supplies `qemu-img`; `ovmf` supplies UEFI firmware. `bash` runs scripts. The automated checks use Bash and standard utilities. Optional `shellcheck` may be used for additional linting but is not required by the supplied check script.
+Roles: `curl` downloads release files over HTTPS; `gpgv` validates the signed checksum manifest; `ubuntu-keyring` supplies the archive trust anchors; `coreutils` supplies `sha256sum`; `qemu-system-x86` runs the guest; `qemu-utils` supplies `qemu-img`; `ovmf` supplies UEFI firmware. `bash` runs scripts. The automated checks use Bash and standard utilities. On macOS, install Homebrew, then run `brew install qemu node`; the project launcher uses QEMU’s Cocoa display backend and the x86-64 EDK II firmware shipped with Homebrew QEMU. Node.js is available for future tooling and is not required by the current foundation scripts. Optional `shellcheck` may be used for additional linting but is not required by the supplied check script.
 
-For accelerated KVM, the host also needs a working `/dev/kvm` and user permissions. TCG is the script default and requires no KVM access, but may be slow. GTK display support is expected by the default launch command. If the OVMF files are installed in a nonstandard location, set both `OVMF_CODE` and `OVMF_VARS` to a matching pair.
+For accelerated KVM, a Linux host also needs a working `/dev/kvm` and user permissions. TCG is the script default and requires no KVM access, but may be slow; on Apple Silicon, x86-64 guests use TCG emulation. The launcher defaults to Cocoa display on macOS and GTK elsewhere. On macOS, Homebrew QEMU provides the x86-64 UEFI code and variables files. If firmware is installed in a nonstandard location, set both `OVMF_CODE` and `OVMF_VARS` to a matching pair.
 
 ## Download and verify official media
 
@@ -68,7 +68,7 @@ NEXUS_RAM_MB=6144 NEXUS_CPUS=4 NEXUS_DISK_SIZE=48G \
 NEXUS_QEMU_ACCEL=kvm bash scripts/launch-qemu.sh
 ```
 
-Supported disk capacity syntax is a positive integer followed by `M`, `G`, or `T`. The disk capacity is applied only when the virtual disk is first created; changing the variable does not resize an existing disk. To use a non-default media/disk location set `NEXUS_ISO_PATH` and/or `NEXUS_DISK_PATH`. The launch script is interactive and should not be run in unattended CI without a display configuration.
+Supported disk capacity syntax is a positive integer followed by `M`, `G`, or `T`. The disk capacity is applied only when the virtual disk is first created; changing the variable does not resize an existing disk. To use a non-default media/disk location set `NEXUS_ISO_PATH` and/or `NEXUS_DISK_PATH`. The launch script is interactive and should not be run in unattended CI without a display configuration. On macOS, override the window backend with `NEXUS_QEMU_DISPLAY=BACKEND` if needed (for example, `cocoa`); on headless hosts, consult `qemu-system-x86_64 -display help` before selecting a backend.
 
 ## Checks
 
