@@ -6,6 +6,7 @@ This milestone establishes verified Ubuntu installation media and a local QEMU/U
 
 - Target: x86_64; Ubuntu 26.04.1 LTS Server minimal installation as the initial base.
 - Physical reference device: HP Chromebook x360 14b-cb0 (MADOO), Celeron N4500, 4 GB RAM, 32 GB eMMC. Its storage and memory are constraints for the future native image; no NEXUS boot on this device is claimed.
+- Qualification note: Ubuntu 26.04 Desktop calls for 6 GB RAM and 25 GB free storage for a comfortable experience. Do not treat the stock Desktop image as a fit for this 4 GB target. The current minimal/server base plus a NEXUS session remains a candidate only until its actual memory and storage use are measured on the device.
 - Guest direction: Wayland, GRUB, systemd; UEFI firmware via OVMF in QEMU.
 - `scripts/`: ISO verification, QEMU launch, static checks.
 - `linux/config/`: reviewed design defaults; not yet consumed by an image build.
