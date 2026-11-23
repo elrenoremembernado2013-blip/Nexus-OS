@@ -7,7 +7,7 @@ Build a lightweight, secure, customizable desktop environment designed to run sm
 
 ## Linux-native desktop direction
 
-The first native desktop prototype baseline is KWin on Wayland with the KDE Plasma shell and Qt Quick/QML, on the Ubuntu foundation. Treat this as a prototype choice pending QEMU and memory validation, not a delivered or tested feature. Start with a Plasma theme/layout and one focused QML widget; do not build a custom compositor. Keep the existing browser prototype clearly identified as a prototype and visual reference. See `docs/PLATFORM_ARCHITECTURE.md` and `docs/LINUX_FOUNDATION.md`.
+The first native desktop prototype baseline is Linux Mint 22.3 Xfce on its Ubuntu 24.04 LTS package base, targeting the HP Chromebook x360 14b (MADOO: 4 GB RAM, 32 GB eMMC). Treat this as an unvalidated prototype direction. Start with Xfce theme, panel and menu customization; do not build a custom compositor. Keep the existing browser prototype clearly identified as a prototype and visual reference. See `docs/PLATFORM_ARCHITECTURE.md` and `docs/LINUX_FOUNDATION.md`.
 
 ## Design
 - Premium, cinematic, minimalist dark UI with glass panels, warm copper/orange accents with optional cool theme variants, real non-AI photographic wallpapers, and careful typography.
