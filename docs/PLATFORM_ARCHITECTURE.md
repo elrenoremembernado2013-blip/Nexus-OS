@@ -6,6 +6,14 @@ NEXUS's first full desktop foundation is **Ubuntu 26.04 LTS minimal/server**, cu
 
 The Ubuntu installer/QEMU scripts currently create a stock Ubuntu guest. They do not build, install, or boot a NEXUS OS image. The browser desktop remains a prototype and does not control host hardware.
 
+## Reference device
+
+The initial physical reference device is the **HP Chromebook x360 14b-cb0 (MADOO)** with Intel Celeron N4500 (2 cores/2 threads), 4 GB RAM, and 32 GB eMMC storage, based on the owner's reported specifications. HP documents this model family with the N4500, 4 GB and 32 GB configurations. The firmware version reported is 158.16868.0; MADOO is the board/platform name, not that version number.
+
+Design and test plans must treat 4 GB RAM and 32 GB storage as hard device constraints. Keep the base install and user data within the available storage, and measure memory on the physical device after the first native image boots. The 128 MB idle figure remains an aspiration only. The QEMU launch script's 4 GB guest RAM and 40 GB virtual disk defaults are for development-host testing; they do not describe a configuration to run on this Chromebook.
+
+MADOO is listed by MrChromebox as supporting UEFI Full ROM firmware. This indicates a possible firmware path for a standard UEFI test, not that NEXUS has booted or that every Chromebook component is supported. Firmware modification, recovery, and device-specific driver validation remain separate prerequisites before installing to the Chromebook.
+
 ## Platform decisions
 
 | Area | Initial direction |
