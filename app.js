@@ -499,7 +499,6 @@ if(app==="settings"){
   document.documentElement.style.setProperty("--blur","18px");
   applyWallpaper("alpine",false);
   applyTheme("dark");
-  setMotion(Boolean(motionMedia?.matches),false);
   brightness.value="100";updateBrightness();
   Object.entries(controlDefaults).forEach(([key,value])=>setControlPreference(key,value));
   setAccent("#ffad7a");blur.value="18";setBlur();
