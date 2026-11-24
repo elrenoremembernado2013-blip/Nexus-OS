@@ -710,12 +710,12 @@ document.addEventListener("keydown",event=>{
 
 $("#appSearch").oninput=renderLauncher;
 $("#appSearch").onkeydown=event=>{
- const items=$(".app-item").filter(item=>item.style.display!=="none");
+ const items=Array.from(document.querySelectorAll(".app-item")).filter(item=>item.style.display!=="none");
  if(event.key==="Enter"&&items.length){event.preventDefault();items[0].click()}
  else if(event.key==="ArrowDown"&&items.length){event.preventDefault();items[0].focus()}
 };
 $("#appGrid").addEventListener("keydown",event=>{
- const items=$(".app-item").filter(item=>item.style.display!=="none");
+ const items=Array.from(document.querySelectorAll(".app-item")).filter(item=>item.style.display!=="none");
  const index=items.indexOf(event.target.closest(".app-item"));
  if(index<0||!items.length)return;
  let next=index;
