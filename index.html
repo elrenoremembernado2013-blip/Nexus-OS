@@ -13,8 +13,8 @@
       <div class="brand"><span class="brand-mark">N</span><span>NEXUS</span></div>
       <div class="top-center" id="clock">--:--</div>
       <div class="top-actions">
-        <button class="top-icon" aria-label="Open Control Centre notifications" id="notificationButton" title="Notifications">◉</button>
-        <button class="status-pill" id="controlButton"><span><img class="control-centre-icon" src="assets/icons/control-centre.svg" alt=""></span> Control Centre <span class="chevron">⌄</span></button>
+        <button class="top-icon" aria-label="Open Control Centre notifications" id="notificationButton" title="Notifications" aria-controls="controlPanel" aria-expanded="false">◉</button>
+        <button class="status-pill" id="controlButton" aria-controls="controlPanel" aria-expanded="false"><span><img class="control-centre-icon" src="assets/icons/control-centre.svg" alt=""></span> Control Centre <span class="chevron">⌄</span></button>
       </div>
     </header>
     <section class="desktop-welcome">
@@ -29,7 +29,7 @@
       <button class="shortcut" data-app="gaming"><span class="shortcut-icon"><img class="app-icon-image" src="assets/icons/games-hub.svg" alt=""></span><span>Gaming</span></button>
     </div>
     <div class="dock-wrap"><nav class="dock" aria-label="Application dock">
-      <button class="dock-app launcher-app" id="launcherButton" title="App launcher" aria-label="App launcher"><img class="dock-icon-image" src="assets/icons/launcher.svg" alt=""></button>
+      <button class="dock-app launcher-app" id="launcherButton" title="App launcher" aria-label="App launcher" aria-controls="launcher" aria-expanded="false"><img class="dock-icon-image" src="assets/icons/launcher.svg" alt=""></button>
       <span class="dock-separator"></span>
       <button class="dock-app" data-app="files" title="File Manager" aria-label="File Manager"><img class="dock-icon-image" src="assets/icons/files.svg" alt=""></button>
       <button class="dock-app" data-app="browser" title="Browser" aria-label="Browser"><img class="dock-icon-image" src="assets/icons/browser.svg" alt=""></button>
