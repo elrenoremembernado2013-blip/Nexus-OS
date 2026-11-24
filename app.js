@@ -709,6 +709,24 @@ document.addEventListener("keydown",event=>{
 });
 
 $("#appSearch").oninput=renderLauncher;
+$("#appSearch").onkeydown=event=>{
+ const items=$(".app-item").filter(item=>item.style.display!=="none");
+ if(event.key==="Enter"&&items.length){event.preventDefault();items[0].click()}
+ else if(event.key==="ArrowDown"&&items.length){event.preventDefault();items[0].focus()}
+};
+$("#appGrid").addEventListener("keydown",event=>{
+ const items=$(".app-item").filter(item=>item.style.display!=="none");
+ const index=items.indexOf(event.target.closest(".app-item"));
+ if(index<0||!items.length)return;
+ let next=index;
+ if(event.key==="ArrowDown"||event.key==="ArrowRight")next=(index+1)%items.length;
+ else if(event.key==="ArrowUp"||event.key==="ArrowLeft")next=(index-1+items.length)%items.length;
+ else if(event.key==="Home")next=0;
+ else if(event.key==="End")next=items.length-1;
+ else return;
+ event.preventDefault();
+ items[next].focus();
+});
 $("#appGrid").addEventListener("click",event=>{
  const item=event.target.closest(".app-item[data-app]");
  if(item)openApp(item.dataset.app);
