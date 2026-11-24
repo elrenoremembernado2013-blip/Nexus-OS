@@ -19,13 +19,16 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 - Basic calculator
 
 ## Run
-Open \`index.html\` in a modern browser.
+Open `index.html` in a modern browser.
 
 ## Validate
-Run \`bash scripts/check-foundation.sh\` from the repository root. This checks the Linux helper scripts and configuration, validates JavaScript syntax with Node.js, verifies local scripts/styles/icons referenced by \`index.html\`, and rejects unsafe \`eval()\`/\`Function()\` execution patterns in the prototype. Node.js and Python 3 are required for the prototype checks.
+Run `bash scripts/check-foundation.sh` from the repository root. This checks the Linux helper scripts and configuration, validates JavaScript syntax with Node.js, verifies local scripts/styles/icons referenced by `index.html`, and rejects unsafe `eval()`/`Function()` execution patterns in the prototype. Node.js and Python 3 are required for the prototype checks.
 
 ## Prototype limitations
 The File Manager uses browser file-system permissions only after the user explicitly chooses a folder. Browsers without the File System Access API can open selected files for read-only preview; folder mutations remain unavailable there. File operations are confined to the browser-granted folder. Package installation, hardware controls, system monitoring and Steam/Proton support are not native Linux integrations. Wi-Fi, Bluetooth and system volume controls are unavailable here; no host metrics are fabricated. Notes and desktop preferences use local browser storage. The Browser opens websites in separate tabs.
+
+## Linux foundation status
+Linux Mint Xfce on Ubuntu LTS is the selected first base for the reported HP Chromebook x360 14b hardware. Stock Mint reached its live desktop in QEMU on the Mac development host. **This is not a NEXUS image and does not qualify the Chromebook.** See the [MADOO Chromebook qualification plan](docs/MADOO_CHROMEBOOK_QUALIFICATION.md) before any physical-device or firmware work.
 
 ## Roadmap
 1. Stabilize desktop shell and accessibility.
