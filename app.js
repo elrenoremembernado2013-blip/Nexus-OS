@@ -78,19 +78,20 @@ function renderLauncher(){
   grid.append(button);
  });
 }
+let panelTrigger=null;
 function syncPanelExpanded(){
  const controlOpen=!control.classList.contains("hidden");
  const launcherOpen=!launcher.classList.contains("hidden");
  ["#controlButton","#notificationButton"].forEach(selector=>$(selector).setAttribute("aria-expanded",String(controlOpen)));
  $("#launcherButton").setAttribute("aria-expanded",String(launcherOpen));
 }
-function closePanels(){control.classList.add("hidden");launcher.classList.add("hidden");syncPanelExpanded()}
-$("#controlButton").onclick=()=>{launcher.classList.add("hidden");control.classList.toggle("hidden");syncPanelExpanded()};
-$("#notificationButton").onclick=()=>{launcher.classList.add("hidden");control.classList.remove("hidden");syncPanelExpanded();$("#controlNotifications").scrollIntoView({block:"nearest",behavior:document.body.classList.contains("reduced-motion")?"auto":"smooth"})};
+function closePanels(){control.classList.add("hidden");launcher.classList.add("hidden");panelTrigger=null;syncPanelExpanded()}
+$("#controlButton").onclick=e=>{const opening=control.classList.contains("hidden");launcher.classList.add("hidden");control.classList.toggle("hidden");panelTrigger=opening?e.currentTarget:null;syncPanelExpanded()};
+$("#notificationButton").onclick=e=>{launcher.classList.add("hidden");control.classList.remove("hidden");panelTrigger=e.currentTarget;syncPanelExpanded();$("#controlNotifications").scrollIntoView({block:"nearest",behavior:document.body.classList.contains("reduced-motion")?"auto":"smooth"})};
 $("#clearNotifications").onclick=()=>{$("#notificationList").innerHTML='<div class="notification-empty"><p>You are all caught up.</p><small>Notifications will appear here.</small></div>';notify("Notifications cleared")};
-$("#launcherButton").onclick=()=>{control.classList.add("hidden");launcher.classList.toggle("hidden");syncPanelExpanded();if(!launcher.classList.contains("hidden"))$("#appSearch").focus()};
-document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{$("#"+b.dataset.close).classList.add("hidden");syncPanelExpanded()});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){const launcherWasOpen=!launcher.classList.contains("hidden"),controlWasOpen=!control.classList.contains("hidden");control.classList.add("hidden");launcher.classList.add("hidden");syncPanelExpanded();if(launcherWasOpen)$("#launcherButton").focus();else if(controlWasOpen)$("#controlButton").focus()}});
+$("#launcherButton").onclick=e=>{const opening=launcher.classList.contains("hidden");control.classList.add("hidden");launcher.classList.toggle("hidden");panelTrigger=opening?e.currentTarget:null;syncPanelExpanded();if(opening)$("#appSearch").focus();else e.currentTarget.focus()};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{const panel=$("#"+b.dataset.close);panel.classList.add("hidden");syncPanelExpanded();if(panelTrigger){const trigger=panelTrigger;panelTrigger=null;trigger.focus()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){const launcherWasOpen=!launcher.classList.contains("hidden"),controlWasOpen=!control.classList.contains("hidden");if(!launcherWasOpen&&!controlWasOpen)return;const trigger=launcherWasOpen?$("#launcherButton"):panelTrigger||$("#controlButton");control.classList.add("hidden");launcher.classList.add("hidden");panelTrigger=null;syncPanelExpanded();trigger.focus()}});
 const controlDefaults={dnd:false,power:false};
 const controlState={...controlDefaults};
 function applyControlToggle(button, enabled){
