@@ -59,9 +59,9 @@
       <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
       <div class="app-grid" id="appGrid" aria-label="Installed applications"></div>
     </section>
-    <section class="window hidden" id="appWindow" aria-live="polite">
+    <section class="window hidden" id="appWindow" role="dialog" aria-labelledby="windowTitle" tabindex="-1">
       <div class="window-titlebar"><div class="window-controls"><button class="window-control close" id="windowClose" aria-label="Close">×</button><button class="window-control minimize" id="windowMin" aria-label="Minimize">−</button></div><span id="windowTitle">Application</span><button class="window-control maximize" id="windowMax" aria-label="Maximize">□</button></div>
-      <div class="window-content" id="windowContent"></div>
+      <div class="window-content" id="windowContent" tabindex="-1"></div>
     </section>
     <div class="toast hidden" id="toast"></div>
   </main>
