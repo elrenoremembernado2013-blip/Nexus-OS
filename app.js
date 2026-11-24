@@ -89,7 +89,7 @@ $("#controlButton").onclick=()=>{launcher.classList.add("hidden");control.classL
 $("#notificationButton").onclick=()=>{launcher.classList.add("hidden");control.classList.remove("hidden");syncPanelExpanded();$("#controlNotifications").scrollIntoView({block:"nearest",behavior:document.body.classList.contains("reduced-motion")?"auto":"smooth"})};
 $("#clearNotifications").onclick=()=>{$("#notificationList").innerHTML='<div class="notification-empty"><p>You are all caught up.</p><small>Notifications will appear here.</small></div>';notify("Notifications cleared")};
 $("#launcherButton").onclick=()=>{control.classList.add("hidden");launcher.classList.toggle("hidden");syncPanelExpanded();if(!launcher.classList.contains("hidden"))$("#appSearch").focus()};
-$("[data-close]").forEach(b=>b.onclick=()=>{$("#"+b.dataset.close).classList.add("hidden");syncPanelExpanded()});
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{$("#"+b.dataset.close).classList.add("hidden");syncPanelExpanded()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){const launcherWasOpen=!launcher.classList.contains("hidden"),controlWasOpen=!control.classList.contains("hidden");control.classList.add("hidden");launcher.classList.add("hidden");syncPanelExpanded();if(launcherWasOpen)$("#launcherButton").focus();else if(controlWasOpen)$("#controlButton").focus()}});
 const controlDefaults={dnd:false,power:false};
 const controlState={...controlDefaults};
