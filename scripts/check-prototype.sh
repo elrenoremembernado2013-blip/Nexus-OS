@@ -9,7 +9,10 @@ command -v node >/dev/null 2>&1 || {
   exit 1
 }
 
-mapfile -t JS_FILES < <(find app.js apps -type f -name '*.js' -print | sort)
+JS_FILES=()
+while IFS= read -r file; do
+  JS_FILES+=("$file")
+done < <(find app.js apps -type f -name '*.js' -print | sort)
 [[ ${#JS_FILES[@]} -gt 0 ]] || { echo "No JavaScript files found." >&2; exit 1; }
 for file in "${JS_FILES[@]}"; do
   node --check "$file"
