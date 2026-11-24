@@ -19,10 +19,17 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 - Basic calculator
 
 ## Run
-Open `index.html` in a modern browser.
+Serve the repository over HTTP (recommended over `file://` so the File System Access API, local storage, and canvas colour sampling behave consistently):
+
+```sh
+python3 -m http.server 4173
+# or: npm run dev
+```
+
+Then open `http://localhost:4173` in a modern browser.
 
 ## Validate
-Run `bash scripts/check-foundation.sh` from the repository root. This checks the Linux helper scripts and configuration, validates JavaScript syntax with Node.js, verifies local scripts/styles/icons referenced by `index.html`, and rejects unsafe `eval()`/`Function()` execution patterns in the prototype. Node.js and Python 3 are required for the prototype checks.
+Run `bash scripts/check-foundation.sh` (or `npm test`) from the repository root. This checks the Linux Mint helper scripts and configuration, runs `--dry-run` / `--help` smoke checks, validates JavaScript syntax with Node.js, runs unit tests for the app registry, window manager, native-service boundary, calculator parser, browser URL validator, store catalog, file helpers, calendar, and terminal preview, verifies local scripts/styles/icons referenced by `index.html` and the Store catalog, and rejects unsafe `eval()`/`Function()` execution patterns. Node.js and Python 3 are required for the prototype checks.
 
 ## Prototype limitations
 The File Manager uses browser file-system permissions only after the user explicitly chooses a folder. Browsers without the File System Access API can open selected files for read-only preview; folder mutations remain unavailable there. File operations are confined to the browser-granted folder. Package installation, hardware controls, system monitoring and Steam/Proton support are not native Linux integrations. Wi-Fi, Bluetooth and system volume controls are unavailable here; no host metrics are fabricated. Notes and desktop preferences use local browser storage. The Browser opens websites in separate tabs.

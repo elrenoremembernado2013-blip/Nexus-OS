@@ -35,9 +35,17 @@ done
 
 case "$BASE_URL" in https://*) ;; *) echo 'Release base URL must use HTTPS.' >&2; exit 2 ;; esac
 [[ "$ISO_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo 'ISO name must be a simple filename.' >&2; exit 2; }
-for command in curl gpgv sha256sum awk; do
+for command in curl gpgv awk tr; do
   command -v "$command" >/dev/null 2>&1 || { printf 'Missing required command: %s\n' "$command" >&2; exit 1; }
 done
+if command -v sha256sum >/dev/null 2>&1; then
+  HASH_COMMAND=sha256sum
+elif command -v shasum >/dev/null 2>&1; then
+  HASH_COMMAND=shasum
+else
+  echo 'Missing SHA-256 utility (install coreutils or use macOS shasum).' >&2
+  exit 1
+fi
 [[ -r "$KEYRING" ]] || { printf 'Ubuntu archive keyring not readable: %s\nInstall ubuntu-keyring or pass --keyring.\n' "$KEYRING" >&2; exit 1; }
 mkdir -p -- "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd -- "$OUTPUT_DIR" && pwd)"
@@ -45,8 +53,10 @@ CHECKSUMS="$OUTPUT_DIR/SHA256SUMS"
 SIGNATURE="$OUTPUT_DIR/SHA256SUMS.gpg"
 ISO_PATH="$OUTPUT_DIR/$ISO_NAME"
 
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/SHA256SUMS" -o "$CHECKSUMS"
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/SHA256SUMS.gpg" -o "$SIGNATURE"
+curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/SHA256SUMS" -o "$CHECKSUMS.part"
+mv -- "$CHECKSUMS.part" "$CHECKSUMS"
+curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/SHA256SUMS.gpg" -o "$SIGNATURE.part"
+mv -- "$SIGNATURE.part" "$SIGNATURE"
 echo 'Verifying the signed Ubuntu checksum manifest…'
 gpgv --keyring "$KEYRING" "$SIGNATURE" "$CHECKSUMS"
 
@@ -58,8 +68,14 @@ fi
 
 EXPECTED="$(awk -v file="$ISO_NAME" '$2 == file || $2 == "*" file { print $1; exit }' "$CHECKSUMS")"
 [[ "$EXPECTED" =~ ^[[:xdigit:]]{64}$ ]] || { printf 'No valid SHA-256 entry for %s in signed manifest.\n' "$ISO_NAME" >&2; exit 1; }
-ACTUAL="$(sha256sum -- "$ISO_PATH" | awk '{print $1}')"
-if [[ "${ACTUAL,,}" != "${EXPECTED,,}" ]]; then
+if [[ "$HASH_COMMAND" == sha256sum ]]; then
+  ACTUAL="$("$HASH_COMMAND" -- "$ISO_PATH" | awk '{print $1}')"
+else
+  ACTUAL="$("$HASH_COMMAND" -a 256 "$ISO_PATH" | awk '{print $1}')"
+fi
+ACTUAL_NORMALIZED="$(printf '%s' "$ACTUAL" | tr '[:upper:]' '[:lower:]')"
+EXPECTED_NORMALIZED="$(printf '%s' "$EXPECTED" | tr '[:upper:]' '[:lower:]')"
+if [[ "$ACTUAL_NORMALIZED" != "$EXPECTED_NORMALIZED" ]]; then
   printf 'SHA-256 mismatch for %s\nExpected: %s\nActual:   %s\n' "$ISO_NAME" "$EXPECTED" "$ACTUAL" >&2
   exit 1
 fi

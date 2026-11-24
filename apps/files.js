@@ -2,6 +2,12 @@
   const maxPreviewBytes = 1024 * 1024;
   const textExtensions = /\.(txt|md|markdown|csv|json|xml|yaml|yml|log|ini|cfg|conf|html|css|js|ts|sh|py|c|h|cpp|rs)$/i;
 
+  function validName(name) {
+    if (typeof name !== "string") return false;
+    const trimmed = name.trim();
+    return Boolean(trimmed && trimmed !== "." && trimmed !== ".." && !/[\\/]/.test(trimmed));
+  }
+
   function render() {
     return `
       <section class="file-manager" aria-labelledby="filesTitle">
@@ -160,9 +166,14 @@
 
     function updateActions() {
       const hasWritableFolder = Boolean(currentHandle);
+      const renameButton = $("#filesRename");
+      const canMove = Boolean(selectedEntry?.handle && typeof selectedEntry.handle.move === "function");
       $("#filesNewFolder").disabled = !hasWritableFolder;
       $("#filesNewFile").disabled = !hasWritableFolder;
-      $("#filesRename").disabled = !hasWritableFolder || !selectedEntry?.handle || typeof selectedEntry.handle.move !== "function";
+      renameButton.disabled = !hasWritableFolder || !canMove;
+      renameButton.title = hasWritableFolder && selectedEntry?.handle && !canMove
+        ? "Rename requires a browser that supports FileSystemHandle.move()."
+        : "";
       $("#filesCopy").disabled = !hasWritableFolder || !selectedEntry?.handle;
       $("#filesCut").disabled = !hasWritableFolder || !selectedEntry?.handle;
       $("#filesDelete").disabled = !hasWritableFolder || !selectedEntry?.handle;
@@ -222,13 +233,20 @@
         button.type = "button";
         button.textContent = segment.name;
         button.setAttribute("aria-current", index === path.length - 1 ? "location" : "false");
-        button.addEventListener("click", () => {
+        button.addEventListener("click", async () => {
+          const prevPath = path;
+          const prevHandle = currentHandle;
           path = path.slice(0, index + 1);
           currentHandle = path[path.length - 1].handle;
           selectedEntry = null;
           clearPreview();
           drawBreadcrumbs();
-          drawEntries();
+          const ok = await drawEntries();
+          if (!ok) {
+            path = prevPath;
+            currentHandle = prevHandle;
+            drawBreadcrumbs();
+          }
         });
         breadcrumbs.append(button);
       });
@@ -253,46 +271,61 @@
           ? `${openedFiles.length} selected file${openedFiles.length === 1 ? "" : "s"} · read-only`
           : "No folder selected";
         if (openedFiles.length) setStatus(`${visible.length} file${visible.length === 1 ? "" : "s"} shown. Opened files are read-only.`);
-        return;
+        return true;
       }
 
       try {
         setStatus("Reading the selected folder…");
         const directory = currentHandle;
+        const term = search.value.trim().toLocaleLowerCase();
         const entries = [];
         for await (const [name, handle] of directory.entries()) {
-          if (name.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())) {
+          if (request !== listingGeneration || directory !== currentHandle) return false;
+          if (name.toLocaleLowerCase().includes(term)) {
             let size = 0;
             let modified = 0;
             if (handle.kind === "file") {
               const file = await handle.getFile();
+              if (request !== listingGeneration || directory !== currentHandle) return false;
               size = file.size;
               modified = file.lastModified;
             }
             entries.push({ name, handle, kind: handle.kind, size, modified, parent: directory });
           }
         }
-        if (request !== listingGeneration || directory !== currentHandle) return;
+        if (request !== listingGeneration || directory !== currentHandle) return false;
         entries.sort((a, b) => a.kind === b.kind
           ? a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
           : a.kind === "directory" ? -1 : 1);
         entries.forEach(entry => rows.append(makeRow(entry)));
         storage.textContent = `${entries.length} item${entries.length === 1 ? "" : "s"} in this folder · capacity unavailable`;
         setStatus(`${entries.length} item${entries.length === 1 ? "" : "s"} shown.`);
+        return true;
       } catch (error) {
         setStatus(`Could not read the selected folder: ${error.message}`, true);
+        return false;
       }
     }
 
     async function enterDirectory(entry) {
+      const prevHandle = currentHandle;
+      const prevPath = path;
       try {
         currentHandle = entry.handle;
-        path.push({ name: entry.name, handle: entry.handle });
+        path = [...path, { name: entry.name, handle: entry.handle }];
         selectedEntry = null;
         clearPreview();
         drawBreadcrumbs();
-        await drawEntries();
+        const ok = await drawEntries();
+        if (!ok) {
+          currentHandle = prevHandle;
+          path = prevPath;
+          drawBreadcrumbs();
+        }
       } catch (error) {
+        currentHandle = prevHandle;
+        path = prevPath;
+        drawBreadcrumbs();
         setStatus(`Could not open this folder: ${error.message}`, true);
       }
     }
@@ -306,11 +339,6 @@
       }
       const permission = await rootHandle.requestPermission({ mode: "readwrite" });
       if (permission !== "granted") throw new Error("Write access was not granted.");
-    }
-
-    function validName(name) {
-      const trimmed = name?.trim();
-      return Boolean(trimmed && trimmed !== "." && trimmed !== ".." && !/[\\/]/.test(trimmed));
     }
 
     async function existsIn(directory, name) {
@@ -454,8 +482,13 @@
         await ensureWritePermission();
         const sameFolder = source.parent && await source.parent.isSameEntry(currentHandle);
         if (sameFolder) throw new Error("Choose a different folder before pasting.");
-        if (source.kind === "directory" && path.some(segment => segment.handle === source.handle)) {
-          throw new Error("A folder cannot be copied or moved inside itself.");
+        if (source.kind === "directory") {
+          for (const segment of path) {
+            const isSame = typeof segment.handle?.isSameEntry === "function"
+              ? await segment.handle.isSameEntry(source.handle)
+              : segment.handle === source.handle;
+            if (isSame) throw new Error("A folder cannot be copied or moved inside itself.");
+          }
         }
         const counter = { count: 0 };
         await copyEntry(source, currentHandle, source.name, counter);
@@ -507,5 +540,6 @@
     };
   }
 
+  window.NexusFilesHelpers = Object.freeze({ isValidEntryName: validName });
   window.NexusAppRegistry.register({ id: "files", name: "File Manager", render, mount });
 })();

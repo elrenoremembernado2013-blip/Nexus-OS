@@ -12,6 +12,7 @@
     "telemetry",
     "notifications",
     "files",
+    "terminal",
   ]);
 
   class NativeIntegrationUnavailableError extends Error {

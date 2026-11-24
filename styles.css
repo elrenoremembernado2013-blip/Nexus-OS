@@ -873,3 +873,11 @@ body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after
 .terminal-footnote{margin:0;padding:0 13px 13px;color:#a5adba;font:9px/1.5 ui-sans-serif,system-ui}
 @keyframes nexus-terminal-blink{to{visibility:hidden}}
 @media(prefers-reduced-motion:reduce){.terminal-caret{animation:none}}
+
+/* Multi-window stacking context & desktop shell layers */
+.window-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
+.window{pointer-events:auto}
+.window.is-active{border-color:color-mix(in srgb,var(--accent) 42%,rgba(255,255,255,.22));box-shadow:0 30px 85px rgba(0,0,0,.55)}
+.topbar,.dock-wrap{z-index:20}
+.panel,.launcher,.toast{z-index:30}
+

@@ -7,7 +7,16 @@
     { name: "Network", icon: "⇄", detail: "Interface state and transfer activity" }
   ];
 
+  function telemetryAvailable() {
+    try {
+      return Boolean(window.NexusNativeServices?.status("telemetry")?.available);
+    } catch {
+      return false;
+    }
+  }
+
   function render() {
+    const available = telemetryAvailable();
     return `
       <section class="system-monitor" aria-labelledby="monitorTitle">
         <header class="app-heading">
@@ -16,7 +25,7 @@
             <h2 class="content-title" id="monitorTitle">System Monitor</h2>
             <p class="content-sub">Resource reporting requires a native Linux monitoring service.</p>
           </div>
-          <span class="integration-status">No telemetry source</span>
+          <span class="integration-status">${available ? "Telemetry connected" : "No telemetry source"}</span>
         </header>
         <div class="monitor-grid" id="monitorGrid"></div>
         <div class="monitor-boundary">
@@ -28,6 +37,7 @@
 
   function mount(root) {
     const grid = root.querySelector("#monitorGrid");
+    const available = telemetryAvailable();
     resources.forEach(resource => {
       const card = document.createElement("article");
       card.className = "monitor-card";
@@ -41,7 +51,7 @@
       detail.textContent = resource.detail;
       const state = document.createElement("span");
       state.className = "monitor-unavailable";
-      state.textContent = "Unavailable";
+      state.textContent = available ? "Ready" : "Unavailable";
       card.append(icon, title, detail, state);
       grid.append(card);
     });

@@ -56,21 +56,6 @@ if [[ "${1:-}" == --dry-run ]]; then DRY_RUN=true; shift; fi
 [[ "$DISK_SIZE" =~ ^[1-9][0-9]*[MGT]$ ]] || { echo 'NEXUS_DISK_SIZE must be a positive integer plus M, G, or T.' >&2; exit 2; }
 [[ "$ACCEL" == tcg || "$ACCEL" == kvm ]] || { echo 'NEXUS_QEMU_ACCEL must be tcg or kvm.' >&2; exit 2; }
 [[ "$VIDEO" == virtio || "$VIDEO" == std ]] || { echo 'NEXUS_QEMU_VIDEO must be virtio or std.' >&2; exit 2; }
-if [[ "$DRY_RUN" == true ]]; then
-  printf 'DRY RUN - NEXUS QEMU profile\n'
-  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\nVideo: %s\n' \
-    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL" "$VIDEO"
-  if [[ -n "$DEBUG_LOG" ]]; then printf 'Debug log: %s (overwritten)\n' "$DEBUG_LOG"; else printf 'Debug log: disabled\n'; fi
-  if [[ -f "$ISO_PATH" ]]; then
-    printf 'Boot media: present (%s)\n' "$ISO_PATH"
-  else
-    printf 'Boot media: not present; disk boot (%s)\n' "$ISO_PATH"
-  fi
-  exit 0
-fi
-command -v "$QEMU" >/dev/null 2>&1 || { printf 'Missing QEMU executable: %s\n' "$QEMU" >&2; exit 1; }
-command -v qemu-img >/dev/null 2>&1 || { echo 'Missing qemu-img (install qemu-utils).' >&2; exit 1; }
-
 find_firmware_pair() {
   local code vars
   for code in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/edk2/x64/OVMF_CODE.4m.fd /usr/share/edk2/x64/OVMF_CODE.fd /opt/homebrew/share/qemu/edk2-x86_64-code.fd /usr/local/share/qemu/edk2-x86_64-code.fd; do
@@ -85,6 +70,28 @@ find_firmware_pair() {
   done
   return 1
 }
+
+if [[ "$DRY_RUN" == true ]]; then
+  printf 'DRY RUN - NEXUS QEMU profile\n'
+  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\nVideo: %s\n' \
+    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL" "$VIDEO"
+  if [[ -n "$DEBUG_LOG" ]]; then printf 'Debug log: %s (overwritten)\n' "$DEBUG_LOG"; else printf 'Debug log: disabled\n'; fi
+  if [[ -f "$ISO_PATH" ]]; then
+    printf 'Boot media: present (%s)\n' "$ISO_PATH"
+  else
+    printf 'Boot media: not present; disk boot (%s)\n' "$ISO_PATH"
+  fi
+  if command -v "$QEMU" >/dev/null 2>&1; then printf 'Host QEMU: available\n'; else printf 'Host QEMU: missing (%s)\n' "$QEMU"; fi
+  if command -v qemu-img >/dev/null 2>&1; then printf 'Host qemu-img: available\n'; else printf 'Host qemu-img: missing\n'; fi
+  if find_firmware_pair >/dev/null 2>&1 || [[ -n "${OVMF_CODE:-}" && -n "${OVMF_VARS:-}" ]]; then
+    printf 'Host OVMF firmware: available\n'
+  else
+    printf 'Host OVMF firmware: missing or custom paths not set\n'
+  fi
+  exit 0
+fi
+command -v "$QEMU" >/dev/null 2>&1 || { printf 'Missing QEMU executable: %s\n' "$QEMU" >&2; exit 1; }
+command -v qemu-img >/dev/null 2>&1 || { echo 'Missing qemu-img (install qemu-utils).' >&2; exit 1; }
 
 if [[ -z "${OVMF_CODE:-}" || -z "${OVMF_VARS:-}" ]]; then
   FIRMWARE_PAIR=()
@@ -105,7 +112,13 @@ if [[ ! -e "$DISK_PATH" ]]; then
   qemu-img create -f qcow2 "$DISK_PATH" "$DISK_SIZE"
 fi
 VARS_PATH="$VM_STATE_DIR/OVMF_VARS.fd"
-if [[ ! -e "$VARS_PATH" ]]; then cp -- "$OVMF_VARS" "$VARS_PATH"; fi
+TEMPLATE_BYTES="$(wc -c < "$OVMF_VARS")"
+if [[ ! -e "$VARS_PATH" ]]; then
+  cp -- "$OVMF_VARS" "$VARS_PATH"
+elif [[ "$(wc -c < "$VARS_PATH")" -ne "$TEMPLATE_BYTES" ]]; then
+  echo "Warning: cached $VARS_PATH size differs from $OVMF_VARS; refreshing writable UEFI vars." >&2
+  cp -- "$OVMF_VARS" "$VARS_PATH"
+fi
 
 ARGS=(-machine "q35,accel=$ACCEL" -cpu max -smp "$CPUS" -m "$RAM_MB"
   -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE"

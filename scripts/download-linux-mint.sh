@@ -7,6 +7,8 @@ OUTPUT_DIR="${NEXUS_DOWNLOAD_DIR:-$ROOT_DIR/build/downloads}"
 BASE_URL="${LINUX_MINT_RELEASE_BASE_URL:-https://mirrors.kernel.org/linuxmint/stable/22.3}"
 ISO_NAME="${LINUX_MINT_ISO_NAME:-linuxmint-22.3-xfce-64bit.iso}"
 SIGNING_FINGERPRINT="27DEB15644C6B3CF3BD7D291300F846BA25BAE09"
+GPG_KEYSERVER="${NEXUS_GPG_KEYSERVER:-hkps://keys.openpgp.org}"
+KEYRING_PATH="${NEXUS_MINT_KEYRING:-}"
 
 usage() {
   cat <<'USAGE'
@@ -18,7 +20,7 @@ Linux Mint mirror. It checks the manifest signature against the published Linux
 Mint ISO signing-key fingerprint, then verifies the ISO digest.
 
 Environment overrides: NEXUS_DOWNLOAD_DIR, LINUX_MINT_RELEASE_BASE_URL,
-LINUX_MINT_ISO_NAME.
+LINUX_MINT_ISO_NAME, NEXUS_GPG_KEYSERVER, NEXUS_MINT_KEYRING.
 USAGE
 }
 
@@ -31,6 +33,7 @@ while (($#)); do
 done
 
 case "$BASE_URL" in https://*) ;; *) echo 'Release base URL must use HTTPS.' >&2; exit 2 ;; esac
+case "$GPG_KEYSERVER" in hkps://*|hkp://*) ;; *) echo 'GPG keyserver URL must use hkps:// or hkp://.' >&2; exit 2 ;; esac
 [[ "$ISO_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo 'ISO name must be a simple filename.' >&2; exit 2; }
 for command in curl gpg awk tr; do
   command -v "$command" >/dev/null 2>&1 || { printf 'Missing required command: %s\n' "$command" >&2; exit 1; }
@@ -53,9 +56,16 @@ GPG_HOME="$(mktemp -d "${TMPDIR:-/tmp}/nexus-mint-gpg.XXXXXX")"
 STATUS_FILE="$GPG_HOME/verification.status"
 trap 'rm -rf -- "$GPG_HOME"' EXIT
 
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/sha256sum.txt" -o "$CHECKSUMS"
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/sha256sum.txt.gpg" -o "$SIGNATURE"
-gpg --batch --homedir "$GPG_HOME" --keyserver hkp://keys.openpgp.org:80 --recv-keys "$SIGNING_FINGERPRINT"
+curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/sha256sum.txt" -o "$CHECKSUMS.part"
+mv -- "$CHECKSUMS.part" "$CHECKSUMS"
+curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/sha256sum.txt.gpg" -o "$SIGNATURE.part"
+mv -- "$SIGNATURE.part" "$SIGNATURE"
+if [[ -n "$KEYRING_PATH" ]]; then
+  [[ -r "$KEYRING_PATH" ]] || { printf 'Mint signing keyring not readable: %s\n' "$KEYRING_PATH" >&2; exit 1; }
+  gpg --batch --homedir "$GPG_HOME" --import "$KEYRING_PATH"
+else
+  gpg --batch --homedir "$GPG_HOME" --keyserver "$GPG_KEYSERVER" --recv-keys "$SIGNING_FINGERPRINT"
+fi
 IMPORTED_FINGERPRINT="$(gpg --batch --homedir "$GPG_HOME" --with-colons --fingerprint "$SIGNING_FINGERPRINT" | awk -F: '$1 == "fpr" { print $10; exit }')"
 [[ "$IMPORTED_FINGERPRINT" == "$SIGNING_FINGERPRINT" ]] || { echo 'Linux Mint signing-key fingerprint mismatch.' >&2; exit 1; }
 gpg --batch --homedir "$GPG_HOME" --status-fd 1 --verify "$SIGNATURE" "$CHECKSUMS" >"$STATUS_FILE"
