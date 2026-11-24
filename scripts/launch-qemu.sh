@@ -12,6 +12,8 @@ RAM_MB="${NEXUS_RAM_MB:-4096}"
 CPUS="${NEXUS_CPUS:-2}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-40G}"
 ACCEL="${NEXUS_QEMU_ACCEL:-tcg}"
+VIDEO="${NEXUS_QEMU_VIDEO:-virtio}"
+DEBUG_LOG="${NEXUS_QEMU_DEBUG_LOG:-}"
 if [[ -n "${NEXUS_QEMU_DISPLAY:-}" ]]; then
   DISPLAY_BACKEND="$NEXUS_QEMU_DISPLAY"
 elif [[ "$(uname -s)" == Darwin ]]; then
@@ -33,6 +35,8 @@ Environment configuration:
   NEXUS_DISK_SIZE=40G        new qcow2 disk capacity (M, G, or T suffix)
   NEXUS_QEMU_ACCEL=tcg        QEMU accelerator (tcg or host-supported kvm)
   NEXUS_QEMU_DISPLAY=BACKEND  display backend (defaults to cocoa on macOS, gtk elsewhere)
+  NEXUS_QEMU_VIDEO=virtio|std  guest video device (defaults to virtio)
+  NEXUS_QEMU_DEBUG_LOG=PATH    optional QEMU log path (overwritten; guest_errors,unimp)
   NEXUS_ISO_PATH=PATH         installer ISO; omit the file to boot the disk only
   NEXUS_DISK_PATH=PATH        guest qcow2 disk location
   OVMF_CODE=PATH              UEFI firmware code image
@@ -51,10 +55,12 @@ if [[ "${1:-}" == --dry-run ]]; then DRY_RUN=true; shift; fi
 [[ "$CPUS" =~ ^[1-9][0-9]*$ ]] || { echo 'NEXUS_CPUS must be a positive integer.' >&2; exit 2; }
 [[ "$DISK_SIZE" =~ ^[1-9][0-9]*[MGT]$ ]] || { echo 'NEXUS_DISK_SIZE must be a positive integer plus M, G, or T.' >&2; exit 2; }
 [[ "$ACCEL" == tcg || "$ACCEL" == kvm ]] || { echo 'NEXUS_QEMU_ACCEL must be tcg or kvm.' >&2; exit 2; }
+[[ "$VIDEO" == virtio || "$VIDEO" == std ]] || { echo 'NEXUS_QEMU_VIDEO must be virtio or std.' >&2; exit 2; }
 if [[ "$DRY_RUN" == true ]]; then
   printf 'DRY RUN - NEXUS QEMU profile\n'
-  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\n' \
-    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL"
+  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\nVideo: %s\n' \
+    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL" "$VIDEO"
+  if [[ -n "$DEBUG_LOG" ]]; then printf 'Debug log: %s (overwritten)\n' "$DEBUG_LOG"; else printf 'Debug log: disabled\n'; fi
   if [[ -f "$ISO_PATH" ]]; then
     printf 'Boot media: present (%s)\n' "$ISO_PATH"
   else
@@ -105,7 +111,12 @@ ARGS=(-machine "q35,accel=$ACCEL" -cpu max -smp "$CPUS" -m "$RAM_MB"
   -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE"
   -drive "if=pflash,format=raw,unit=1,file=$VARS_PATH"
   -drive "file=$DISK_PATH,if=virtio,format=qcow2" -netdev user,id=n0 -device virtio-net-pci,netdev=n0
-  -device virtio-vga -display "$DISPLAY_BACKEND")
+  -display "$DISPLAY_BACKEND")
+if [[ "$VIDEO" == std ]]; then ARGS+=(-vga std); else ARGS+=(-device virtio-vga); fi
+if [[ -n "$DEBUG_LOG" ]]; then
+  mkdir -p -- "$(dirname -- "$DEBUG_LOG")"
+  ARGS+=(-D "$DEBUG_LOG" -d guest_errors,unimp)
+fi
 if [[ -f "$ISO_PATH" ]]; then
   ARGS+=(-cdrom "$ISO_PATH" -boot order=d)
 else
