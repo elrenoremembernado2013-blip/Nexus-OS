@@ -120,15 +120,23 @@ elif [[ "$(wc -c < "$VARS_PATH")" -ne "$TEMPLATE_BYTES" ]]; then
   cp -- "$OVMF_VARS" "$VARS_PATH"
 fi
 
-ARGS=(-machine "q35,accel=$ACCEL" -cpu max -smp "$CPUS" -m "$RAM_MB"
-  -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE"
-  -drive "if=pflash,format=raw,unit=1,file=$VARS_PATH"
-  -drive "file=$DISK_PATH,if=virtio,format=qcow2" -netdev user,id=n0 -device virtio-net-pci,netdev=n0
+MACHINE_OPT="q35,accel=$ACCEL"
+PFLASH_CODE_OPT="if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE"
+PFLASH_VARS_OPT="if=pflash,format=raw,unit=1,file=$VARS_PATH"
+DISK_DRIVE_OPT="file=$DISK_PATH,if=virtio,format=qcow2"
+NETDEV_OPT="user,id=n0"
+NET_DEVICE_OPT="virtio-net-pci,netdev=n0"
+DEBUG_FLAGS="guest_errors,unimp"
+
+ARGS=(-machine "$MACHINE_OPT" -cpu max -smp "$CPUS" -m "$RAM_MB"
+  -drive "$PFLASH_CODE_OPT"
+  -drive "$PFLASH_VARS_OPT"
+  -drive "$DISK_DRIVE_OPT" -netdev "$NETDEV_OPT" -device "$NET_DEVICE_OPT"
   -display "$DISPLAY_BACKEND")
 if [[ "$VIDEO" == std ]]; then ARGS+=(-vga std); else ARGS+=(-device virtio-vga); fi
 if [[ -n "$DEBUG_LOG" ]]; then
   mkdir -p -- "$(dirname -- "$DEBUG_LOG")"
-  ARGS+=(-D "$DEBUG_LOG" -d guest_errors,unimp)
+  ARGS+=(-D "$DEBUG_LOG" -d "$DEBUG_FLAGS")
 fi
 if [[ -f "$ISO_PATH" ]]; then
   ARGS+=(-cdrom "$ISO_PATH" -boot order=d)

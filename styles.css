@@ -877,6 +877,7 @@ body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after
 /* Multi-window stacking context & desktop shell layers */
 .window-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
 .window{pointer-events:auto}
+.window.maximized{left:12px;top:64px;transform:none;width:calc(100vw - 24px);height:calc(100vh - 148px)}
 .window.is-active{border-color:color-mix(in srgb,var(--accent) 42%,rgba(255,255,255,.22));box-shadow:0 30px 85px rgba(0,0,0,.55)}
 .topbar,.dock-wrap{z-index:20}
 .panel,.launcher,.toast{z-index:30}

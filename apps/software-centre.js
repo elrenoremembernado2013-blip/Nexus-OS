@@ -686,7 +686,6 @@
         go({ view: "apps" }, false);
       }
       search.focus();
-      search.setSelectionRange(query.length, query.length);
     });
 
     root.addEventListener("change", event => {

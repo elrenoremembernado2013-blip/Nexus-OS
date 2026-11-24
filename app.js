@@ -202,6 +202,19 @@
     });
   });
 
+  document.addEventListener("pointerdown", event => {
+    const target = event.target;
+    if (
+      target.closest &&
+      target.closest("#controlPanel, #controlButton, #notificationButton, #launcher, #launcherButton")
+    ) {
+      return;
+    }
+    if (!control.classList.contains("hidden") || !launcher.classList.contains("hidden")) {
+      closePanels();
+    }
+  });
+
   document.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
     const launcherWasOpen = !launcher.classList.contains("hidden");
@@ -217,6 +230,7 @@
 
   const controlDefaults = { dnd: false, power: false };
   const controlState = { ...controlDefaults };
+  const controlListeners = new Set();
 
   function applyControlToggle(button, enabled) {
     const key = button.dataset.toggle;
@@ -226,6 +240,7 @@
     button.querySelector("small").textContent = (enabled ? "On" : "Off") + " · preview";
     window.localStorage.setItem("nexus-control-" + key, String(enabled));
     if (key === "power") desktop.classList.toggle("lightweight", enabled);
+    controlListeners.forEach(listener => listener({ ...controlState }));
   }
 
   function setControlPreference(key, enabled) {
@@ -276,6 +291,11 @@
     getCustomDesktopWallpaperUrl: () => activeCustomWallpaperUrl,
     getControlState: () => ({ ...controlState }),
     setControlPreference,
+    onControlChange(listener) {
+      if (typeof listener !== "function") return () => {};
+      controlListeners.add(listener);
+      return () => controlListeners.delete(listener);
+    },
     resetControls: () => Object.entries(controlDefaults).forEach(([key, value]) => setControlPreference(key, value)),
     resetBrightness: () => {
       brightness.value = "100";
@@ -429,9 +449,9 @@
       clearWindowGeometry();
       el.classList.add(side === "left" ? "snapped-left" : "snapped-right");
       el.style.left = side === "left" ? "8px" : "calc(50vw + 4px)";
-      el.style.top = "60px";
+      el.style.top = "64px";
       el.style.width = "calc(50vw - 12px)";
-      el.style.height = "calc(100vh - 90px)";
+      el.style.height = "calc(100vh - 148px)";
       el.style.transform = "none";
       record.snapped = side;
       record.maximized = false;

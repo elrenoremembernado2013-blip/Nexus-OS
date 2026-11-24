@@ -399,6 +399,7 @@
         rootHandle = folder;
         currentHandle = folder;
         path = [{ name: folder.name, handle: folder }];
+        clipboard = null;
         openedFiles = [];
         openInput.value = "";
         clearPreview();
@@ -414,6 +415,7 @@
       rootHandle = null;
       currentHandle = null;
       path = [];
+      clipboard = null;
       selectedEntry = null;
       clearPreview();
       drawBreadcrumbs();
@@ -516,6 +518,12 @@
       try {
         await ensureWritePermission();
         await currentHandle.removeEntry(entry.name, { recursive: entry.kind === "directory" });
+        if (clipboard?.entry) {
+          const sameEntry = typeof clipboard.entry.handle?.isSameEntry === "function"
+            ? await clipboard.entry.handle.isSameEntry(entry.handle)
+            : clipboard.entry.handle === entry.handle;
+          if (sameEntry) clipboard = null;
+        }
         clearPreview();
         setStatus(`Deleted “${entry.name}”.`);
         await drawEntries();

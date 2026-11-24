@@ -530,9 +530,11 @@
       pendingAccent = null;
       $("#applyWallpaperPreview").textContent = "Apply wallpaper";
       $("#wallpaperPreviewTitle").textContent = item.querySelector("span").textContent;
-      $("#wallpaperPreviewImage").src = imageUrl;
+      const previewImg = $("#wallpaperPreviewImage");
+      previewImg.crossOrigin = "anonymous";
+      previewImg.src = imageUrl;
       suggestWallpaperAccents(imageUrl);
-      $("#wallpaperPreviewImage").alt = item.querySelector("img").alt;
+      previewImg.alt = item.querySelector("img").alt;
       $("#wallpaperPreviewCaption").textContent =
         id === window.localStorage.getItem("nexus-wallpaper")
           ? "This is your currently applied wallpaper."
@@ -572,9 +574,11 @@
         pendingWallpaper = null;
         pendingAccent = null;
         $("#wallpaperPreviewTitle").textContent = file.name;
-        $("#wallpaperPreviewImage").src = candidateUrl;
+        const previewImg = $("#wallpaperPreviewImage");
+        previewImg.removeAttribute("crossorigin");
+        previewImg.src = candidateUrl;
         suggestWallpaperAccents(candidateUrl);
-        $("#wallpaperPreviewImage").alt = "Preview of your imported image";
+        previewImg.alt = "Preview of your imported image";
         $("#wallpaperPreviewCaption").textContent =
           "Preview only — your current wallpaper will remain until you apply this image.";
         $("#applyWallpaperPreview").textContent = "Save and apply";
@@ -740,6 +744,11 @@
     const controlState = shell?.getControlState?.() || { dnd: false, power: false };
     bindSwitch($("#lightToggle"), controlState.power, enabled => shell?.setControlPreference?.("power", enabled));
     bindSwitch($("#dndToggle"), controlState.dnd, enabled => shell?.setControlPreference?.("dnd", enabled));
+    const unsubscribeControls = shell?.onControlChange?.(state => {
+      if (unmounted) return;
+      updateSwitchState($("#lightToggle"), Boolean(state.power));
+      updateSwitchState($("#dndToggle"), Boolean(state.dnd));
+    });
 
     const motionPreference = window.localStorage.getItem("nexus-reduced-motion");
     const motionMedia = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -829,6 +838,7 @@
     return () => {
       unmounted = true;
       accentSuggestionToken++;
+      unsubscribeControls?.();
       closeWallpaperPreview();
       if (themeMedia) {
         if (themeMedia.removeEventListener) themeMedia.removeEventListener("change", onThemeMediaChange);
