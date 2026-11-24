@@ -62,6 +62,7 @@ Steam/Proton, Wine, Waydroid, and Darling remain future conditional integrations
 - [x] 128 MB idle described as an unverified aspiration.
 - [x] Download and verify pinned Mint media on the Mac host; the signed manifest and ISO SHA-256 both passed on 2026-11-23.
 - [x] Boot the stock Mint installer to its Xfce live desktop in QEMU using compatibility mode on 2026-11-24. Normal mode remained on a black screen after the splash. In compatibility mode, the desktop appeared after startup logs and a guest key event refreshed the captured display. This confirms only the stock Mint live environment under Mac TCG, not a NEXUS image or Chromebook compatibility.
+- [ ] Reproduce the live desktop observation before starting the Xfce customization milestone. A separate exploratory QEMU 11.1.3 TCG retry on 2026-11-24 used 4 GiB RAM, 2 vCPUs, UEFI, the verified Mint ISO, and compatibility mode. Startup logs appeared, but after switching virtual consoles the captured display was black; no usable desktop or resource measurement was confirmed. This retry used a temporary host-share device and is inconclusive; it does not replace the earlier recorded live-desktop pass. A standard-VGA comparison was started but stopped before a result. No Chromebook firmware or storage was touched.
 - [ ] Prototype Xfce theme/panel/menu changes and measure resource use.
 - [ ] Add reviewed image configuration and repeatable build tooling.
 - [ ] Build a custom image and meet the QEMU acceptance criteria.
