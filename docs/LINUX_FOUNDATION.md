@@ -61,7 +61,7 @@ Steam/Proton, Wine, Waydroid, and Darling remain future conditional integrations
 - [x] Buildroot scoped as experimental, separate lightweight image work.
 - [x] 128 MB idle described as an unverified aspiration.
 - [x] Download and verify pinned Mint media on the Mac host; the signed manifest and ISO SHA-256 both passed on 2026-11-23.
-- [ ] Boot the stock Mint installer to a usable installer desktop in QEMU; on 2026-11-23 the Mac TCG run reached the GRUB menu and Mint splash, then remained on a black screen without reaching the desktop. This is an incomplete QEMU check, not NEXUS or Chromebook validation.
+- [ ] Boot the stock Mint installer to a usable installer desktop in QEMU; on 2026-11-24 the Mac TCG run reached GRUB and the Mint splash in normal mode. Compatibility mode showed systemd startup messages, then both runs ended on a black screen without reaching the desktop. This is an incomplete QEMU check, not NEXUS or Chromebook validation.
 - [ ] Prototype Xfce theme/panel/menu changes and measure resource use.
 - [ ] Add reviewed image configuration and repeatable build tooling.
 - [ ] Build a custom image and meet the QEMU acceptance criteria.
