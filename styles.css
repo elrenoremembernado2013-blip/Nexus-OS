@@ -122,11 +122,17 @@
 .tile:focus-visible,.clear-notifications:focus-visible,.close-btn:focus-visible,
 .top-icon:focus-visible,.status-pill:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .desktop.lightweight .panel,.desktop.lightweight .launcher,.desktop.lightweight .window,
-.desktop.lightweight .topbar,.desktop.lightweight .dock{
- backdrop-filter:blur(4px);
- box-shadow:0 12px 32px rgba(0,0,0,.28);
+.desktop.lightweight .topbar,.desktop.lightweight .dock,.desktop.lightweight .settings-card,
+.desktop.lightweight .wallpaper-preview-dialog,.desktop.lightweight .wallpaper-preview-dialog::backdrop{
+ -webkit-backdrop-filter:none;
+ backdrop-filter:none;
+ box-shadow:none;
 }
-.desktop.lightweight .dock-app,.desktop.lightweight .tile{transition:none}
+.desktop.lightweight *,.desktop.lightweight *::before,.desktop.lightweight *::after{
+ animation:none!important;
+ transition:none!important;
+ scroll-behavior:auto!important;
+}
 @media(max-width:600px){
  .slider-control{flex:1;justify-content:flex-end}
  .slider-control input{width:min(38vw,132px)}
