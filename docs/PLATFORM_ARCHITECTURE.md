@@ -59,6 +59,14 @@ Buildroot remains useful for tightly scoped appliance or recovery experiments, b
 
 The Mint media script verifies the release's signed checksum manifest and the ISO digest. This makes media acquisition verifiable; it is not yet a reproducible NEXUS image build.
 
+### Custom ISO tooling boundary
+
+Cubic is a candidate for a disposable customization experiment because its upstream project describes support for live ISOs from Ubuntu-based distributions. It is not selected as NEXUS's release builder. Cubic's installation uses a third-party PPA, and its upstream installation page warns that Cubic uses root privileges for ISO and filesystem operations and recommends running it in an isolated virtual machine if concerned. Do not add Cubic or its PPA to the MADOO Chromebook or a daily-use host. If evaluated, use a disposable Linux VM with a verified Mint ISO and no personal data; treat its output as an exploratory artifact until every input and tool version is pinned and independent clean builds are compared.
+
+The next milestone remains a stock Mint Xfce guest experiment: capture the theme, panel, and menu configuration plus assets, then measure memory and disk use. Keep those settings reviewable in the repository before deciding whether Cubic or a repository-owned build pipeline should package them. A tool that can emit an ISO does not by itself establish reproducibility or pass the QEMU acceptance gate.
+
+Sources: [Cubic project](https://github.com/PJ-Singh-001/Cubic) and [Cubic installation and security notice](https://github.com/PJ-Singh-001/Cubic/wiki/Install-Cubic).
+
 Before the first custom image build:
 
 1. Pin the Mint release, edition, ISO URL, published SHA-256, signing-key fingerprint, and manifest verification result in a release record.
