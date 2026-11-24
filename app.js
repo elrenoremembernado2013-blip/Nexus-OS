@@ -132,7 +132,7 @@ $("#volumeValue").textContent="Unavailable";
 $$("[data-app]:not(.app-item)").forEach(b=>b.addEventListener("click",()=>{
  const app=b.dataset.app;
  if(b.classList.contains("dock-app")&&activeApp===app){
-  if(win.classList.contains("hidden")){win.classList.remove("hidden");$( ".dock-app[data-app='"+app+"']")?.classList.remove("minimized");focusWindow()}
+  if(win.classList.contains("hidden")){win.classList.remove("hidden");$( ".dock-app[data-app='"+app+"']")?.classList.remove("minimized");focusWindow();content.focus()}
   else focusWindow();
   closePanels();
   return;
@@ -154,8 +154,8 @@ function openApp(app){
  title.textContent=appNames[app];content.innerHTML=appView(app);content.scrollTop=0;
  if(app==="settings")window.NexusAppRegistry.enhanceSettings(content);
  wireApp(app);
- $$( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});
- focusWindow();
+ $( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});
+ focusWindow();content.focus();
 }
 function appView(app){
 const heading=(t,s)=>'<h2 class="content-title">'+t+'</h2><p class="content-sub">'+s+'</p>';
@@ -656,22 +656,30 @@ titlebar.addEventListener("dblclick",e=>{
  if(e.target.closest(".window-control"))return;
  if(maximized||snapped)restoreWindow();else maximizeWindow();
 });
-$("#windowClose").onclick=()=>{win.classList.add("hidden");if(activeApp){window.NexusAppRegistry.unmountApp(activeApp);$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.remove("running","minimized"))}activeApp=null};
-$("#windowMin").onclick=()=>{win.classList.add("hidden");if(activeApp){$$( ".dock-app[data-app='"+activeApp+"']" ).forEach(b=>b.classList.add("minimized"))}notify("Window minimised")};
+$("#windowClose").onclick=closeActiveWindow;
+$("#windowMin").onclick=minimizeActiveWindow;
 $("#windowMax").onclick=()=>{if(maximized||snapped)restoreWindow();else maximizeWindow()};
+function focusAppButton(appId){
+ const button=$(".dock-app[data-app='"+appId+"']");
+ if(button)button.focus();
+}
 function closeActiveWindow(){
  if(win.classList.contains("hidden"))return;
  win.classList.add("hidden");
- if(activeApp){
-  window.NexusAppRegistry.unmountApp(activeApp);
-  $(".dock-app[data-app='"+activeApp+"']").forEach(b=>b.classList.remove("running","minimized"));
+ const closingApp=activeApp;
+ if(closingApp){
+  window.NexusAppRegistry.unmountApp(closingApp);
+  $(".dock-app[data-app='"+closingApp+"']").forEach(b=>b.classList.remove("running","minimized"));
  }
  activeApp=null;
+ if(closingApp)focusAppButton(closingApp);
 }
 function minimizeActiveWindow(){
  if(win.classList.contains("hidden"))return;
  win.classList.add("hidden");
- if(activeApp)$(".dock-app[data-app='"+activeApp+"']").forEach(b=>b.classList.add("minimized"));
+ const minimizedApp=activeApp;
+ if(minimizedApp)$(".dock-app[data-app='"+minimizedApp+"']").forEach(b=>b.classList.add("minimized"));
+ if(minimizedApp)focusAppButton(minimizedApp);
  notify("Window minimised");
 }
 titlebar.title="Drag to move · Double-click to maximise · Alt+F9 minimise · Alt+F10 maximise · Alt+F4 close · Ctrl+Alt+←/→ snap";
