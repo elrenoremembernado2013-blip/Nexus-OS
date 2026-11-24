@@ -140,6 +140,16 @@
 }
 
 
+@media(pointer:coarse){
+ .dock-app{min-width:48px;min-height:48px}
+ .top-icon,.status-pill,.close-btn,.window-control,.clear-notifications,.app-item,.shortcut{
+  min-width:44px;
+  min-height:44px;
+ }
+ input[type="range"]::-webkit-slider-thumb{width:24px;height:24px}
+ input[type="range"]::-moz-range-thumb{width:24px;height:24px}
+}
+
 /* NEXUS Settings app */
 .settings-layout{display:grid;grid-template-columns:178px minmax(0,1fr);gap:24px;min-height:100%;margin:-2px}
 .settings-sidebar{border-right:1px solid var(--line);padding:8px 14px 8px 0}
