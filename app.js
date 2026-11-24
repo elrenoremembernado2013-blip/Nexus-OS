@@ -459,13 +459,25 @@ if(app==="settings"){
  }
  setSwitch($("#lightToggle"),controlState.power,enabled=>setControlPreference("power",enabled));
  setSwitch($("#dndToggle"),controlState.dnd,enabled=>setControlPreference("dnd",enabled));
- const motionSaved=localStorage.getItem("nexus-reduced-motion")==="true";
- function setMotion(enabled){
+ const motionPreference=localStorage.getItem("nexus-reduced-motion");
+ const motionMedia=window.matchMedia?.("(prefers-reduced-motion: reduce)");
+ let motionEnabled=motionPreference===null?Boolean(motionMedia?.matches):motionPreference==="true";
+ function setMotion(enabled,save=true){
+  motionEnabled=enabled;
   document.body.classList.toggle("reduced-motion",enabled);
-  localStorage.setItem("nexus-reduced-motion",String(enabled));
+  if(save)localStorage.setItem("nexus-reduced-motion",String(enabled));
+  const toggle=$("#motionToggle");
+  if(toggle)setSwitch(toggle,enabled,setMotion);
  }
- setMotion(motionSaved);
- setSwitch($("#motionToggle"),motionSaved,setMotion);
+ setMotion(motionEnabled,false);
+ if(motionMedia){
+  const syncSystemMotion=event=>{
+   if(localStorage.getItem("nexus-reduced-motion")===null)setMotion(event.matches,false);
+  };
+  if(motionMedia.addEventListener)motionMedia.addEventListener("change",syncSystemMotion);
+  else motionMedia.addListener?.(syncSystemMotion);
+ }
+ setSwitch($("#motionToggle"),motionEnabled,setMotion);
  $$("[data-settings-section]").forEach(button=>button.onclick=()=>{
   const section=button.dataset.settingsSection;
   $$("[data-settings-section]").forEach(item=>{
@@ -487,14 +499,14 @@ if(app==="settings"){
   document.documentElement.style.setProperty("--blur","18px");
   applyWallpaper("alpine",false);
   applyTheme("dark");
-  document.body.classList.remove("reduced-motion");
+  setMotion(Boolean(motionMedia?.matches),false);
   brightness.value="100";updateBrightness();
   Object.entries(controlDefaults).forEach(([key,value])=>setControlPreference(key,value));
   setAccent("#ffad7a");blur.value="18";setBlur();
-  setMotion(false);
+  setMotion(Boolean(motionMedia?.matches),false);
   setSwitch($("#lightToggle"),false,enabled=>setControlPreference("power",enabled));
   setSwitch($("#dndToggle"),false,enabled=>setControlPreference("dnd",enabled));
-  setSwitch($("#motionToggle"),false,setMotion);
+  setSwitch($("#motionToggle"),motionEnabled,setMotion);
   notify("NEXUS preferences restored");
  };
 }
