@@ -9,7 +9,7 @@ VM_STATE_DIR="$BUILD_DIR/qemu"
 ISO_PATH="${NEXUS_ISO_PATH:-$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso}"
 DISK_PATH="${NEXUS_DISK_PATH:-$BUILD_DIR/images/nexus-mint-22.3.qcow2}"
 RAM_MB="${NEXUS_RAM_MB:-4096}"
-CPUS="${NEXUS_CPUS:-4}"
+CPUS="${NEXUS_CPUS:-2}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-40G}"
 ACCEL="${NEXUS_QEMU_ACCEL:-tcg}"
 if [[ -n "${NEXUS_QEMU_DISPLAY:-}" ]]; then
@@ -29,7 +29,7 @@ Usage: bash scripts/launch-qemu.sh
 
 Environment configuration:
   NEXUS_RAM_MB=4096          guest memory in MiB
-  NEXUS_CPUS=4               virtual CPU count
+  NEXUS_CPUS=2               virtual CPU count
   NEXUS_DISK_SIZE=40G        new qcow2 disk capacity (M, G, or T suffix)
   NEXUS_QEMU_ACCEL=tcg        QEMU accelerator (tcg or host-supported kvm)
   NEXUS_QEMU_DISPLAY=BACKEND  display backend (defaults to cocoa on macOS, gtk elsewhere)
