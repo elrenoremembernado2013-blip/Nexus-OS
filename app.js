@@ -154,7 +154,7 @@ function openApp(app){
  title.textContent=appNames[app];content.innerHTML=appView(app);content.scrollTop=0;
  if(app==="settings")window.NexusAppRegistry.enhanceSettings(content);
  wireApp(app);
- $( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});
+ document.querySelectorAll( ".dock-app[data-app]" ).forEach(b=>{b.classList.toggle("running",b.dataset.app===app);b.classList.remove("minimized")});
  focusWindow();content.focus();
 }
 function appView(app){
@@ -669,7 +669,7 @@ function closeActiveWindow(){
  const closingApp=activeApp;
  if(closingApp){
   window.NexusAppRegistry.unmountApp(closingApp);
-  $(".dock-app[data-app='"+closingApp+"']").forEach(b=>b.classList.remove("running","minimized"));
+  document.querySelectorAll(".dock-app[data-app='"+closingApp+"']").forEach(b=>b.classList.remove("running","minimized"));
  }
  activeApp=null;
  if(closingApp)focusAppButton(closingApp);
@@ -678,7 +678,7 @@ function minimizeActiveWindow(){
  if(win.classList.contains("hidden"))return;
  win.classList.add("hidden");
  const minimizedApp=activeApp;
- if(minimizedApp)$(".dock-app[data-app='"+minimizedApp+"']").forEach(b=>b.classList.add("minimized"));
+ if(minimizedApp)document.querySelectorAll(".dock-app[data-app='"+minimizedApp+"']").forEach(b=>b.classList.add("minimized"));
  if(minimizedApp)focusAppButton(minimizedApp);
  notify("Window minimised");
 }
