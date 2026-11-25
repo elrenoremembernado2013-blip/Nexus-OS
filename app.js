@@ -21,6 +21,22 @@
   let toastTimer = null;
   let panelTrigger = null;
 
+  function readStorage(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeStorage(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage quota or sandbox restrictions in browser preview.
+    }
+  }
+
   function setDesktopBackground(url) {
     desktop.style.backgroundImage =
       `linear-gradient(120deg,rgba(8,13,25,.72),rgba(11,13,30,.24)),url("${url}")`;
@@ -37,7 +53,7 @@
     const image = wallpaperCatalog[id];
     if (!image) return false;
     setDesktopBackground(image);
-    if (persist) window.localStorage.setItem("nexus-wallpaper", id);
+    if (persist) writeStorage("nexus-wallpaper", id);
     return true;
   }
 
@@ -47,11 +63,11 @@
     }
     activeCustomWallpaperUrl = url;
     setDesktopBackground(url);
-    if (persist) window.localStorage.setItem("nexus-wallpaper", "custom");
+    if (persist) writeStorage("nexus-wallpaper", "custom");
   }
 
   async function restoreCustomWallpaperAtStartup() {
-    if (window.localStorage.getItem("nexus-wallpaper") !== "custom" || !("indexedDB" in window)) return;
+    if (readStorage("nexus-wallpaper") !== "custom" || !("indexedDB" in window)) return;
     try {
       const db = await new Promise((resolve, reject) => {
         const request = window.indexedDB.open("nexus-wallpaper-store", 1);
@@ -73,7 +89,7 @@
       if (blob && ["image/jpeg", "image/png", "image/webp"].includes(blob.type)) {
         setCustomDesktopWallpaper(URL.createObjectURL(blob), false);
       } else if (!blob) {
-        window.localStorage.setItem("nexus-wallpaper", "alpine");
+        writeStorage("nexus-wallpaper", "alpine");
         setDesktopWallpaper("alpine", false);
       }
     } catch (error) {
@@ -238,7 +254,7 @@
     button.classList.toggle("active", enabled);
     button.setAttribute("aria-pressed", String(enabled));
     button.querySelector("small").textContent = (enabled ? "On" : "Off") + " · preview";
-    window.localStorage.setItem("nexus-control-" + key, String(enabled));
+    writeStorage("nexus-control-" + key, String(enabled));
     if (key === "power") desktop.classList.toggle("lightweight", enabled);
     controlListeners.forEach(listener => listener({ ...controlState }));
   }
@@ -250,20 +266,20 @@
 
   $$("[data-toggle]").forEach(button => {
     const key = button.dataset.toggle;
-    const saved = window.localStorage.getItem("nexus-control-" + key);
+    const saved = readStorage("nexus-control-" + key);
     applyControlToggle(button, saved === null ? controlDefaults[key] : saved === "true");
     button.addEventListener("click", () => applyControlToggle(button, !controlState[key]));
   });
 
   const brightness = $("#brightness");
-  const savedBrightness = window.localStorage.getItem("nexus-brightness");
+  const savedBrightness = readStorage("nexus-brightness");
   if (savedBrightness !== null) brightness.value = savedBrightness;
 
   function updateBrightness() {
     const output = $("#brightnessValue");
     output.value = brightness.value + "%";
     output.textContent = brightness.value + "%";
-    window.localStorage.setItem("nexus-brightness", brightness.value);
+    writeStorage("nexus-brightness", brightness.value);
     desktop.style.filter = "brightness(" + Number(brightness.value) / 100 + ")";
   }
   brightness.addEventListener("input", updateBrightness);
@@ -688,19 +704,19 @@
   });
 
   renderLauncher();
-  if (window.localStorage.getItem("nexus-wallpaper") === "custom") {
+  if (readStorage("nexus-wallpaper") === "custom") {
     restoreCustomWallpaperAtStartup();
   } else {
-    setDesktopWallpaper(window.localStorage.getItem("nexus-wallpaper") || "alpine", false);
+    setDesktopWallpaper(readStorage("nexus-wallpaper") || "alpine", false);
   }
-  const savedAccent = window.localStorage.getItem("nexus-accent");
+  const savedAccent = readStorage("nexus-accent");
   document.documentElement.style.setProperty("--accent", savedAccent || "#ffad7a");
-  const savedBlur = window.localStorage.getItem("nexus-blur");
+  const savedBlur = readStorage("nexus-blur");
   document.documentElement.style.setProperty("--blur", (savedBlur || "18") + "px");
-  if (window.localStorage.getItem("nexus-reduced-motion") === "true") {
+  if (readStorage("nexus-reduced-motion") === "true") {
     document.body.classList.add("reduced-motion");
   }
-  const savedTheme = window.localStorage.getItem("nexus-theme") || "dark";
+  const savedTheme = readStorage("nexus-theme") || "dark";
   const systemPrefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   desktop.classList.toggle("theme-light", savedTheme === "light" || (savedTheme === "system" && systemPrefersLight));
 })();

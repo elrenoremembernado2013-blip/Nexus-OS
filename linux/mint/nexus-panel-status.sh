@@ -101,17 +101,23 @@ fi
 base_label="Linux Mint 22.3 Xfce"
 if [[ -r "$SYSTEM_CONF" ]]; then
   conf_distro=""
-  conf_release=""
-  conf_desktop=""
+  conf_version=""
+  conf_edition=""
   while IFS='=' read -r k v; do
     case "$k" in
       NEXUS_BASE_DISTRO) conf_distro="$v" ;;
-      NEXUS_BASE_RELEASE) conf_release="$v" ;;
-      NEXUS_DESKTOP) conf_desktop="$v" ;;
+      NEXUS_BASE_VERSION) conf_version="$v" ;;
+      NEXUS_BASE_EDITION) conf_edition="$v" ;;
     esac
   done < "$SYSTEM_CONF"
-  if [[ -n "$conf_distro" && -n "$conf_release" ]]; then
-    base_label="${conf_distro} ${conf_release}${conf_desktop:+ ${conf_desktop}}"
+  if [[ "$conf_distro" == "linuxmint" ]]; then
+    conf_distro="Linux Mint"
+  fi
+  if [[ "$conf_edition" == "xfce" ]]; then
+    conf_edition="Xfce"
+  fi
+  if [[ -n "$conf_distro" && -n "$conf_version" ]]; then
+    base_label="${conf_distro} ${conf_version}${conf_edition:+ ${conf_edition}}"
   fi
 fi
 
