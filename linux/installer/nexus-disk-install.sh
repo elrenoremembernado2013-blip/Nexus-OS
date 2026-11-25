@@ -74,7 +74,6 @@ fi
 [[ -b "$DISK" ]] || { printf 'Target is not a block device: %s\n' "$DISK" >&2; exit 1; }
 
 # Safety check: refuse if target disk holds /, /rofs, /cdrom, or any active mount
-disk_base="$(basename "$DISK")"
 if lsblk -n -o MOUNTPOINT "$DISK" 2>/dev/null | grep -qE '^(/|/rofs|/cdrom|/boot|/home)'; then
   printf 'SAFETY ABORT: %s has active system mountpoints!\n' "$DISK" >&2
   exit 1
@@ -243,13 +242,13 @@ fi
 chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive dpkg --purge casper lupin-casper >/dev/null 2>&1 || true
 
 # Ensure kernel & initramfs are present in /boot for update-grub
-if ! ls "$TARGET"/boot/vmlinuz-* >/dev/null 2>&1; then
+if ! compgen -G "$TARGET/boot/vmlinuz-*" >/dev/null; then
   if [[ -r /cdrom/casper/vmlinuz ]]; then
-    kver="$(ls "$TARGET/lib/modules" | head -n1)"
+    kver="$(find "$TARGET/lib/modules" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | head -n1)"
     cp -f /cdrom/casper/vmlinuz "$TARGET/boot/vmlinuz-${kver}"
   fi
 fi
-if ! ls "$TARGET"/boot/initrd.img-* >/dev/null 2>&1; then
+if ! compgen -G "$TARGET/boot/initrd.img-*" >/dev/null; then
   chroot "$TARGET" /usr/sbin/update-initramfs -c -k all
 else
   chroot "$TARGET" /usr/sbin/update-initramfs -u -k all
