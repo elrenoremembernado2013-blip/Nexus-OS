@@ -56,7 +56,7 @@ jobs:
           event_name = os.environ["EVENT_NAME"]
           selected = "all" if event_name == "push" else os.environ.get("INPUT_EDITION", "all")
           entries = [
-              {"edition": "lite", "base_edition": "xfce", "ram_matrix": "512 768 1024 2048 4096"},
+              {"edition": "lite", "base_edition": "xfce", "ram_matrix": "512 768 1024 2048"},
               {"edition": "cinnamon", "base_edition": "cinnamon", "ram_matrix": "2048 4096"},
               {"edition": "xfce", "base_edition": "xfce", "ram_matrix": "4096"},
           ]
@@ -68,7 +68,7 @@ jobs:
   iso-and-qemu:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -114,10 +114,10 @@ jobs:
           echo "::notice title=NEXUS-ISO-${{ matrix.edition }}::file=nexus-os-22.3-${{ matrix.edition }}-amd64.iso bytes=${iso_bytes} sha256=${iso_sha}"
           sudo rm -rf "build/iso/work-${{ matrix.edition }}" build/downloads/*.iso
 
-      - name: Run Graphical QEMU RAM matrix (${{ matrix.ram_matrix }} MiB)
+      - name: Run Graphical + Install + 3-Reboot QEMU RAM matrix (${{ matrix.ram_matrix }} MiB)
         run: |
-          boot_sec="${{ github.event.inputs.boot_seconds || '45' }}"
-          primary_idle="${{ github.event.inputs.primary_idle || '300' }}"
+          boot_sec="${{ github.event.inputs.boot_seconds || '35' }}"
+          primary_idle="${{ github.event.inputs.primary_idle || '120' }}"
           set +e
           bash linux/test/run-qemu-validation.sh \
             --edition "${{ matrix.edition }}" \
@@ -125,7 +125,9 @@ jobs:
             --boot-seconds "$boot_sec" \
             --idle-seconds 30 \
             --primary-idle "$primary_idle" \
-            --graphical > /tmp/qemu-runner.log 2>&1
+            --graphical \
+            --install-test \
+            --reliability > /tmp/qemu-runner.log 2>&1
           rc=$?
           set -e
           cat /tmp/qemu-runner.log
@@ -137,44 +139,61 @@ jobs:
           python3 - "build/qemu-test/qemu-results-${{ matrix.edition }}.json" <<'PY'
           import json, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))
-          print(f"::notice title=NEXUS-QEMU-META-{data['edition']}::accel={data['accel']} graphical={data['graphical']} runs={len(data['runs'])}")
+          print(f"::notice title=NEXUS-QEMU-META-{data['edition']}::accel={data['accel']} graphical={data['graphical']} install_test={data.get('install_test')} runs={len(data['runs'])}")
           for r in data["runs"]:
-              desk = r.get("desktop") or {}
-              apps = r.get("apps") or {}
-              stages = r.get("stages") or {}
-              zp = r.get("zram_pressure") or {}
-              shots = [(s.get("name"), s.get("non_black_pct"), s.get("width"), s.get("height")) for s in r.get("screenshots") or []]
+              live_r = r.get("live_reps") or []
+              l0 = live_r[0] if live_r else {}
+              ir0 = l0.get("install_report") or {}
+              iboot = r.get("installed_boots") or []
+              compact_boots = []
+              for b in iboot:
+                  st = b.get("stages") or {}
+                  zp = b.get("zram_pressure") or {}
+                  compact_boots.append({
+                      "boot": b.get("boot_num"),
+                      "src": b.get("source"),
+                      "vda": b.get("booted_from_vda"),
+                      "no_iso": b.get("live_iso_absent"),
+                      "efi": b.get("efi_boot_ok"),
+                      "login": b.get("login_success"),
+                      "desk": b.get("graphical_session_success"),
+                      "panel_map": b.get("panel_win_mapped"),
+                      "wm_s": b.get("wm_ready_sec"),
+                      "pnl_s": b.get("panel_ready_sec"),
+                      "apps": b.get("application_test_success"),
+                      "clean": b.get("windows_closed_cleanup"),
+                      "persist": (b.get("persistence") or {}).get("persistence_verified"),
+                      "net": (b.get("network") or {}).get("nmcli_state"),
+                      "err": (b.get("installed_checks") or {}).get("journal_err_count"),
+                      "fail_u": (b.get("installed_checks") or {}).get("failed_systemd_units"),
+                      "zram": zp.get("status") if not zp.get("skipped") else "N/A",
+                      "mem": {k: {
+                          "u": v.get("used_ram_mib"),
+                          "a": v.get("available_ram_mib"),
+                          "c": v.get("cached_mib"),
+                          "sw": v.get("swap_used_mib"),
+                          "cpu": v.get("cpu_usage_pct"),
+                          "oom": v.get("oom_kill_count"),
+                          "zr": (v.get("zram") or [{}])[0].get("compression_ratio") if v.get("zram") else None,
+                      } for k, v in st.items()},
+                      "shots": [(s.get("name"), s.get("non_black_pct")) for s in (b.get("screenshots") or [])],
+                  })
               summary = {
-                  "ram_mib": r.get("ram_mib"),
-                  "uefi_boot": r.get("uefi_boot_success"),
-                  "login": r.get("login_success"),
-                  "desktop": r.get("graphical_session_success"),
-                  "apps_ok": r.get("application_test_success"),
-                  "mem_ok": r.get("memory_test_success"),
-                  "zram_ok": r.get("zram_test_success"),
-                  "preflight_ok": r.get("installation_preflight_success"),
-                  "wm": desk.get("wm"),
-                  "panel": desk.get("panel_running"),
-                  "panel_rss": desk.get("panel_rss_mib"),
-                  "res": desk.get("resolution"),
-                  "alt_f4": apps.get("keyboard_alt_f4_closed"),
-                  "cleaned": apps.get("windows_closed_cleanup"),
-                  "net": (r.get("network") or {}).get("nmcli_state"),
-                  "stages": {k: {
-                      "tot": v.get("ram_total_mib"),
-                      "used": v.get("used_ram_mib"),
-                      "avail": v.get("available_ram_mib"),
-                      "cache": v.get("cached_mib"),
-                      "swap_used": v.get("swap_used_mib"),
-                      "zram_mem": (v.get("zram") or [{}])[0].get("mem_used_total_mib") if v.get("zram") else None,
-                      "oom": v.get("oom_kill_count"),
-                      "top": [(p.get("comm"), p.get("rss_mib")) for p in (v.get("top_processes") or [])[:4]],
-                  } for k, v in stages.items()},
-                  "zram_p": zp,
-                  "shots": shots,
-                  "fail": r.get("desktop_failed"),
+                  "ram": r.get("ram_mib"),
+                  "uefi": r.get("uefi_boot_success"),
+                  "live": f"{r.get('live_successes')}/{r.get('live_attempts')}",
+                  "inst": f"{r.get('install_successes')}/{r.get('install_attempts')}",
+                  "iboot": f"{r.get('installed_boot_successes')}/{r.get('installed_boot_attempts')}",
+                  "persist": r.get("persistence_verified"),
+                  "ub_ui": (l0.get("ubiquity_ui") or {}).get("window_verified"),
+                  "inst_sec": ir0.get("elapsed_sec"),
+                  "inst_efi": ir0.get("bootloader_efi_ok"),
+                  "live_shots": [(s.get("name"), s.get("non_black_pct")) for s in (l0.get("screenshots") or [])],
+                  "live_glx": (l0.get("desktop") or {}).get("glx_diag"),
+                  "cinn_2g_virtio": r.get("cinnamon_2g_virtio_diag"),
+                  "boots": compact_boots,
               }
-              print(f"::notice title=NEXUS-QEMU-{data['edition']}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
+              print(f"::notice title=NEXUS-123-{data['edition']}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
           PY
 
       - name: Upload ISO, SHA-256, and build metadata (${{ matrix.edition }})

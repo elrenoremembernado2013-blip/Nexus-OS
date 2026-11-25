@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""Host-side QEMU QMP + virtio-serial graphical desktop & telemetry orchestrator.
-Captures synchronized PPM->PNG screenshots, injects safe QMP input events, and
-records separated boot, login, graphical session, app, memory, ZRAM, and preflight results.
+"""Host-side QEMU QMP + virtio-serial graphical desktop, install & multi-reboot orchestrator.
+Supports single live/install runs and multi-reboot installed-disk verification cycles.
 """
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import socket
 import struct
@@ -74,7 +72,7 @@ class QmpClient:
         self.sock_path = sock_path
         self.sock = None
 
-    def connect(self, timeout=20):
+    def connect(self, timeout=25):
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self.sock_path.exists():
@@ -150,7 +148,11 @@ def main():
     ap.add_argument("--vserial-sock", required=True)
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--idle-seconds", type=int, default=30)
-    ap.add_argument("--timeout-seconds", type=int, default=600)
+    ap.add_argument("--panel-wait-sec", type=int, default=90)
+    ap.add_argument("--timeout-seconds", type=int, default=900)
+    ap.add_argument("--do-install", action="store_true")
+    ap.add_argument("--expected-boots", type=int, default=1)
+    ap.add_argument("--final-action", choices=["quit", "poweroff"], default="quit")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -167,7 +169,7 @@ def main():
     while time.time() < deadline and not vserial_path.exists():
         time.sleep(0.3)
     if vserial_path.exists():
-        for _ in range(30):
+        for _ in range(40):
             try:
                 vs = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 vs.settimeout(2)
@@ -176,20 +178,20 @@ def main():
             except OSError:
                 time.sleep(0.3)
 
-    screenshots = []
-    events = []
-    complete_data = None
+    boot_cycles = []
+    current_shots = []
     failure_data = None
     boot_shot_taken = False
     start_t = time.time()
     buf = ""
+    cycle_idx = 1
 
     try:
         while time.time() < deadline:
             if proc.poll() is not None:
                 break
-            if qmp_ok and not boot_shot_taken and (time.time() - start_t) >= 30:
-                screenshots.append(qmp.screendump(out_dir, "00_boot_progress"))
+            if qmp_ok and not boot_shot_taken and (time.time() - start_t) >= 25:
+                current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_00_boot_progress"))
                 boot_shot_taken = True
 
             if vs:
@@ -206,18 +208,23 @@ def main():
                                 ev = json.loads(line)
                             except json.JSONDecodeError:
                                 continue
-                            events.append(ev)
                             et = ev.get("event")
                             if et == "agent_started":
-                                vs.sendall((json.dumps({"cmd": "run_suite", "idle_seconds": args.idle_seconds}) + "\n").encode("utf-8"))
+                                cfg = {
+                                    "cmd": "run_suite",
+                                    "idle_seconds": args.idle_seconds,
+                                    "do_install": args.do_install,
+                                    "panel_wait_sec": args.panel_wait_sec,
+                                }
+                                vs.sendall((json.dumps(cfg) + "\n").encode("utf-8"))
                             elif et == "desktop_ready":
                                 if qmp_ok:
                                     qmp.nudge_mouse()
-                                    screenshots.append(qmp.screendump(out_dir, "01_desktop_initial"))
+                                    current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_01_desktop_initial"))
                                 vs.sendall(b'{"cmd":"ack"}\n')
-                            elif et in ("app_file_manager", "app_terminal", "app_settings", "app_multi_apps"):
+                            elif et in ("app_file_manager", "app_terminal", "app_settings", "app_multi_apps", "ubiquity_ui"):
                                 if qmp_ok:
-                                    screenshots.append(qmp.screendump(out_dir, f"02_{et}"))
+                                    current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_02_{et}"))
                                 vs.sendall(b'{"cmd":"ack"}\n')
                             elif et == "test_alt_f4":
                                 if qmp_ok:
@@ -226,23 +233,43 @@ def main():
                             elif et == "desktop_failed":
                                 failure_data = ev.get("data")
                                 if qmp_ok:
-                                    screenshots.append(qmp.screendump(out_dir, "99_desktop_failed"))
+                                    current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_99_desktop_failed"))
                                 break
                             elif et == "complete":
-                                complete_data = ev.get("data")
                                 if qmp_ok:
-                                    screenshots.append(qmp.screendump(out_dir, "06_post_close"))
-                                break
+                                    current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_06_post_close"))
+                                boot_cycles.append({
+                                    "cycle": cycle_idx,
+                                    "screenshots": current_shots,
+                                    "guest_report": ev.get("data"),
+                                })
+                                current_shots = []
+                                if len(boot_cycles) < args.expected_boots:
+                                    vs.sendall(b'{"cmd":"reboot"}\n')
+                                    cycle_idx += 1
+                                    boot_shot_taken = False
+                                    start_t = time.time()
+                                else:
+                                    if args.final_action == "poweroff":
+                                        vs.sendall(b'{"cmd":"poweroff"}\n')
+                                    else:
+                                        vs.sendall(b'{"cmd":"done"}\n')
+                                    break
                 except socket.timeout:
                     pass
-                if complete_data or failure_data:
+                if failure_data or len(boot_cycles) >= args.expected_boots:
                     break
             else:
                 time.sleep(0.5)
     finally:
-        if qmp_ok:
-            if not screenshots:
-                screenshots.append(qmp.screendump(out_dir, "98_timeout_screen"))
+        if args.final_action == "poweroff" and len(boot_cycles) >= args.expected_boots and not failure_data:
+            try:
+                proc.wait(timeout=35)
+            except subprocess.TimeoutExpired:
+                pass
+        if proc.poll() is None and qmp_ok:
+            if not boot_cycles and not current_shots:
+                current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_98_timeout_screen"))
             qmp.quit()
         if vs:
             try:
@@ -250,21 +277,23 @@ def main():
             except Exception:
                 pass
         try:
-            proc.wait(timeout=8)
+            proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
 
+    first_report = boot_cycles[0]["guest_report"] if boot_cycles else None
+    first_shots = boot_cycles[0]["screenshots"] if boot_cycles else current_shots
     result = {
         "vm_exited_cleanly": proc.returncode == 0,
         "qmp_connected": qmp_ok,
-        "screenshots": screenshots,
+        "screenshots": first_shots,
         "desktop_failed": failure_data,
-        "guest_report": complete_data,
-        "events_count": len(events),
+        "guest_report": first_report,
+        "boot_cycles": boot_cycles,
     }
     print(json.dumps(result, indent=2))
-    return 0 if complete_data else 1
+    return 0 if len(boot_cycles) >= args.expected_boots and not failure_data else 1
 
 
 if __name__ == "__main__":

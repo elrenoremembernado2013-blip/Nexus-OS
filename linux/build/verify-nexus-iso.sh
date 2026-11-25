@@ -96,6 +96,36 @@ if command -v xorriso >/dev/null 2>&1; then
     exit 1
   fi
   echo "PASS ISO structure and boot entries verified via xorriso."
+
+  # Production/test separation verification: ensure zero test agents/hooks exist in released ISO
+  sep_tmp="$(mktemp -d "${TMPDIR:-/tmp}/nexus-iso-sep.XXXXXX")"
+  trap 'rm -rf -- "$sep_tmp"' EXIT
+  initrd_entry="$(printf '%s\n' "$listing" | tr -d "'" | grep -E '/casper/initrd(\.lz|\.gz|\.xz)?$' | head -n1 || true)"
+  if [[ -n "$initrd_entry" && -x "$(command -v unmkinitramfs || true)" ]]; then
+    xorriso -osirrox on -indev "$ISO_PATH" -extract "$initrd_entry" "$sep_tmp/initrd" >/dev/null 2>&1
+    mkdir -p -- "$sep_tmp/initrd-tree"
+    unmkinitramfs "$sep_tmp/initrd" "$sep_tmp/initrd-tree"
+    if find "$sep_tmp/initrd-tree" \( -name '*nexus-test*' -o -name '*casper-test*' -o -name '*99nexus_test_harness*' -o -name '*nexus-guest-test*' \) | grep -q .; then
+      echo 'SECURITY FAIL: Test harness artifact found inside released ISO initramfs!' >&2
+      exit 1
+    fi
+    if grep -rnq 'org\.nexus\.test\.0' "$sep_tmp/initrd-tree" 2>/dev/null; then
+      echo 'SECURITY FAIL: Test virtio-serial channel reference found inside released ISO initramfs!' >&2
+      exit 1
+    fi
+    echo 'PASS production/test separation: zero test hooks in released ISO initramfs.'
+  fi
+  if command -v unsquashfs >/dev/null 2>&1; then
+    xorriso -osirrox on -indev "$ISO_PATH" -extract /casper/filesystem.squashfs "$sep_tmp/fs.squashfs" >/dev/null 2>&1
+    sq_list="$(unsquashfs -l "$sep_tmp/fs.squashfs" 2>/dev/null || true)"
+    if printf '%s\n' "$sq_list" | grep -Eq 'nexus-test-agent|nexus-guest-test|casper-test-hook|99nexus_test_harness|/libexec/nexus-test'; then
+      echo 'SECURITY FAIL: Test agent/script found inside released ISO filesystem.squashfs!' >&2
+      exit 1
+    fi
+    echo 'PASS production/test separation: zero test agents in released ISO squashfs.'
+  fi
+  rm -rf -- "$sep_tmp"
+  trap - EXIT
 else
   echo 'WARN xorriso not installed; skipped internal ISO tree inspection.' >&2
 fi

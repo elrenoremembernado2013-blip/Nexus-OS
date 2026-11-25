@@ -102,6 +102,7 @@ run_cmd install -m 0755 "$SCRIPT_DIR/memory-audit.sh" /usr/local/bin/nexus-memor
 run_cmd install -m 0755 "$SCRIPT_DIR/nexus-lite-install.sh" /usr/local/bin/nexus-lite-install
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" /usr/local/bin/nexus-install-preflight
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" /usr/local/bin/nexus-installer-launcher
+run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" /usr/local/bin/nexus-disk-install
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
 run_cmd cp -a "$SCRIPT_DIR/openbox" /usr/local/share/nexus-os/lite/
 

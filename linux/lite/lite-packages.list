@@ -11,6 +11,11 @@ core:curl
 core:network-manager
 core:zram-tools
 core:policykit-1-gnome
+core:grub2-common
+core:grub-efi-amd64-bin
+core:efibootmgr
+core:parted
+core:dosfstools
 
 # Minimal Openbox + tint2 desktop (no Cinnamon, no picom compositor by default)
 desktop:openbox

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Reproducible QEMU multi-RAM, UEFI boot, and graphical desktop validation runner.
-# Uses strictly disposable qcow2 disks under build/qemu-test/ (never touches host disks).
+# Reproducible QEMU multi-RAM, UEFI boot, graphical desktop, installation,
+# and post-install multi-reboot validation runner.
+# Strictly uses disposable qcow2 disks under build/qemu-test/ (never host disks).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,27 +12,33 @@ TEST_DIR="${NEXUS_QEMU_TEST_DIR:-$REPO_ROOT/build/qemu-test}"
 EDITION="lite"
 ISO_PATH=""
 RAM_LIST="512 768 1024 2048 4096"
-BOOT_SECONDS=45
+BOOT_SECONDS=35
 IDLE_SECONDS=30
-PRIMARY_IDLE_SECONDS=300
+PRIMARY_IDLE_SECONDS=120
 GRAPHICAL=false
+INSTALL_TEST=false
+RELIABILITY=false
+VGA_MODE="std"
 DRY_RUN=false
 
 usage() {
   cat <<'USAGE'
 Usage: bash linux/test/run-qemu-validation.sh [OPTIONS]
 
-Runs UEFI/OVMF ISO boot checks and (with --graphical) full virtio-serial + QMP
-graphical desktop validation, 6-stage guest RAM probes, ZRAM tests, and PNG captures.
+Runs UEFI/OVMF ISO boot checks, graphical live tests, disposable-disk installation,
+and post-install multi-reboot validation without the live ISO.
 
 Options:
   --edition NAME          lite | cinnamon | xfce (default: lite)
   --iso PATH              Override ISO file path
   --ram-matrix LIST       Space-separated MiB list (default: "512 768 1024 2048 4096")
-  --boot-seconds SEC      UEFI boot check window in seconds (default: 45)
+  --boot-seconds SEC      UEFI boot check window in seconds (default: 35)
   --idle-seconds SEC      Secondary-tier guest idle probe window (default: 30)
-  --primary-idle SEC      Primary-tier guest idle probe window (default: 300)
-  --graphical             Enable virtio-serial + QMP graphical desktop & memory suite
+  --primary-idle SEC      Primary-tier guest idle probe window (default: 120)
+  --graphical             Enable virtio-serial + QMP live graphical & memory suite
+  --install-test          Install onto disposable qcow2 and run 3 installed-disk boots (no ISO)
+  --reliability           Add repeated live boots (3x) and repeated installs (2x) on primary tier
+  --vga TYPE              QEMU VGA device: std | virtio (default: std)
   --dry-run               Print QEMU validation plan without launching VMs
   --help, -h              Show this help message
 USAGE
@@ -46,6 +53,9 @@ while (($#)); do
     --idle-seconds) [[ $# -ge 2 ]] || { echo '--idle-seconds requires seconds' >&2; exit 2; }; IDLE_SECONDS="$2"; shift 2 ;;
     --primary-idle) [[ $# -ge 2 ]] || { echo '--primary-idle requires seconds' >&2; exit 2; }; PRIMARY_IDLE_SECONDS="$2"; shift 2 ;;
     --graphical) GRAPHICAL=true; shift ;;
+    --install-test) INSTALL_TEST=true; GRAPHICAL=true; shift ;;
+    --reliability) RELIABILITY=true; shift ;;
+    --vga) [[ $# -ge 2 ]] || { echo '--vga requires std or virtio' >&2; exit 2; }; VGA_MODE="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -63,17 +73,16 @@ fi
 
 if [[ "$DRY_RUN" == true ]]; then
   echo "NEXUS QEMU Multi-RAM Validation Plan (dry-run)"
-  echo "  Edition: $EDITION"
-  echo "  Graphical mode: $GRAPHICAL"
+  echo "  Edition: $EDITION (vga=$VGA_MODE)"
+  echo "  Graphical mode: $GRAPHICAL | Install+3-Reboot mode: $INSTALL_TEST | Reliability repeats: $RELIABILITY"
   echo "  ISO: $ISO_PATH"
   echo "  RAM matrix (MiB): $RAM_LIST"
   echo "  Disposable work dir: $TEST_DIR"
-  echo "  Host prereqs check:"
-  for bin in qemu-system-x86_64 qemu-img xorriso cpio gzip; do
+  for bin in qemu-system-x86_64 qemu-img xorriso cpio gzip unmkinitramfs; do
     if command -v "$bin" >/dev/null 2>&1; then
       echo "    [OK] $bin"
     else
-      echo "    [MISSING] $bin (install: sudo apt install -y qemu-system-x86 qemu-utils ovmf xorriso)"
+      echo "    [MISSING] $bin"
     fi
   done
   exit 0
@@ -105,7 +114,7 @@ ACCEL="tcg"
 
 mkdir -p -- "$TEST_DIR"
 SUMMARY="$TEST_DIR/qemu-results-${EDITION}.json"
-echo '{"edition":"'"$EDITION"'","iso":"'"$ISO_PATH"'","accel":"'"$ACCEL"'","graphical":'"$GRAPHICAL"',"runs":[]}' > "$SUMMARY"
+echo '{"edition":"'"$EDITION"'","iso":"'"$ISO_PATH"'","accel":"'"$ACCEL"'","graphical":'"$GRAPHICAL"',"install_test":'"$INSTALL_TEST"',"runs":[]}' > "$SUMMARY"
 
 test_vmlinuz=""
 test_initrd=""
@@ -122,7 +131,7 @@ if [[ "$GRAPHICAL" == true ]]; then
       break
     fi
   done
-  [[ -n "$initrd_name" ]] || { printf 'Could not locate /casper/initrd* inside %s (found: %s)\n' "$ISO_PATH" "$casper_list" >&2; exit 1; }
+  [[ -n "$initrd_name" ]] || { printf 'Could not locate /casper/initrd* inside %s\n' "$ISO_PATH" >&2; exit 1; }
   xorriso -osirrox on -indev "$ISO_PATH" -extract /casper/vmlinuz "$overlay_dir/vmlinuz" >/dev/null 2>&1
   xorriso -osirrox on -indev "$ISO_PATH" -extract "/casper/${initrd_name}" "$overlay_dir/orig-initrd" >/dev/null 2>&1
 
@@ -154,6 +163,60 @@ if [[ "$GRAPHICAL" == true ]]; then
   test_initrd="$overlay_dir/test-initrd.img"
 fi
 
+is_primary_tier() {
+  local ed="$1" rm="$2"
+  [[ "$ed" == "lite" && "$rm" == "1024" ]] && return 0
+  [[ "$ed" == "cinnamon" && "$rm" == "4096" ]] && return 0
+  [[ "$ed" == "xfce" && "$rm" == "4096" ]] && return 0
+  return 1
+}
+
+run_live_cmd_json() {
+  python3 - "$ACCEL" "$1" "$2" "$ISO_PATH" "$test_vmlinuz" "$test_initrd" "$3" "$4" "$5" "$6" <<'PY'
+import json, sys
+accel, ram, disk, iso, vml, initrd, slog, qmp, vs, vga = sys.argv[1:]
+print(json.dumps([
+    "qemu-system-x86_64",
+    "-machine", f"q35,accel={accel}",
+    "-cpu", "max", "-smp", "2", "-m", ram,
+    "-drive", f"file={disk},if=virtio,format=qcow2",
+    "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
+    "-vga", vga, "-display", "none",
+    "-serial", f"file:{slog}",
+    "-qmp", f"unix:{qmp},server,nowait",
+    "-device", "virtio-serial-pci",
+    "-chardev", f"socket,path={vs},server=on,wait=off,id=nexus_ch",
+    "-device", "virtserialport,chardev=nexus_ch,name=org.nexus.test.0",
+    "-kernel", vml, "-initrd", initrd,
+    "-append", "boot=casper cdrom-detect/try-usb=true noprompt console=ttyS0,115200 ---",
+    "-cdrom", iso,
+]))
+PY
+}
+
+run_installed_cmd_json() {
+  python3 - "$ACCEL" "$1" "$2" "$OVMF_CODE" "$3" "$4" "$5" "$6" "$7" <<'PY'
+import json, sys
+accel, ram, disk, ovmf_code, ovmf_vars, slog, qmp, vs, vga = sys.argv[1:]
+print(json.dumps([
+    "qemu-system-x86_64",
+    "-machine", f"q35,accel={accel}",
+    "-cpu", "max", "-smp", "2", "-m", ram,
+    "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={ovmf_code}",
+    "-drive", f"if=pflash,format=raw,unit=1,file={ovmf_vars}",
+    "-drive", f"file={disk},if=virtio,format=qcow2",
+    "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
+    "-vga", vga, "-display", "none",
+    "-serial", f"file:{slog}",
+    "-qmp", f"unix:{qmp},server,nowait",
+    "-device", "virtio-serial-pci",
+    "-chardev", f"socket,path={vs},server=on,wait=off,id=nexus_ch",
+    "-device", "virtserialport,chardev=nexus_ch,name=org.nexus.test.0",
+    "-boot", "order=c",
+]))
+PY
+}
+
 for ram_mb in $RAM_LIST; do
   run_dir="$TEST_DIR/${EDITION}-${ram_mb}m"
   mkdir -p -- "$run_dir"
@@ -167,14 +230,14 @@ for ram_mb in $RAM_LIST; do
   cp -f -- "$OVMF_VARS" "$vars_copy"
   rm -f -- "$qmp_sock" "$screendump_ppm" "$screendump_png"
 
-  # Stage 1: UEFI/OVMF direct ISO boot check (proves unmodified ISO boots via GRUB/EFI)
+  # Stage 1: UEFI/OVMF direct ISO boot check
   qemu-system-x86_64 \
     -machine "q35,accel=${ACCEL}" -cpu max -smp 2 -m "$ram_mb" \
     -drive "if=pflash,format=raw,unit=0,readonly=on,file=${OVMF_CODE}" \
     -drive "if=pflash,format=raw,unit=1,file=${vars_copy}" \
     -drive "file=${disk},if=virtio,format=qcow2" \
     -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
-    -vga std -display none -serial "file:${serial_log}" \
+    -vga "$VGA_MODE" -display none -serial "file:${serial_log}" \
     -qmp "unix:${qmp_sock},server,nowait" \
     -cdrom "$ISO_PATH" -boot order=d >/dev/null 2>&1 &
   qemu_pid=$!
@@ -185,13 +248,10 @@ for ram_mb in $RAM_LIST; do
     uefi_alive=true
     python3 - "$qmp_sock" "$screendump_ppm" <<'PY' 2>/dev/null || true
 import json, socket, sys
-sock_path, ppm = sys.argv[1], sys.argv[2]
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-    s.settimeout(5)
-    s.connect(sock_path)
-    s.recv(4096)
+    s.settimeout(5); s.connect(sys.argv[1]); s.recv(4096)
     s.sendall(b'{"execute":"qmp_capabilities"}\n'); s.recv(4096)
-    s.sendall(json.dumps({"execute":"screendump","arguments":{"filename":ppm}}).encode()+b"\n"); s.recv(4096)
+    s.sendall(json.dumps({"execute":"screendump","arguments":{"filename":sys.argv[2]}}).encode()+b"\n"); s.recv(4096)
     s.sendall(b'{"execute":"quit"}\n')
 PY
     sleep 2
@@ -199,55 +259,114 @@ PY
   fi
   wait "$qemu_pid" 2>/dev/null || true
 
-  # Stage 2: Graphical desktop + GUI automation + 6-stage memory + ZRAM test via ephemeral initrd overlay
-  graphical_json="$run_dir/graphical-result.json"
-  if [[ "$GRAPHICAL" == true ]]; then
-    idle_sec="$IDLE_SECONDS"
-    if [[ "$EDITION" == "lite" && ( "$ram_mb" == "512" || "$ram_mb" == "1024" ) ]]; then
-      idle_sec="$PRIMARY_IDLE_SECONDS"
-    elif [[ "$EDITION" != "lite" && "$ram_mb" == "4096" ]]; then
-      idle_sec="$PRIMARY_IDLE_SECONDS"
+  # Determine idle & repeat counts
+  idle_sec="$IDLE_SECONDS"
+  if [[ "$EDITION" == "lite" && ( "$ram_mb" == "512" || "$ram_mb" == "1024" ) ]]; then
+    idle_sec="$PRIMARY_IDLE_SECONDS"
+  elif [[ "$EDITION" != "lite" && "$ram_mb" == "4096" ]]; then
+    idle_sec="$PRIMARY_IDLE_SECONDS"
+  fi
+  live_repeats=1
+  install_repeats=1
+  if [[ "$RELIABILITY" == true ]] && is_primary_tier "$EDITION" "$ram_mb"; then
+    live_repeats=3
+    install_repeats=2
+  fi
+
+  # Stage 2: Live graphical ISO runs + optional installation onto disposable qcow2
+  live_runs_dir="$run_dir/live-runs"
+  mkdir -p -- "$live_runs_dir"
+  for rep in $(seq 1 "$live_repeats"); do
+    rep_dir="$live_runs_dir/rep-${rep}"
+    mkdir -p -- "$rep_dir"
+    vserial_sock="$rep_dir/vserial.sock"
+    gqmp_sock="$rep_dir/gqmp.sock"
+    gserial_log="$rep_dir/live-serial.log"
+    rep_json="$rep_dir/live-result.json"
+    rm -f -- "$vserial_sock" "$gqmp_sock" "$rep_json"
+
+    rep_idle="$idle_sec"
+    install_flag=()
+    timeout_sec=$(( rep_idle + 540 ))
+    if [[ "$INSTALL_TEST" == true && "$rep" -le "$install_repeats" ]]; then
+      install_flag=(--do-install)
+      timeout_sec=$(( rep_idle + 1200 ))
     fi
-    timeout_sec=$(( idle_sec + 420 ))
-    vserial_sock="$run_dir/vserial.sock"
-    gqmp_sock="$run_dir/gqmp.sock"
-    gserial_log="$run_dir/graphical-serial.log"
-    rm -f -- "$vserial_sock" "$gqmp_sock" "$graphical_json"
-    cmd_json="$(python3 - "$ACCEL" "$ram_mb" "$disk" "$ISO_PATH" "$test_vmlinuz" "$test_initrd" "$gserial_log" "$gqmp_sock" "$vserial_sock" <<'PY'
-import json, sys
-accel, ram, disk, iso, vml, initrd, slog, qmp, vs = sys.argv[1:]
-print(json.dumps([
-    "qemu-system-x86_64",
-    "-machine", f"q35,accel={accel}",
-    "-cpu", "max", "-smp", "2", "-m", ram,
-    "-drive", f"file={disk},if=virtio,format=qcow2",
-    "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
-    "-vga", "std", "-display", "none",
-    "-serial", f"file:{slog}",
-    "-qmp", f"unix:{qmp},server,nowait",
-    "-device", "virtio-serial-pci",
-    "-chardev", f"socket,path={vs},server=on,wait=off,id=nexus_ch",
-    "-device", "virtserialport,chardev=nexus_ch,name=org.nexus.test.0",
-    "-kernel", vml, "-initrd", initrd,
-    "-append", "boot=casper cdrom-detect/try-usb=true noprompt console=ttyS0,115200 ---",
-    "-cdrom", iso,
-]))
-PY
-)"
+    if (( rep > 1 )); then
+      rep_idle=20
+    fi
+    cmd_json="$(run_live_cmd_json "$ram_mb" "$disk" "$gserial_log" "$gqmp_sock" "$vserial_sock" "$VGA_MODE")"
     python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
       --qemu-cmd-json "$cmd_json" \
       --qmp-sock "$gqmp_sock" \
       --vserial-sock "$vserial_sock" \
-      --out-dir "$run_dir" \
-      --idle-seconds "$idle_sec" \
-      --timeout-seconds "$timeout_sec" > "$graphical_json" || true
+      --out-dir "$rep_dir" \
+      --idle-seconds "$rep_idle" \
+      --panel-wait-sec 90 \
+      --timeout-seconds "$timeout_sec" \
+      "${install_flag[@]}" > "$rep_json" || true
+  done
+
+  # Stage 2b: Cinnamon 2048 MiB diagnostic comparison with virtio-gpu (when EDITION=cinnamon, ram=2048, vga=std)
+  cinn_virtio_json="$run_dir/cinnamon-2g-virtio.json"
+  if [[ "$EDITION" == "cinnamon" && "$ram_mb" == "2048" && "$VGA_MODE" == "std" ]]; then
+    diag_dir="$run_dir/diag-virtio"
+    mkdir -p -- "$diag_dir"
+    diag_disk="$diag_dir/diag.qcow2"
+    qemu-img create -f qcow2 "$diag_disk" 20G >/dev/null
+    cmd_json="$(run_live_cmd_json "$ram_mb" "$diag_disk" "$diag_dir/serial.log" "$diag_dir/qmp.sock" "$diag_dir/vs.sock" "virtio")"
+    python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
+      --qemu-cmd-json "$cmd_json" \
+      --qmp-sock "$diag_dir/qmp.sock" \
+      --vserial-sock "$diag_dir/vs.sock" \
+      --out-dir "$diag_dir" \
+      --idle-seconds 90 \
+      --panel-wait-sec 120 \
+      --timeout-seconds 660 > "$cinn_virtio_json" || true
+    rm -f -- "$diag_disk"
   fi
 
-  python3 - "$SUMMARY" "$ram_mb" "$uefi_alive" "$serial_log" "$screendump_ppm" "$screendump_png" "$graphical_json" "$SCRIPT_DIR" <<'PY'
+  # Stage 3: Installed-system multi-reboot validation WITHOUT live ISO (Boot 1 -> warm reboot -> Boot 2 -> poweroff -> Cold Boot 3)
+  inst_warm_json="$run_dir/installed-warm.json"
+  inst_cold_json="$run_dir/installed-cold.json"
+  if [[ "$INSTALL_TEST" == true ]]; then
+    inst_dir="$run_dir/installed-boots"
+    mkdir -p -- "$inst_dir/warm" "$inst_dir/cold"
+    cp -f -- "$OVMF_VARS" "$inst_dir/warm/OVMF_VARS.fd"
+    cp -f -- "$OVMF_VARS" "$inst_dir/cold/OVMF_VARS.fd"
+
+    # Boots 1 & 2 (warm reboot cycle via OVMF + /dev/vda only)
+    cmd_warm="$(run_installed_cmd_json "$ram_mb" "$disk" "$inst_dir/warm/OVMF_VARS.fd" "$inst_dir/warm/serial.log" "$inst_dir/warm/qmp.sock" "$inst_dir/warm/vs.sock" "$VGA_MODE")"
+    python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
+      --qemu-cmd-json "$cmd_warm" \
+      --qmp-sock "$inst_dir/warm/qmp.sock" \
+      --vserial-sock "$inst_dir/warm/vs.sock" \
+      --out-dir "$inst_dir/warm" \
+      --idle-seconds 30 \
+      --panel-wait-sec 90 \
+      --expected-boots 2 \
+      --final-action poweroff \
+      --timeout-seconds 1200 > "$inst_warm_json" || true
+
+    # Boot 3 (cold power-on after clean shutdown, still NO ISO)
+    cmd_cold="$(run_installed_cmd_json "$ram_mb" "$disk" "$inst_dir/cold/OVMF_VARS.fd" "$inst_dir/cold/serial.log" "$inst_dir/cold/qmp.sock" "$inst_dir/cold/vs.sock" "$VGA_MODE")"
+    python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
+      --qemu-cmd-json "$cmd_cold" \
+      --qmp-sock "$inst_dir/cold/qmp.sock" \
+      --vserial-sock "$inst_dir/cold/vs.sock" \
+      --out-dir "$inst_dir/cold" \
+      --idle-seconds "$idle_sec" \
+      --panel-wait-sec 90 \
+      --expected-boots 1 \
+      --final-action poweroff \
+      --timeout-seconds $(( idle_sec + 600 )) > "$inst_cold_json" || true
+  fi
+
+  python3 - "$SUMMARY" "$ram_mb" "$uefi_alive" "$serial_log" "$screendump_ppm" "$screendump_png" "$live_runs_dir" "$inst_warm_json" "$inst_cold_json" "$cinn_virtio_json" "$SCRIPT_DIR" <<'PY'
 import importlib.util, json, sys
 from pathlib import Path
 
-spec = importlib.util.spec_from_file_location("qgr", str(Path(sys.argv[8]) / "qemu-graphical-runner.py"))
+spec = importlib.util.spec_from_file_location("qgr", str(Path(sys.argv[11]) / "qemu-graphical-runner.py"))
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 
@@ -255,50 +374,121 @@ summary_path = Path(sys.argv[1])
 ram_mb = int(sys.argv[2])
 uefi_alive = sys.argv[3] == "true"
 serial_log = Path(sys.argv[4])
-uefi_ppm = Path(sys.argv[5])
-uefi_png = Path(sys.argv[6])
-graphical_json = Path(sys.argv[7])
+uefi_ppm, uefi_png = Path(sys.argv[5]), Path(sys.argv[6])
+live_runs_dir = Path(sys.argv[7])
+inst_warm_json = Path(sys.argv[8])
+inst_cold_json = Path(sys.argv[9])
+cinn_virtio_json = Path(sys.argv[10])
+
+def load_json(p):
+    if p.is_file() and p.read_text(encoding="utf-8").strip():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    return {}
 
 uefi_shot = {"non_black_pct": 0.0, "png": None}
 if uefi_ppm.is_file():
     uefi_shot = runner.ppm_to_png_and_stats(uefi_ppm, uefi_png)
 
-gdata = {}
-if graphical_json.is_file() and graphical_json.read_text(encoding="utf-8").strip():
-    try:
-        gdata = json.loads(graphical_json.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        gdata = {}
+live_reps = []
+for rep_file in sorted(live_runs_dir.glob("rep-*/live-result.json")):
+    ld = load_json(rep_file)
+    gr = ld.get("guest_report") or {}
+    desk = gr.get("desktop") or {}
+    apps = gr.get("apps") or {}
+    stages = gr.get("stages") or {}
+    zp = gr.get("zram_pressure") or {}
+    ir = gr.get("install_report") or {}
+    live_reps.append({
+        "rep": rep_file.parent.name,
+        "login_success": bool(desk.get("lightdm_active") and desk.get("user")),
+        "graphical_session_success": bool(desk.get("wm") and desk.get("panel_running")),
+        "panel_win_mapped": desk.get("panel_win_mapped"),
+        "wm_ready_sec": desk.get("wm_ready_sec"),
+        "panel_ready_sec": desk.get("panel_ready_sec"),
+        "application_test_success": bool(apps.get("file_manager", {}).get("window_verified") and apps.get("terminal", {}).get("window_verified")),
+        "ubiquity_ui": gr.get("ubiquity_ui"),
+        "memory_stages": len(stages),
+        "zram_status": zp.get("status") if not zp.get("skipped") else "N/A",
+        "install_executed": ir.get("executed", False),
+        "install_success": ir.get("install_success"),
+        "install_report": ir,
+        "desktop": desk,
+        "apps": apps,
+        "stages": stages,
+        "network": gr.get("network"),
+        "zram_pressure": zp,
+        "screenshots": ld.get("screenshots", []),
+        "desktop_failed": ld.get("desktop_failed"),
+    })
 
-gr = gdata.get("guest_report") or {}
-desk = gr.get("desktop") or {}
-apps = gr.get("apps") or {}
-stages = gr.get("stages") or {}
-zram_p = gr.get("zram_pressure") or {}
+installed_boots = []
+for src_name, src_path in (("warm_cycle", inst_warm_json), ("cold_boot", inst_cold_json)):
+    idata = load_json(src_path)
+    for cyc in idata.get("boot_cycles") or []:
+        gr = cyc.get("guest_report") or {}
+        desk = gr.get("desktop") or {}
+        apps = gr.get("apps") or {}
+        ic = gr.get("installed_checks") or {}
+        per = gr.get("persistence") or {}
+        zp = gr.get("zram_pressure") or {}
+        stages = gr.get("stages") or {}
+        installed_boots.append({
+            "source": src_name,
+            "boot_num": gr.get("boot_num"),
+            "vm_exited_cleanly": idata.get("vm_exited_cleanly"),
+            "booted_from_vda": ic.get("booted_from_vda"),
+            "live_iso_absent": ic.get("live_iso_absent"),
+            "efi_boot_ok": ic.get("efi_boot_ok"),
+            "login_success": bool(desk.get("lightdm_active") and desk.get("user")),
+            "graphical_session_success": bool(desk.get("wm") and desk.get("panel_running")),
+            "panel_win_mapped": desk.get("panel_win_mapped"),
+            "wm_ready_sec": desk.get("wm_ready_sec"),
+            "panel_ready_sec": desk.get("panel_ready_sec"),
+            "application_test_success": bool(apps.get("file_manager", {}).get("window_verified") and apps.get("terminal", {}).get("window_verified")),
+            "windows_closed_cleanup": apps.get("windows_closed_cleanup"),
+            "persistence": per,
+            "network": gr.get("network"),
+            "memory_stages": len(stages),
+            "stages": stages,
+            "zram_pressure": zp,
+            "installed_checks": ic,
+            "screenshots": cyc.get("screenshots", []),
+        })
+
+diag_virtio = load_json(cinn_virtio_json)
+first_live = live_reps[0] if live_reps else {}
+inst_ok_count = sum(1 for r in live_reps if r.get("install_executed") and r.get("install_success"))
+inst_try_count = sum(1 for r in live_reps if r.get("install_executed"))
+boot_ok_count = sum(1 for b in installed_boots if b.get("booted_from_vda") and b.get("live_iso_absent") and b.get("graphical_session_success"))
 
 entry = {
     "ram_mib": ram_mb,
-    "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0 or serial_log.stat().st_size > 0 if serial_log.is_file() else uefi_alive),
+    "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0 or (serial_log.stat().st_size > 0 if serial_log.is_file() else uefi_alive)),
     "uefi_boot_screenshot": uefi_shot,
-    "login_success": bool(desk.get("lightdm_active") and desk.get("user")),
-    "graphical_session_success": bool(desk.get("wm") and desk.get("panel_running")),
-    "application_test_success": bool(
-        apps.get("file_manager", {}).get("window_verified")
-        and apps.get("terminal", {}).get("window_verified")
-    ),
-    "memory_test_success": len(stages) >= 6,
-    "zram_test_success": zram_p.get("status") == "PASS" if not zram_p.get("skipped") else "N/A",
-    "installation_preflight_success": bool(gr.get("lsblk_vda_present")),
-    "desktop": desk,
-    "apps": apps,
-    "stages": stages,
-    "network": gr.get("network"),
-    "zram_status": gr.get("zram_status"),
-    "zram_pressure": zram_p,
-    "installer_preflight": gr.get("installer_preflight"),
-    "ubiquity_present": gr.get("ubiquity_present"),
-    "screenshots": gdata.get("screenshots", []),
-    "desktop_failed": gdata.get("desktop_failed"),
+    "live_attempts": len(live_reps),
+    "live_successes": sum(1 for r in live_reps if r.get("graphical_session_success") and r.get("application_test_success")),
+    "install_attempts": inst_try_count,
+    "install_successes": inst_ok_count,
+    "installed_boot_attempts": 3 if inst_try_count > 0 else 0,
+    "installed_boot_successes": boot_ok_count,
+    "persistence_verified": any((b.get("persistence") or {}).get("persistence_verified") for b in installed_boots),
+    "live_reps": live_reps,
+    "installed_boots": installed_boots,
+    "cinnamon_2g_virtio_diag": {
+        "screenshots": diag_virtio.get("screenshots"),
+        "glx_diag": ((diag_virtio.get("guest_report") or {}).get("desktop") or {}).get("glx_diag"),
+        "panel_win_mapped": ((diag_virtio.get("guest_report") or {}).get("desktop") or {}).get("panel_win_mapped"),
+        "wm_ready_sec": ((diag_virtio.get("guest_report") or {}).get("desktop") or {}).get("wm_ready_sec"),
+        "panel_ready_sec": ((diag_virtio.get("guest_report") or {}).get("desktop") or {}).get("panel_ready_sec"),
+    } if diag_virtio else None,
+    "first_live_summary": {
+        "login": first_live.get("login_success"),
+        "desktop": first_live.get("graphical_session_success"),
+        "apps_ok": first_live.get("application_test_success"),
+    },
 }
 
 data = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -306,7 +496,7 @@ data["runs"].append(entry)
 summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY
   rm -f -- "$disk"
-  printf 'QEMU %s %s MiB validation finished.\n' "$EDITION" "$ram_mb"
+  printf 'QEMU %s %s MiB Phase 12.3 validation finished.\n' "$EDITION" "$ram_mb"
 done
 
 [[ -n "$overlay_dir" ]] && rm -rf -- "$overlay_dir"

@@ -8,6 +8,11 @@ core:unattended-upgrades
 core:ca-certificates
 core:gnupg
 core:curl
+core:grub2-common
+core:grub-efi-amd64-bin
+core:efibootmgr
+core:parted
+core:dosfstools
 
 # Desktop (Linux Mint Cinnamon flagship)
 desktop:cinnamon

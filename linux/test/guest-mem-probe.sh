@@ -42,8 +42,21 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 stage, out_file = sys.argv[1], sys.argv[2]
+
+def read_cpu_sample():
+    line = Path("/proc/stat").read_text(encoding="utf-8", errors="replace").splitlines()[0]
+    vals = [int(x) for x in line.split()[1:]]
+    idle = vals[3] + (vals[4] if len(vals) > 4 else 0)
+    return sum(vals), idle
+
+t1, i1 = read_cpu_sample()
+time.sleep(0.25)
+t2, i2 = read_cpu_sample()
+dt = max(1, t2 - t1)
+cpu_pct = round(100.0 * (1.0 - ((i2 - i1) / dt)), 1)
 
 mem = {}
 for line in Path("/proc/meminfo").read_text(encoding="utf-8", errors="replace").splitlines():
@@ -65,12 +78,19 @@ for dev in sorted(Path("/sys/block").glob("zram*")):
     item = {"device": dev.name}
     if (dev / "comp_algorithm").is_file():
         item["comp_algorithm"] = (dev / "comp_algorithm").read_text(encoding="utf-8", errors="replace").strip()
+    if (dev / "disksize").is_file():
+        ds = (dev / "disksize").read_text(encoding="utf-8", errors="replace").strip()
+        if ds.isdigit():
+            item["disksize_mib"] = round(int(ds) / (1024 * 1024), 1)
     if (dev / "mm_stat").is_file():
         cols = (dev / "mm_stat").read_text(encoding="utf-8", errors="replace").split()
         if len(cols) >= 3:
-            item["orig_data_mib"] = round(int(cols[0]) / (1024 * 1024), 2)
-            item["compr_data_mib"] = round(int(cols[1]) / (1024 * 1024), 2)
+            orig = int(cols[0]) / (1024 * 1024)
+            compr = int(cols[1]) / (1024 * 1024)
+            item["orig_data_mib"] = round(orig, 2)
+            item["compr_data_mib"] = round(compr, 2)
             item["mem_used_total_mib"] = round(int(cols[2]) / (1024 * 1024), 2)
+            item["compression_ratio"] = round(orig / compr, 2) if compr > 0.01 else None
     zram.append(item)
 
 ps_out = subprocess.run(["ps", "-eo", "pid,comm,rss,vsz", "--sort=-rss"], capture_output=True, text=True).stdout
@@ -101,6 +121,7 @@ payload = {
     "swap_total_mib": round(swap_tot),
     "swap_used_mib": round(max(0.0, swap_tot - swap_free)),
     "zram": zram,
+    "cpu_usage_pct": cpu_pct,
     "oom_kill_count": vmstat.get("oom_kill", 0),
     "loadavg": Path("/proc/loadavg").read_text(encoding="utf-8", errors="replace").split()[:3],
     "free_h": free_h,

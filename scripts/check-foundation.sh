@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/casper-test-hook.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/installer/nexus-disk-install.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/casper-test-hook.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/casper-test-hook.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/installer/nexus-disk-install.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/casper-test-hook.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
@@ -88,9 +88,19 @@ bash linux/lite/memory-audit.sh --json >/dev/null
 bash linux/lite/provision-nexus-lite.sh --dry-run --skip-ufw --purge-bloat >/dev/null
 bash linux/lite/build-nexus-lite-iso.sh --dry-run >/dev/null
 bash linux/lite/nexus-lite-install.sh --dry-run >/dev/null
+bash linux/installer/nexus-disk-install.sh --disk /dev/vda --dry-run >/dev/null
+if bash linux/installer/nexus-disk-install.sh --disk /dev/vda >/dev/null 2>&1; then
+  printf 'FAIL nexus-disk-install.sh must refuse execution without --yes-erase-disk\n' >&2
+  exit 1
+fi
+if grep -R -n 'org\.nexus\.test\.0' linux/mint linux/cinnamon linux/lite linux/xfce linux/installer >/dev/null 2>&1; then
+  printf 'SECURITY FAIL: Test channel org.nexus.test.0 referenced in production linux/ directories\n' >&2
+  exit 1
+fi
 bash linux/test/guest-mem-probe.sh --dry-run >/dev/null
 bash linux/test/test-zram-pressure.sh --dry-run >/dev/null
 bash linux/test/run-qemu-validation.sh --dry-run >/dev/null
+bash linux/test/run-qemu-validation.sh --install-test --reliability --dry-run >/dev/null
 
 # Phase 12 invariant checks: Edition isolation, Lite safety, Openbox XML, and --revert hygiene
 python3 - <<'PY'
