@@ -81,6 +81,17 @@ Recommended free disk space: at least 12 GiB under `build/` (ignored by Git).
    - `nexus-os-22.3-xfce-amd64.iso.sha256`
    - `build-info.json`
 
+5. Validate the generated ISO, test in QEMU/OVMF, and prepare release metadata:
+
+   ```sh
+   bash linux/build/validate-packages.sh
+   bash linux/build/verify-nexus-iso.sh
+   NEXUS_ISO_PATH=build/iso/out/nexus-os-22.3-xfce-amd64.iso bash scripts/launch-qemu.sh
+   bash linux/build/prepare-release.sh --stage testing
+   ```
+
+   See `docs/RELEASE_ENGINEERING.md` for release promotion gates and USB media creation.
+
 ## Testing & Verification Limits
 
 - **Automated in CI (`bash scripts/check-foundation.sh`):**

@@ -10,6 +10,8 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 SYSTEM_CONF="$REPO_ROOT/linux/config/nexus-system.conf"
 PKG_MANIFEST="$REPO_ROOT/linux/config/mint-packages.list"
 PREREQ_SCRIPT="$SCRIPT_DIR/check-build-prereqs.sh"
+VALIDATE_PKGS="$SCRIPT_DIR/validate-packages.sh"
+BRANDING_SCRIPT="$SCRIPT_DIR/apply-iso-branding.sh"
 
 DOWNLOAD_DIR="${NEXUS_DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 BASE_ISO="${NEXUS_BASE_ISO:-$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso}"
@@ -51,6 +53,7 @@ done
 
 [[ -r "$SYSTEM_CONF" ]] || { printf 'Missing system config: %s\n' "$SYSTEM_CONF" >&2; exit 1; }
 [[ -r "$PKG_MANIFEST" ]] || { printf 'Missing package manifest: %s\n' "$PKG_MANIFEST" >&2; exit 1; }
+bash "$VALIDATE_PKGS" "$PKG_MANIFEST" >/dev/null
 
 if [[ "$CHECK_ONLY" == true ]]; then
   exec bash "$PREREQ_SCRIPT"
@@ -164,6 +167,8 @@ rm -rf -- "$squash_root/tmp/nexus-repo"
 
 cleanup
 mounted_chroot=false
+
+bash "$BRANDING_SCRIPT" --iso-root "$iso_root" --squash-root "$squash_root"
 
 rm -f -- "$iso_root/casper/filesystem.squashfs"
 mksquashfs "$squash_root" "$iso_root/casper/filesystem.squashfs" -comp xz -noappend

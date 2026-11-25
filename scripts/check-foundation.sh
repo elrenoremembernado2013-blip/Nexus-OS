@@ -4,20 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/build-nexus-iso.sh linux/cinnamon/apply-nexus-cinnamon.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/build-nexus-iso.sh linux/cinnamon/apply-nexus-cinnamon.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
 fi
 
-for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md docs/INSTALLER_ARCHITECTURE.md docs/RECOVERY_AND_BOOT.md; do
+for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md docs/INSTALLER_ARCHITECTURE.md docs/RECOVERY_AND_BOOT.md docs/RELEASE_ENGINEERING.md; do
   [[ -f "$required" ]] || { printf 'Missing required foundation file: %s\n' "$required" >&2; exit 1; }
 done
 
@@ -61,9 +61,17 @@ bash linux/mint/nexus-firstboot.sh --help >/dev/null
 bash linux/mint/nexus-firstboot.sh --dry-run --profile lightweight --theme dark --check-updates --gaming-status --mark-done >/dev/null
 bash linux/build/check-build-prereqs.sh --help >/dev/null
 bash linux/build/check-build-prereqs.sh >/dev/null
+bash linux/build/validate-packages.sh >/dev/null
+bash linux/build/apply-iso-branding.sh --dry-run >/dev/null
 bash linux/build/build-nexus-iso.sh --help >/dev/null
 bash linux/build/build-nexus-iso.sh --check >/dev/null
 bash linux/build/build-nexus-iso.sh --dry-run --with-gaming --with-dev >/dev/null
+bash linux/build/verify-nexus-iso.sh --dry-run >/dev/null
+bash linux/build/prepare-release.sh --dry-run --stage testing >/dev/null
+if bash linux/build/prepare-release.sh --dry-run --stage stable >/dev/null 2>&1; then
+  echo 'Expected prepare-release.sh to refuse stable stage without --vm-verified' >&2
+  exit 1
+fi
 bash linux/cinnamon/apply-nexus-cinnamon.sh --help >/dev/null
 bash linux/cinnamon/apply-nexus-cinnamon.sh --dry-run --theme nebula --profile lightweight --dock-position left --workspaces 4 >/dev/null
 bash linux/cinnamon/apply-nexus-cinnamon.sh --dry-run --preset-profile gaming --effect-level off --panel-size small --wallpaper-fit zoom --accent '#ffad7a' >/dev/null
