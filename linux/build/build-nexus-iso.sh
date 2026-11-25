@@ -169,8 +169,23 @@ fi
 iso_root="$WORK_DIR/iso-root"
 squash_root="$WORK_DIR/squashfs-root"
 mounted_chroot=false
+resolv_backup=""
+policy_rc_added=false
 
 cleanup() {
+  if [[ "$policy_rc_added" == true ]]; then
+    rm -f -- "$squash_root/usr/sbin/policy-rc.d" 2>/dev/null || true
+    policy_rc_added=false
+  fi
+  if [[ -n "$resolv_backup" ]]; then
+    rm -f -- "$squash_root/etc/resolv.conf" 2>/dev/null || true
+    if [[ "$resolv_backup" == "__SYMLINK__:"* ]]; then
+      ln -s "${resolv_backup#__SYMLINK__:}" "$squash_root/etc/resolv.conf" 2>/dev/null || true
+    elif [[ -f "$resolv_backup" ]]; then
+      mv -f -- "$resolv_backup" "$squash_root/etc/resolv.conf" 2>/dev/null || true
+    fi
+    resolv_backup=""
+  fi
   if [[ "$mounted_chroot" == true ]]; then
     umount -lf "$squash_root/dev/pts" 2>/dev/null || true
     umount -lf "$squash_root/dev" 2>/dev/null || true
@@ -194,6 +209,22 @@ mount -t proc proc "$squash_root/proc"
 mount -t sysfs sysfs "$squash_root/sys"
 mount --bind /run "$squash_root/run"
 mounted_chroot=true
+
+if [[ -L "$squash_root/etc/resolv.conf" ]]; then
+  resolv_backup="__SYMLINK__:$(readlink "$squash_root/etc/resolv.conf")"
+  rm -f -- "$squash_root/etc/resolv.conf"
+elif [[ -f "$squash_root/etc/resolv.conf" ]]; then
+  resolv_backup="$WORK_DIR/resolv.conf.orig"
+  cp -a "$squash_root/etc/resolv.conf" "$resolv_backup"
+fi
+if [[ -r /etc/resolv.conf ]]; then
+  cp -L /etc/resolv.conf "$squash_root/etc/resolv.conf"
+fi
+if [[ ! -e "$squash_root/usr/sbin/policy-rc.d" ]]; then
+  printf '#!/bin/sh\nexit 101\n' > "$squash_root/usr/sbin/policy-rc.d"
+  chmod 0755 "$squash_root/usr/sbin/policy-rc.d"
+  policy_rc_added=true
+fi
 
 mkdir -p -- "$squash_root/tmp/nexus-repo"
 cp -a "$REPO_ROOT/linux" "$squash_root/tmp/nexus-repo/linux"

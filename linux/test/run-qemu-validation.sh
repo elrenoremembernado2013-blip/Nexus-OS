@@ -103,28 +103,66 @@ for ram_mb in $RAM_LIST; do
   disk="$run_dir/disposable.qcow2"
   vars_copy="$run_dir/OVMF_VARS.fd"
   serial_log="$run_dir/serial.log"
+  qmp_sock="$run_dir/qmp.sock"
+  screendump_ppm="$run_dir/screen.ppm"
   qemu-img create -f qcow2 "$disk" 20G >/dev/null
   cp -f -- "$OVMF_VARS" "$vars_copy"
-  timeout "${BOOT_SECONDS}" qemu-system-x86_64 \
+  rm -f -- "$qmp_sock" "$screendump_ppm"
+
+  qemu-system-x86_64 \
     -machine "q35,accel=${ACCEL}" -cpu max -smp 2 -m "$ram_mb" \
     -drive "if=pflash,format=raw,unit=0,readonly=on,file=${OVMF_CODE}" \
     -drive "if=pflash,format=raw,unit=1,file=${vars_copy}" \
     -drive "file=${disk},if=virtio,format=qcow2" \
     -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
-    -display none -serial "file:${serial_log}" \
-    -cdrom "$ISO_PATH" -boot order=d >/dev/null 2>&1 || true
+    -vga std -display none -serial "file:${serial_log}" \
+    -qmp "unix:${qmp_sock},server,nowait" \
+    -cdrom "$ISO_PATH" -boot order=d >/dev/null 2>&1 &
+  qemu_pid=$!
+  sleep "$BOOT_SECONDS"
 
-  boot_marker="unknown"
+  vm_alive=false
+  if kill -0 "$qemu_pid" 2>/dev/null; then
+    vm_alive=true
+    python3 - "$qmp_sock" "$screendump_ppm" <<'PY' 2>/dev/null || true
+import json, socket, sys
+sock_path, dump_path = sys.argv[1], sys.argv[2]
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+    s.settimeout(5)
+    s.connect(sock_path)
+    s.recv(4096)
+    s.sendall(json.dumps({"execute": "qmp_capabilities"}).encode() + b"\n")
+    s.recv(4096)
+    s.sendall(json.dumps({"execute": "screendump", "arguments": {"filename": dump_path}}).encode() + b"\n")
+    s.recv(4096)
+    s.sendall(json.dumps({"execute": "quit"}).encode() + b"\n")
+PY
+    sleep 2
+    kill "$qemu_pid" 2>/dev/null || true
+  fi
+  wait "$qemu_pid" 2>/dev/null || true
+
+  boot_marker="boot_window_elapsed_no_serial"
   if grep -qiE 'lightdm|login:|ubuntu|linuxmint|nexus' "$serial_log" 2>/dev/null; then
     boot_marker="kernel_or_userspace_reached"
+  elif [[ -s "$screendump_ppm" ]]; then
+    boot_marker="framebuffer_captured_inspect_ppm"
   fi
-  python3 - "$SUMMARY" "$ram_mb" "$boot_marker" "$serial_log" <<'PY'
+  python3 - "$SUMMARY" "$ram_mb" "$boot_marker" "$vm_alive" "$serial_log" "$screendump_ppm" <<'PY'
 import json, sys
 from pathlib import Path
 p = Path(sys.argv[1])
 data = json.loads(p.read_text(encoding="utf-8"))
-data["runs"].append({"ram_mib": int(sys.argv[2]), "boot_marker": sys.argv[3], "serial_log": sys.argv[4]})
+ppm = Path(sys.argv[6])
+data["runs"].append({
+    "ram_mib": int(sys.argv[2]),
+    "boot_marker": sys.argv[3],
+    "vm_alive_at_deadline": sys.argv[4] == "true",
+    "serial_log": sys.argv[5],
+    "screendump_ppm": sys.argv[6] if ppm.is_file() else None,
+    "screendump_bytes": ppm.stat().st_size if ppm.is_file() else 0,
+})
 p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY
-  printf 'QEMU %s %s MiB -> %s (serial log: %s)\n' "$EDITION" "$ram_mb" "$boot_marker" "$serial_log"
+  printf 'QEMU %s %s MiB -> %s (alive=%s, ppm=%s)\n' "$EDITION" "$ram_mb" "$boot_marker" "$vm_alive" "$screendump_ppm"
 done
