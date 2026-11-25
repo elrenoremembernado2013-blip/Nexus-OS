@@ -11,7 +11,7 @@ This milestone establishes verified Linux Mint 22.3 Xfce installation media and 
 - Guest direction: X11, Xfce, Xfwm4, GRUB, systemd; UEFI firmware via OVMF in QEMU.
 - `scripts/`: media verification, QEMU launch, and static checks.
 - `linux/config/`: declarative design defaults (`NEXUS_TARGET_RAM_MB` is read as the fallback default by `scripts/launch-qemu.sh`); not yet consumed by an image build.
-- `linux/xfce/` and `linux/mint/`: user-session GTK3/Xfce theme & low-resource defaults (`apply-nexus-xfce.sh`) and a read-only RAM/disk footprint reporter (`measure-footprint.sh`) for booted Linux Mint 22.3 Xfce guests.
+- `linux/xfce/` and `linux/mint/`: user-session GTK3/Xfce theme & low-resource defaults (`apply-nexus-xfce.sh`), a focused `xfce4-genmon-plugin` panel status helper (`nexus-panel-status.sh`), a read-only RAM/disk footprint reporter (`measure-footprint.sh`), and a read-only MADOO live-media qualification reporter (`madoo-qualify-report.sh`) for booted Linux Mint 22.3 Xfce guests.
 - `nexus-br2-external/`: retained separately for experimental Buildroot work; it is not the primary desktop.
 - `build/`: local downloads, VM state, and disk images; ignored by Git.
 

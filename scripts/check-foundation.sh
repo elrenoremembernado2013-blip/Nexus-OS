@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
@@ -47,6 +47,13 @@ bash linux/mint/apply-nexus-xfce.sh --dry-run >/dev/null
 bash linux/mint/apply-nexus-xfce.sh --dry-run --lightweight >/dev/null
 bash linux/mint/apply-nexus-xfce.sh --dry-run --revert >/dev/null
 bash linux/mint/measure-footprint.sh --help >/dev/null
+bash linux/mint/nexus-panel-status.sh --help >/dev/null
+bash linux/mint/nexus-panel-status.sh --genmon >/dev/null
+bash linux/mint/nexus-panel-status.sh --plain >/dev/null
+bash linux/mint/nexus-panel-status.sh --json >/dev/null
+bash linux/mint/madoo-qualify-report.sh --help >/dev/null
+bash linux/mint/madoo-qualify-report.sh --plain >/dev/null
+bash linux/mint/madoo-qualify-report.sh --markdown >/dev/null
 printf 'PASS expected files, Linux Mint config, dry-run CLI checks, signed-checksum, and UEFI/QEMU wiring\n'
 
 bash scripts/check-prototype.sh

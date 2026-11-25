@@ -125,6 +125,7 @@ run_xfconf xfwm4 /general/snap_to_border bool true
 run_xfconf xfwm4 /general/snap_to_windows bool true
 run_xfconf xfwm4 /general/tile_on_move bool true
 run_xfconf xfwm4 /general/cycle_preview bool true
+run_xfconf xfce4-panel /panels/dark-mode bool true
 
 if [[ "$LIGHTWEIGHT" == true ]]; then
   run_xfconf xfwm4 /general/use_compositing bool false
