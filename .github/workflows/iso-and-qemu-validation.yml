@@ -34,23 +34,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Compute edition matrix
+        id: set-matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_EDITION: ${{ github.event.inputs.edition || 'all' }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+
+          event_name = os.environ["EVENT_NAME"]
+          selected = "all" if event_name == "push" else os.environ.get("INPUT_EDITION", "all")
+          entries = [
+              {"edition": "lite", "base_edition": "xfce", "ram_matrix": "512 768 1024 2048 4096"},
+              {"edition": "cinnamon", "base_edition": "cinnamon", "ram_matrix": "2048 4096"},
+              {"edition": "xfce", "base_edition": "xfce", "ram_matrix": "4096"},
+          ]
+          if selected != "all":
+              entries = [e for e in entries if e["edition"] == selected]
+          print("matrix=" + json.dumps(entries))
+          PY
+
   iso-and-qemu:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - edition: lite
-            base_edition: xfce
-            ram_matrix: "512 768 1024 2048 4096"
-          - edition: cinnamon
-            base_edition: cinnamon
-            ram_matrix: "2048 4096"
-          - edition: xfce
-            base_edition: xfce
-            ram_matrix: "4096"
-    if: github.event_name == 'push' || github.event.inputs.edition == 'all' || github.event.inputs.edition == matrix.edition
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     steps:
       - name: Check out repository
@@ -86,6 +104,8 @@ jobs:
           fi
           bash linux/build/verify-nexus-iso.sh --edition "${{ matrix.edition }}"
           (cd build/iso/out && sha256sum -c "nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")
+          cat "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256"
+          cat "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.build-info.json"
           sudo rm -rf "build/iso/work-${{ matrix.edition }}" build/downloads/*.iso
 
       - name: Run QEMU RAM matrix (${{ matrix.ram_matrix }} MiB)
