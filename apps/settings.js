@@ -391,6 +391,30 @@
     const previewDialog = $("#wallpaperPreviewDialog");
     const customInput = $("#customWallpaperFile");
 
+    function readStorage(key) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+
+    function writeStorage(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        // Ignore storage quota or sandbox restrictions in browser preview.
+      }
+    }
+
+    function removeStorage(key) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // Ignore storage restrictions during preference reset.
+      }
+    }
+
     function revokePendingCustomUrl() {
       if (pendingCustomUrl) {
         URL.revokeObjectURL(pendingCustomUrl);
@@ -425,7 +449,7 @@
         const blob = await readCustomWallpaper();
         if (unmounted || !blob || !allowedImageTypes.includes(blob.type)) return;
         const activeCustomUrl = shell?.getCustomDesktopWallpaperUrl?.();
-        if (window.localStorage.getItem("nexus-wallpaper") === "custom") {
+        if (readStorage("nexus-wallpaper") === "custom") {
           if (!activeCustomUrl) {
             shell?.setCustomDesktopWallpaper(URL.createObjectURL(blob), false);
           }
@@ -536,7 +560,7 @@
       suggestWallpaperAccents(imageUrl);
       previewImg.alt = item.querySelector("img").alt;
       $("#wallpaperPreviewCaption").textContent =
-        id === window.localStorage.getItem("nexus-wallpaper")
+        id === readStorage("nexus-wallpaper")
           ? "This is your currently applied wallpaper."
           : "Preview only — your desktop will not change until you apply it.";
       if (!previewDialog.open) previewDialog.showModal();
@@ -598,7 +622,7 @@
     $("#removeCustomWallpaper").addEventListener("click", async () => {
       try {
         await deleteCustomWallpaper();
-        const wasApplied = window.localStorage.getItem("nexus-wallpaper") === "custom";
+        const wasApplied = readStorage("nexus-wallpaper") === "custom";
         shell?.clearCustomDesktopWallpaper?.();
         if (wasApplied) {
           applyWallpaper("alpine", true);
@@ -660,7 +684,7 @@
 
     function setAccent(value) {
       document.documentElement.style.setProperty("--accent", value);
-      window.localStorage.setItem("nexus-accent", value);
+      writeStorage("nexus-accent", value);
       $$("[data-accent]").forEach(swatch => {
         const selected = swatch.dataset.accent === value;
         swatch.classList.toggle("selected", selected);
@@ -677,14 +701,14 @@
     $$("[data-accent]").forEach(swatch => {
       swatch.addEventListener("click", () => setAccent(swatch.dataset.accent));
     });
-    setAccent(window.localStorage.getItem("nexus-accent") || "#ffad7a");
+    setAccent(readStorage("nexus-accent") || "#ffad7a");
 
     function applyTheme(mode) {
       const useLight =
         mode === "light" ||
         (mode === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
       desktop?.classList.toggle("theme-light", useLight);
-      window.localStorage.setItem("nexus-theme", mode);
+      writeStorage("nexus-theme", mode);
       $$("[data-theme-choice]").forEach(button => {
         const selected = button.dataset.themeChoice === mode;
         button.classList.toggle("selected", selected);
@@ -698,11 +722,11 @@
     $$("[data-theme-choice]").forEach(button => {
       button.addEventListener("click", () => applyTheme(button.dataset.themeChoice));
     });
-    applyTheme(window.localStorage.getItem("nexus-theme") || "dark");
+    applyTheme(readStorage("nexus-theme") || "dark");
 
     const themeMedia = window.matchMedia?.("(prefers-color-scheme: light)");
     const onThemeMediaChange = () => {
-      if (window.localStorage.getItem("nexus-theme") === "system") applyTheme("system");
+      if (readStorage("nexus-theme") === "system") applyTheme("system");
     };
     if (themeMedia) {
       if (themeMedia.addEventListener) themeMedia.addEventListener("change", onThemeMediaChange);
@@ -711,12 +735,12 @@
 
     const blur = $("#blurSelect");
     const blurValue = $("#blurValue");
-    blur.value = window.localStorage.getItem("nexus-blur") || "18";
+    blur.value = readStorage("nexus-blur") || "18";
     function setBlur() {
       document.documentElement.style.setProperty("--blur", blur.value + "px");
       blurValue.value = blur.value + " px";
       blurValue.textContent = blur.value + " px";
-      window.localStorage.setItem("nexus-blur", blur.value);
+      writeStorage("nexus-blur", blur.value);
     }
     blur.addEventListener("input", setBlur);
     setBlur();
@@ -750,20 +774,20 @@
       updateSwitchState($("#dndToggle"), Boolean(state.dnd));
     });
 
-    const motionPreference = window.localStorage.getItem("nexus-reduced-motion");
+    const motionPreference = readStorage("nexus-reduced-motion");
     const motionMedia = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     let motionEnabled = motionPreference === null ? Boolean(motionMedia?.matches) : motionPreference === "true";
     function setMotion(enabled, save = true) {
       motionEnabled = enabled;
       document.body.classList.toggle("reduced-motion", enabled);
-      if (save) window.localStorage.setItem("nexus-reduced-motion", String(enabled));
+      if (save) writeStorage("nexus-reduced-motion", String(enabled));
       updateSwitchState($("#motionToggle"), enabled);
     }
     bindSwitch($("#motionToggle"), motionEnabled, enabled => setMotion(enabled, true));
     setMotion(motionEnabled, false);
 
     const onMotionMediaChange = event => {
-      if (window.localStorage.getItem("nexus-reduced-motion") === null) setMotion(event.matches, false);
+      if (readStorage("nexus-reduced-motion") === null) setMotion(event.matches, false);
     };
     if (motionMedia) {
       if (motionMedia.addEventListener) motionMedia.addEventListener("change", onMotionMediaChange);
@@ -805,7 +829,7 @@
         "nexus-control-bluetooth",
         "nexus-control-dnd",
         "nexus-control-power"
-      ].forEach(key => window.localStorage.removeItem(key));
+      ].forEach(removeStorage);
 
       try {
         await deleteCustomWallpaper();
@@ -831,7 +855,7 @@
       context.notify?.("NEXUS preferences restored");
     });
 
-    const savedWallpaper = window.localStorage.getItem("nexus-wallpaper") || "alpine";
+    const savedWallpaper = readStorage("nexus-wallpaper") || "alpine";
     if (savedWallpaper !== "custom") applyWallpaper(savedWallpaper, false);
     restoreCustomWallpaper();
 
