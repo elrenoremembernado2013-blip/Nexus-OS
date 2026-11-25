@@ -6,7 +6,7 @@
 | Hardware / Feature | Classification | Notes & Evidence |
 |---|---|---|
 | `x86_64` Intel Xeon CPU (`2.60 GHz` VM host) | **Tested and working** | Verified via `nexus-install-preflight.sh` & `nexus-gaming-cli.sh` (`3940 MiB` RAM, `/proc/stat`, `/proc/cpuinfo`). |
-| VirtIO / QEMU block disk (`/dev/vda`) & virtual NIC (`eth0`) | **Tested and working** (host detection) | Detected via `lsblk -J` and `/sys/class/net/eth0`. |
+| VirtIO / QEMU block disk (`/dev/vda`), virtual NIC (`eth0`), & VGA/OVMF (`1280x800`) | **Tested and working** (QEMU/OVMF live VM) | Verified in live QEMU graphical boots across `lite`, `cinnamon`, and `xfce` (`lsblk /dev/vda`, `nmcli` `connected`, `1280x800` Xorg/QMP screenshots, run `45656960059`). |
 | Intel Core / Celeron / Pentium (`i915` / Mesa) | **Expected to work (not tested on NEXUS ISO)** | Standard Ubuntu 24.04 / Linux Mint 22.3 `i915` + `mesa-vulkan-drivers` support. |
 | AMD Ryzen CPUs & Radeon GPUs (`amdgpu` / Mesa) | **Expected to work (not tested on NEXUS ISO)** | Open-source `amdgpu` + RADV Vulkan included in Mint 22.3. |
 | NVIDIA discrete/hybrid GPUs | **Partially supported (not tested)** | Requires installing proprietary drivers via Linux Mint **Driver Manager** (`mintdrivers`); `nouveau` lacks full Vulkan/Proton performance. |
