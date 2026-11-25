@@ -5,7 +5,10 @@ if command -v feh >/dev/null 2>&1 && [ -r /usr/local/share/nexus-os/lite/wallpap
   feh --no-fehbg --bg-scale /usr/local/share/nexus-os/lite/wallpaper.jpg &
 fi
 if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile" ] && grep -qx 'profile=lite-1g' "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile"; then
-  command -v nm-applet >/dev/null 2>&1 && nm-applet &
+  if command -v nm-applet >/dev/null 2>&1; then
+    nm-applet &
+  fi
 fi
-command -v /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 >/dev/null 2>&1 && \
+if [ -x /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 ]; then
   /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
+fi
