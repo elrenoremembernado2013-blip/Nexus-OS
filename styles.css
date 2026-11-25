@@ -860,6 +860,7 @@ body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after
 .terminal-screen p{margin:0 0 5px}
 .terminal-welcome{font-size:13px;font-weight:650;color:#f2f0fa}
 .terminal-muted{color:#9ca9b7}
+.terminal-output{color:#e6eef8;white-space:pre-wrap;word-break:break-word}
 .terminal-warning{color:#ffc18e}
 .terminal-prompt{margin-top:15px!important;color:#dfe7e2}
 .terminal-prompt span:first-child{color:#8ed9b1}
