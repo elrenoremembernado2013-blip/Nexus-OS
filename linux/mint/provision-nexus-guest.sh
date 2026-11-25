@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Provision a booted Linux Mint 22.3 Xfce guest with NEXUS OS baseline security,
-# curated packages, and user-space helper scripts.
+# curated packages, branding assets, and user-space helper scripts.
 # Does not build an ISO or touch Chromebook firmware.
 set -euo pipefail
 
@@ -11,6 +11,8 @@ PKG_MANIFEST="$REPO_ROOT/linux/config/mint-packages.list"
 
 DRY_RUN=false
 WITH_GAMING=false
+WITH_DEV=false
+WITH_OPTIONAL=false
 SKIP_UFW=false
 AUTOSTART_FIRSTBOOT=false
 FORCE_DISTRO=false
@@ -21,13 +23,15 @@ usage() {
 Usage: sudo bash linux/mint/provision-nexus-guest.sh [OPTIONS]
 
 Provisions an installed Linux Mint 22.3 Xfce (Ubuntu Noble) system with NEXUS OS
-security defaults (UFW firewall, unattended-upgrades), curated packages, and
-helper scripts under /usr/local. Keeps Mint's /etc/os-release and signed APT
-repositories intact.
+security defaults (UFW firewall, unattended-upgrades), curated packages, branding
+assets, and helper scripts under /usr/local. Keeps Mint's /etc/os-release and
+signed APT repositories intact.
 
 Options:
   --dry-run              Print planned steps without modifying the system
   --with-gaming          Include optional Vulkan/GameMode/steam-installer packages
+  --with-dev             Include optional development packages (git, build-essential, python3)
+  --with-optional        Include optional desktop applications
   --skip-ufw             Do not alter UFW firewall state
   --autostart-firstboot  Install /etc/xdg/autostart/nexus-firstboot.desktop
   --force                Skip Linux Mint / Ubuntu Noble OS verification check
@@ -39,6 +43,8 @@ while (($#)); do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
     --with-gaming) WITH_GAMING=true; shift ;;
+    --with-dev) WITH_DEV=true; shift ;;
+    --with-optional) WITH_OPTIONAL=true; shift ;;
     --skip-ufw) SKIP_UFW=true; shift ;;
     --autostart-firstboot) AUTOSTART_FIRSTBOOT=true; shift ;;
     --force) FORCE_DISTRO=true; shift ;;
@@ -95,11 +101,25 @@ while IFS=':' read -r section pkg; do
   pkg="${pkg%%[[:space:]]*}"
   [[ -n "$pkg" ]] || continue
   case "$section" in
-    core|store) packages+=("$pkg") ;;
+    core|desktop|nexus) packages+=("$pkg") ;;
     gaming)
       if [[ "$WITH_GAMING" == true ]]; then
         packages+=("$pkg")
       fi
+      ;;
+    development)
+      if [[ "$WITH_DEV" == true ]]; then
+        packages+=("$pkg")
+      fi
+      ;;
+    optional)
+      if [[ "$WITH_OPTIONAL" == true ]]; then
+        packages+=("$pkg")
+      fi
+      ;;
+    *)
+      printf 'Unknown package category in %s: %s\n' "$PKG_MANIFEST" "$section" >&2
+      exit 1
       ;;
   esac
 done < "$PKG_MANIFEST"
@@ -109,7 +129,7 @@ if ((${#packages[@]} == 0)); then
   exit 1
 fi
 
-echo "Provisioning NEXUS OS Mint baseline (host=$os_id, codename=$os_codename, gaming=$WITH_GAMING)"
+echo "Provisioning NEXUS OS Mint baseline (host=$os_id, codename=$os_codename, gaming=$WITH_GAMING, dev=$WITH_DEV)"
 
 run_cmd env DEBIAN_FRONTEND=noninteractive apt-get update
 run_cmd env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
@@ -123,8 +143,9 @@ fi
 share_dir="$PREFIX_DIR/share/nexus-os"
 bin_dir="$PREFIX_DIR/bin"
 
-run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/config" "$bin_dir"
+run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/config" "$share_dir/branding" "$bin_dir"
 run_cmd install -m 0644 "$REPO_ROOT/linux/xfce/nexus-dark.css" "$share_dir/xfce/nexus-dark.css"
+run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" "$share_dir/branding/nexus-logo.svg"
 run_cmd install -m 0644 "$SYSTEM_CONF" "$share_dir/config/nexus-system.conf"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/apply-nexus-xfce.sh" "$bin_dir/nexus-apply-xfce"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/measure-footprint.sh" "$bin_dir/nexus-measure-footprint"
@@ -141,26 +162,14 @@ NEXUS_BASE_DISTRO="$os_id"
 NEXUS_BASE_CODENAME="$os_codename"
 NEXUS_DESKTOP="xfce"
 NEXUS_GAMING_PROVISIONED="$WITH_GAMING"
+NEXUS_DEV_PROVISIONED="$WITH_DEV"
 META
   chmod 0644 /etc/nexus-os-release
 fi
 
 if [[ "$AUTOSTART_FIRSTBOOT" == true ]]; then
-  if [[ "$DRY_RUN" == true ]]; then
-    printf '[dry-run] Write /etc/xdg/autostart/nexus-firstboot.desktop\n'
-  else
-    install -d -m 0755 /etc/xdg/autostart
-    cat > /etc/xdg/autostart/nexus-firstboot.desktop <<'DESKTOP'
-[Desktop Entry]
-Type=Application
-Name=NEXUS OS First-Boot Setup
-Comment=Configure NEXUS theme, performance profile, and check updates
-Exec=xfce4-terminal -T "NEXUS OS Setup" -e "/usr/local/bin/nexus-firstboot"
-OnlyShowIn=XFCE;
-X-GNOME-Autostart-enabled=true
-DESKTOP
-    chmod 0644 /etc/xdg/autostart/nexus-firstboot.desktop
-  fi
+  run_cmd install -d -m 0755 /etc/xdg/autostart
+  run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-firstboot.desktop" /etc/xdg/autostart/nexus-firstboot.desktop
 fi
 
 echo 'NEXUS guest provisioning complete. Run nexus-firstboot as your regular desktop user.'

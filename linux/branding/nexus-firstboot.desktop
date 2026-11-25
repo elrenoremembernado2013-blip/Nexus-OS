@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS OS First-Boot Setup
+Comment=Configure NEXUS theme, performance profile, and update readiness
+Exec=xfce4-terminal -T "NEXUS OS Setup" -e "/usr/local/bin/nexus-firstboot"
+Icon=/usr/local/share/nexus-os/branding/nexus-logo.svg
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
