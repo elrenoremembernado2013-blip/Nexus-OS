@@ -97,6 +97,10 @@ def main() -> None:
         sec_status = api("/api/security/status")
         for key in ("firewall", "secure_boot", "disk_encryption", "security_updates", "account", "startup_apps"):
             assert key in sec_status, f"Missing security status key: {key}"
+
+        gaming_status = api("/api/gaming/status")
+        for key in ("steam", "graphics", "hardware", "controllers", "performance"):
+            assert key in gaming_status, f"Missing gaming status key: {key}"
     finally:
         proc.terminate()
         proc.wait(timeout=5)

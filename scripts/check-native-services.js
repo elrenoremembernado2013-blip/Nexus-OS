@@ -13,7 +13,7 @@ const UnavailableError = sandbox.window.NativeIntegrationUnavailableError;
 assert.ok(services, "NexusNativeServices should initialize");
 assert.ok(UnavailableError, "NativeIntegrationUnavailableError should initialize");
 
-for (const id of ["display", "sound", "network", "bluetooth", "power", "telemetry", "terminal", "packages", "files"]) {
+for (const id of ["display", "sound", "network", "bluetooth", "power", "telemetry", "terminal", "packages", "files", "gaming"]) {
   const state = services.status(id);
   assert.equal(state.serviceId, id);
   assert.equal(state.available, false);

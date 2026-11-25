@@ -13,6 +13,7 @@
     "notifications",
     "files",
     "terminal",
+    "gaming",
   ]);
 
   class NativeIntegrationUnavailableError extends Error {

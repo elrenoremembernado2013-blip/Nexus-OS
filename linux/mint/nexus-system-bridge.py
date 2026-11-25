@@ -48,6 +48,7 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "accounts": [["cinnamon-settings", "users"], ["users-admin"]],
     "privacy-security": [["cinnamon-settings", "privacy"], ["gufw"]],
     "packages": [["mintinstall"], ["mintupdate"]],
+    "gaming": [["steam"]],
 }
 
 
@@ -479,6 +480,15 @@ def serve_loopback(port: int) -> None:
                     check=True,
                 )
                 self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
+            elif parsed.path == "/api/gaming/status":
+                gam_cli = Path(__file__).resolve().with_name("nexus-gaming-cli.sh")
+                proc = subprocess.run(
+                    ["bash", str(gam_cli), "status"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":
@@ -515,6 +525,21 @@ def serve_loopback(port: int) -> None:
             elif self.path == "/api/tools/launch":
                 res = launch_allowlisted_tool(str(body.get("category", "")))
                 self._send_json(HTTPStatus.OK if res["ok"] else HTTPStatus.BAD_REQUEST, res)
+            elif self.path == "/api/gaming/mode":
+                mode_action = str(body.get("action", ""))
+                if mode_action not in ("enable", "disable"):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid gaming mode action"})
+                    return
+                gam_cli = Path(__file__).resolve().with_name("nexus-gaming-cli.sh")
+                proc = subprocess.run(
+                    ["bash", str(gam_cli), "gaming-mode", mode_action],
+                    capture_output=True,
+                    text=True,
+                )
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"ok": proc.returncode == 0, "message": proc.stdout.strip() or proc.stderr.strip()},
+                )
             else:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 
