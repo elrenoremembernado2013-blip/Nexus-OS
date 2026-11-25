@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reproducible QEMU multi-RAM & disposable-disk validation runner for NEXUS OS.
+# Reproducible QEMU multi-RAM, UEFI boot, and graphical desktop validation runner.
 # Uses strictly disposable qcow2 disks under build/qemu-test/ (never touches host disks).
 set -euo pipefail
 
@@ -11,23 +11,29 @@ TEST_DIR="${NEXUS_QEMU_TEST_DIR:-$REPO_ROOT/build/qemu-test}"
 EDITION="lite"
 ISO_PATH=""
 RAM_LIST="512 768 1024 2048 4096"
-BOOT_SECONDS=90
+BOOT_SECONDS=45
+IDLE_SECONDS=30
+PRIMARY_IDLE_SECONDS=300
+GRAPHICAL=false
 DRY_RUN=false
 
 usage() {
   cat <<'USAGE'
 Usage: bash linux/test/run-qemu-validation.sh [OPTIONS]
 
-Boots a built NEXUS ISO in headless UEFI/OVMF QEMU across multiple RAM budgets
-using disposable qcow2 images under build/qemu-test/, capturing serial logs.
+Runs UEFI/OVMF ISO boot checks and (with --graphical) full virtio-serial + QMP
+graphical desktop validation, 6-stage guest RAM probes, ZRAM tests, and PNG captures.
 
 Options:
-  --edition NAME      lite | cinnamon | xfce (default: lite)
-  --iso PATH          Override ISO file path
-  --ram-matrix LIST   Space-separated MiB list (default: "512 768 1024 2048 4096")
-  --boot-seconds SEC  Headless boot observation window per VM (default: 90)
-  --dry-run           Print QEMU test plan and host readiness without launching VMs
-  --help, -h          Show this help message
+  --edition NAME          lite | cinnamon | xfce (default: lite)
+  --iso PATH              Override ISO file path
+  --ram-matrix LIST       Space-separated MiB list (default: "512 768 1024 2048 4096")
+  --boot-seconds SEC      UEFI boot check window in seconds (default: 45)
+  --idle-seconds SEC      Secondary-tier guest idle probe window (default: 30)
+  --primary-idle SEC      Primary-tier guest idle probe window (default: 300)
+  --graphical             Enable virtio-serial + QMP graphical desktop & memory suite
+  --dry-run               Print QEMU validation plan without launching VMs
+  --help, -h              Show this help message
 USAGE
 }
 
@@ -37,6 +43,9 @@ while (($#)); do
     --iso) [[ $# -ge 2 ]] || { echo '--iso requires a path' >&2; exit 2; }; ISO_PATH="$2"; shift 2 ;;
     --ram-matrix) [[ $# -ge 2 ]] || { echo '--ram-matrix requires a list' >&2; exit 2; }; RAM_LIST="$2"; shift 2 ;;
     --boot-seconds) [[ $# -ge 2 ]] || { echo '--boot-seconds requires seconds' >&2; exit 2; }; BOOT_SECONDS="$2"; shift 2 ;;
+    --idle-seconds) [[ $# -ge 2 ]] || { echo '--idle-seconds requires seconds' >&2; exit 2; }; IDLE_SECONDS="$2"; shift 2 ;;
+    --primary-idle) [[ $# -ge 2 ]] || { echo '--primary-idle requires seconds' >&2; exit 2; }; PRIMARY_IDLE_SECONDS="$2"; shift 2 ;;
+    --graphical) GRAPHICAL=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -55,11 +64,12 @@ fi
 if [[ "$DRY_RUN" == true ]]; then
   echo "NEXUS QEMU Multi-RAM Validation Plan (dry-run)"
   echo "  Edition: $EDITION"
+  echo "  Graphical mode: $GRAPHICAL"
   echo "  ISO: $ISO_PATH"
   echo "  RAM matrix (MiB): $RAM_LIST"
   echo "  Disposable work dir: $TEST_DIR"
   echo "  Host prereqs check:"
-  for bin in qemu-system-x86_64 qemu-img xorriso; do
+  for bin in qemu-system-x86_64 qemu-img xorriso cpio gzip; do
     if command -v "$bin" >/dev/null 2>&1; then
       echo "    [OK] $bin"
     else
@@ -69,9 +79,9 @@ if [[ "$DRY_RUN" == true ]]; then
   exit 0
 fi
 
-for bin in qemu-system-x86_64 qemu-img; do
+for bin in qemu-system-x86_64 qemu-img xorriso cpio gzip python3; do
   command -v "$bin" >/dev/null 2>&1 || {
-    printf 'Missing %s. On Ubuntu/Debian install: sudo apt install -y qemu-system-x86 qemu-utils ovmf\n' "$bin" >&2
+    printf 'Missing %s. On Ubuntu/Debian install: sudo apt install -y qemu-system-x86 qemu-utils ovmf xorriso\n' "$bin" >&2
     exit 1
   }
 done
@@ -95,7 +105,29 @@ ACCEL="tcg"
 
 mkdir -p -- "$TEST_DIR"
 SUMMARY="$TEST_DIR/qemu-results-${EDITION}.json"
-echo '{"edition":"'"$EDITION"'","iso":"'"$ISO_PATH"'","accel":"'"$ACCEL"'","runs":[]}' > "$SUMMARY"
+echo '{"edition":"'"$EDITION"'","iso":"'"$ISO_PATH"'","accel":"'"$ACCEL"'","graphical":'"$GRAPHICAL"',"runs":[]}' > "$SUMMARY"
+
+test_vmlinuz=""
+test_initrd=""
+if [[ "$GRAPHICAL" == true ]]; then
+  overlay_dir="$TEST_DIR/initrd-${EDITION}"
+  rm -rf -- "$overlay_dir"
+  mkdir -p -- "$overlay_dir/tree/scripts/casper-bottom" "$overlay_dir/tree/nexus-test"
+  xorriso -osirrox on -indev "$ISO_PATH" \
+    -extract /casper/vmlinuz "$overlay_dir/vmlinuz" \
+    -extract /casper/initrd "$overlay_dir/orig-initrd" >/dev/null 2>&1
+  cp -f -- "$SCRIPT_DIR/casper-test-hook.sh" "$overlay_dir/tree/scripts/casper-bottom/99nexus_test_harness"
+  cp -f -- "$SCRIPT_DIR/guest-mem-probe.sh" "$overlay_dir/tree/nexus-test/guest-mem-probe.sh"
+  cp -f -- "$SCRIPT_DIR/test-zram-pressure.sh" "$overlay_dir/tree/nexus-test/test-zram-pressure.sh"
+  cp -f -- "$SCRIPT_DIR/nexus-guest-test.py" "$overlay_dir/tree/nexus-test/nexus-guest-test.py"
+  chmod 0755 "$overlay_dir/tree/scripts/casper-bottom/99nexus_test_harness" "$overlay_dir/tree/nexus-test/"*
+  (cd "$overlay_dir/tree" && find . | cpio -o -H newc --quiet | gzip -n -c > "$overlay_dir/overlay.cpio.gz")
+  cp -f -- "$overlay_dir/orig-initrd" "$overlay_dir/test-initrd.img"
+  dd if=/dev/zero bs=4 count=1 status=none >> "$overlay_dir/test-initrd.img"
+  cat "$overlay_dir/overlay.cpio.gz" >> "$overlay_dir/test-initrd.img"
+  test_vmlinuz="$overlay_dir/vmlinuz"
+  test_initrd="$overlay_dir/test-initrd.img"
+fi
 
 for ram_mb in $RAM_LIST; do
   run_dir="$TEST_DIR/${EDITION}-${ram_mb}m"
@@ -104,11 +136,13 @@ for ram_mb in $RAM_LIST; do
   vars_copy="$run_dir/OVMF_VARS.fd"
   serial_log="$run_dir/serial.log"
   qmp_sock="$run_dir/qmp.sock"
-  screendump_ppm="$run_dir/screen.ppm"
+  screendump_ppm="$run_dir/uefi_boot.ppm"
+  screendump_png="$run_dir/uefi_boot.png"
   qemu-img create -f qcow2 "$disk" 20G >/dev/null
   cp -f -- "$OVMF_VARS" "$vars_copy"
-  rm -f -- "$qmp_sock" "$screendump_ppm"
+  rm -f -- "$qmp_sock" "$screendump_ppm" "$screendump_png"
 
+  # Stage 1: UEFI/OVMF direct ISO boot check (proves unmodified ISO boots via GRUB/EFI)
   qemu-system-x86_64 \
     -machine "q35,accel=${ACCEL}" -cpu max -smp 2 -m "$ram_mb" \
     -drive "if=pflash,format=raw,unit=0,readonly=on,file=${OVMF_CODE}" \
@@ -121,66 +155,131 @@ for ram_mb in $RAM_LIST; do
   qemu_pid=$!
   sleep "$BOOT_SECONDS"
 
-  vm_alive=false
+  uefi_alive=false
   if kill -0 "$qemu_pid" 2>/dev/null; then
-    vm_alive=true
+    uefi_alive=true
     python3 - "$qmp_sock" "$screendump_ppm" <<'PY' 2>/dev/null || true
 import json, socket, sys
-sock_path, dump_path = sys.argv[1], sys.argv[2]
+sock_path, ppm = sys.argv[1], sys.argv[2]
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
     s.settimeout(5)
     s.connect(sock_path)
     s.recv(4096)
-    s.sendall(json.dumps({"execute": "qmp_capabilities"}).encode() + b"\n")
-    s.recv(4096)
-    s.sendall(json.dumps({"execute": "screendump", "arguments": {"filename": dump_path}}).encode() + b"\n")
-    s.recv(4096)
-    s.sendall(json.dumps({"execute": "quit"}).encode() + b"\n")
+    s.sendall(b'{"execute":"qmp_capabilities"}\n'); s.recv(4096)
+    s.sendall(json.dumps({"execute":"screendump","arguments":{"filename":ppm}}).encode()+b"\n"); s.recv(4096)
+    s.sendall(b'{"execute":"quit"}\n')
 PY
     sleep 2
     kill "$qemu_pid" 2>/dev/null || true
   fi
   wait "$qemu_pid" 2>/dev/null || true
 
-  boot_marker="boot_window_elapsed_no_serial"
-  if grep -qiE 'lightdm|login:|ubuntu|linuxmint|nexus' "$serial_log" 2>/dev/null; then
-    boot_marker="kernel_or_userspace_reached"
-  elif [[ -s "$screendump_ppm" ]]; then
-    boot_marker="framebuffer_captured_inspect_ppm"
-  fi
-  python3 - "$SUMMARY" "$ram_mb" "$boot_marker" "$vm_alive" "$serial_log" "$screendump_ppm" <<'PY'
+  # Stage 2: Graphical desktop + GUI automation + 6-stage memory + ZRAM test via ephemeral initrd overlay
+  graphical_json="$run_dir/graphical-result.json"
+  if [[ "$GRAPHICAL" == true ]]; then
+    idle_sec="$IDLE_SECONDS"
+    if [[ "$EDITION" == "lite" && ( "$ram_mb" == "512" || "$ram_mb" == "1024" ) ]]; then
+      idle_sec="$PRIMARY_IDLE_SECONDS"
+    elif [[ "$EDITION" != "lite" && "$ram_mb" == "4096" ]]; then
+      idle_sec="$PRIMARY_IDLE_SECONDS"
+    fi
+    timeout_sec=$(( idle_sec + 420 ))
+    vserial_sock="$run_dir/vserial.sock"
+    gqmp_sock="$run_dir/gqmp.sock"
+    gserial_log="$run_dir/graphical-serial.log"
+    rm -f -- "$vserial_sock" "$gqmp_sock" "$graphical_json"
+    cmd_json="$(python3 - "$ACCEL" "$ram_mb" "$disk" "$ISO_PATH" "$test_vmlinuz" "$test_initrd" "$gserial_log" "$gqmp_sock" "$vserial_sock" <<'PY'
 import json, sys
+accel, ram, disk, iso, vml, initrd, slog, qmp, vs = sys.argv[1:]
+print(json.dumps([
+    "qemu-system-x86_64",
+    "-machine", f"q35,accel={accel}",
+    "-cpu", "max", "-smp", "2", "-m", ram,
+    "-drive", f"file={disk},if=virtio,format=qcow2",
+    "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
+    "-vga", "std", "-display", "none",
+    "-serial", f"file:{slog}",
+    "-qmp", f"unix:{qmp},server,nowait",
+    "-device", "virtio-serial-pci",
+    "-chardev", f"socket,path={vs},server=on,wait=off,id=nexus_ch",
+    "-device", "virtserialport,chardev=nexus_ch,name=org.nexus.test.0",
+    "-kernel", vml, "-initrd", initrd,
+    "-append", "boot=casper cdrom-detect/try-usb=true noprompt console=ttyS0,115200 ---",
+    "-cdrom", iso,
+]))
+PY
+)"
+    python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
+      --qemu-cmd-json "$cmd_json" \
+      --qmp-sock "$gqmp_sock" \
+      --vserial-sock "$vserial_sock" \
+      --out-dir "$run_dir" \
+      --idle-seconds "$idle_sec" \
+      --timeout-seconds "$timeout_sec" > "$graphical_json" || true
+  fi
+
+  python3 - "$SUMMARY" "$ram_mb" "$uefi_alive" "$serial_log" "$screendump_ppm" "$screendump_png" "$graphical_json" "$SCRIPT_DIR" <<'PY'
+import importlib.util, json, sys
 from pathlib import Path
-p = Path(sys.argv[1])
-data = json.loads(p.read_text(encoding="utf-8"))
-ppm = Path(sys.argv[6])
-non_black_pct = 0.0
-if ppm.is_file():
-    raw = ppm.read_bytes()
-    header_end = 0
-    nl_count = 0
-    for idx, b in enumerate(raw):
-        if b == 10:
-            nl_count += 1
-            if nl_count == 3:
-                header_end = idx + 1
-                break
-    body = raw[header_end:]
-    if len(body) >= 3:
-        sample = body[::30]
-        non_zero = sum(1 for v in sample if v > 8)
-        non_black_pct = round((non_zero / max(1, len(sample))) * 100.0, 2)
-data["runs"].append({
-    "ram_mib": int(sys.argv[2]),
-    "boot_marker": sys.argv[3],
-    "vm_alive_at_deadline": sys.argv[4] == "true",
-    "serial_log": sys.argv[5],
-    "screendump_ppm": sys.argv[6] if ppm.is_file() else None,
-    "screendump_bytes": ppm.stat().st_size if ppm.is_file() else 0,
-    "framebuffer_non_black_pct": non_black_pct,
-})
-p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+spec = importlib.util.spec_from_file_location("qgr", str(Path(sys.argv[8]) / "qemu-graphical-runner.py"))
+runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runner)
+
+summary_path = Path(sys.argv[1])
+ram_mb = int(sys.argv[2])
+uefi_alive = sys.argv[3] == "true"
+serial_log = Path(sys.argv[4])
+uefi_ppm = Path(sys.argv[5])
+uefi_png = Path(sys.argv[6])
+graphical_json = Path(sys.argv[7])
+
+uefi_shot = {"non_black_pct": 0.0, "png": None}
+if uefi_ppm.is_file():
+    uefi_shot = runner.ppm_to_png_and_stats(uefi_ppm, uefi_png)
+
+gdata = {}
+if graphical_json.is_file() and graphical_json.read_text(encoding="utf-8").strip():
+    try:
+        gdata = json.loads(graphical_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        gdata = {}
+
+gr = gdata.get("guest_report") or {}
+desk = gr.get("desktop") or {}
+apps = gr.get("apps") or {}
+stages = gr.get("stages") or {}
+zram_p = gr.get("zram_pressure") or {}
+
+entry = {
+    "ram_mib": ram_mb,
+    "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0 or serial_log.stat().st_size > 0 if serial_log.is_file() else uefi_alive),
+    "uefi_boot_screenshot": uefi_shot,
+    "login_success": bool(desk.get("lightdm_active") and desk.get("user")),
+    "graphical_session_success": bool(desk.get("wm") and desk.get("panel_running")),
+    "application_test_success": bool(
+        apps.get("file_manager", {}).get("window_verified")
+        and apps.get("terminal", {}).get("window_verified")
+    ),
+    "memory_test_success": len(stages) >= 6,
+    "zram_test_success": zram_p.get("status") == "PASS",
+    "installation_preflight_success": bool(gr.get("lsblk_vda_present")),
+    "desktop": desk,
+    "apps": apps,
+    "stages": stages,
+    "network": gr.get("network"),
+    "zram_status": gr.get("zram_status"),
+    "zram_pressure": zram_p,
+    "installer_preflight": gr.get("installer_preflight"),
+    "ubiquity_present": gr.get("ubiquity_present"),
+    "screenshots": gdata.get("screenshots", []),
+    "desktop_failed": gdata.get("desktop_failed"),
+}
+
+data = json.loads(summary_path.read_text(encoding="utf-8"))
+data["runs"].append(entry)
+summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY
   rm -f -- "$disk"
-  printf 'QEMU %s %s MiB -> %s (alive=%s, ppm=%s)\n' "$EDITION" "$ram_mb" "$boot_marker" "$vm_alive" "$screendump_ppm"
+  printf 'QEMU %s %s MiB validation finished.\n' "$EDITION" "$ram_mb"
 done

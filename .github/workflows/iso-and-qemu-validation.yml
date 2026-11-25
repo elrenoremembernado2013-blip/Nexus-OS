@@ -14,9 +14,13 @@ on:
         required: true
         default: "all"
       boot_seconds:
-        description: "Headless QEMU boot observation window per RAM tier (seconds)"
+        description: "UEFI boot check window per RAM tier (seconds)"
         required: true
-        default: "120"
+        default: "45"
+      primary_idle:
+        description: "Primary-tier guest idle probe duration (seconds)"
+        required: true
+        default: "300"
   push:
     branches:
       - arena/33e911d5-nexus-os
@@ -79,12 +83,12 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
           df -h
 
-      - name: Install ISO remastering and QEMU/OVMF dependencies
+      - name: Install ISO remastering, cpio, and QEMU/OVMF dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bash coreutils curl gnupg xorriso squashfs-tools \
-            qemu-system-x86 qemu-utils ovmf shellcheck
+            qemu-system-x86 qemu-utils ovmf shellcheck cpio gzip
 
       - name: Validate scripts and edition configs before build
         run: |
@@ -104,18 +108,62 @@ jobs:
           fi
           bash linux/build/verify-nexus-iso.sh --edition "${{ matrix.edition }}"
           (cd build/iso/out && sha256sum -c "nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")
-          cat "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256"
-          cat "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.build-info.json"
+          iso_sha="$(awk '{print $1}' "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")"
+          iso_bytes="$(stat -c %s "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso")"
+          echo "::notice title=NEXUS-ISO-${{ matrix.edition }}::file=nexus-os-22.3-${{ matrix.edition }}-amd64.iso bytes=${iso_bytes} sha256=${iso_sha}"
           sudo rm -rf "build/iso/work-${{ matrix.edition }}" build/downloads/*.iso
 
-      - name: Run QEMU RAM matrix (${{ matrix.ram_matrix }} MiB)
+      - name: Run Graphical QEMU RAM matrix (${{ matrix.ram_matrix }} MiB)
         run: |
-          boot_sec="${{ github.event.inputs.boot_seconds || '120' }}"
+          boot_sec="${{ github.event.inputs.boot_seconds || '45' }}"
+          primary_idle="${{ github.event.inputs.primary_idle || '300' }}"
           bash linux/test/run-qemu-validation.sh \
             --edition "${{ matrix.edition }}" \
             --ram-matrix "${{ matrix.ram_matrix }}" \
-            --boot-seconds "$boot_sec"
-          cat "build/qemu-test/qemu-results-${{ matrix.edition }}.json"
+            --boot-seconds "$boot_sec" \
+            --idle-seconds 30 \
+            --primary-idle "$primary_idle" \
+            --graphical
+          python3 - "build/qemu-test/qemu-results-${{ matrix.edition }}.json" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          print(f"::notice title=NEXUS-QEMU-META-{data['edition']}::accel={data['accel']} graphical={data['graphical']} runs={len(data['runs'])}")
+          for r in data["runs"]:
+              desk = r.get("desktop") or {}
+              apps = r.get("apps") or {}
+              stages = r.get("stages") or {}
+              zp = r.get("zram_pressure") or {}
+              shots = [(s.get("name"), s.get("non_black_pct"), s.get("width"), s.get("height")) for s in r.get("screenshots") or []]
+              summary = {
+                  "ram_mib": r.get("ram_mib"),
+                  "uefi_boot": r.get("uefi_boot_success"),
+                  "login": r.get("login_success"),
+                  "desktop": r.get("graphical_session_success"),
+                  "apps_ok": r.get("application_test_success"),
+                  "mem_ok": r.get("memory_test_success"),
+                  "zram_ok": r.get("zram_test_success"),
+                  "preflight_ok": r.get("installation_preflight_success"),
+                  "wm": desk.get("wm"),
+                  "panel": desk.get("panel_running"),
+                  "res": desk.get("resolution"),
+                  "alt_f4": apps.get("keyboard_alt_f4_closed"),
+                  "net": (r.get("network") or {}).get("nmcli_state"),
+                  "stages": {k: {
+                      "tot": v.get("ram_total_mib"),
+                      "used": v.get("used_ram_mib"),
+                      "avail": v.get("available_ram_mib"),
+                      "cache": v.get("cached_mib"),
+                      "swap_used": v.get("swap_used_mib"),
+                      "zram_mem": (v.get("zram") or [{}])[0].get("mem_used_total_mib") if v.get("zram") else None,
+                      "oom": v.get("oom_kill_count"),
+                      "top": [(p.get("comm"), p.get("rss_mib")) for p in (v.get("top_processes") or [])[:4]],
+                  } for k, v in stages.items()},
+                  "zram_p": zp,
+                  "shots": shots,
+                  "fail": r.get("desktop_failed"),
+              }
+              print(f"::notice title=NEXUS-QEMU-{data['edition']}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
+          PY
 
       - name: Upload ISO, SHA-256, and build metadata (${{ matrix.edition }})
         if: always()

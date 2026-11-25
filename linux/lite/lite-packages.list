@@ -26,6 +26,8 @@ desktop:gpicview
 desktop:lxtask
 desktop:network-manager-gnome
 desktop:xorg
+desktop:x11-utils
+desktop:x11-xserver-utils
 
 # NEXUS lightweight integration & CLI tools
 nexus:python3

@@ -118,7 +118,7 @@ run_cmd install -m 0755 "$SCRIPT_DIR/openbox/autostart" /etc/skel/.config/openbo
 run_cmd install -m 0644 "$SCRIPT_DIR/openbox/tint2rc" /etc/skel/.config/tint2/tint2rc
 
 if [[ "$DRY_RUN" == true ]]; then
-  echo '[dry-run] Write /etc/skel/.config/nexus-os/lite-profile, /etc/lightdm/lightdm.conf.d/50-nexus-lite.conf, /etc/nexus-os-release'
+  echo '[dry-run] Write /etc/skel/.config/nexus-os/lite-profile, /etc/lightdm/lightdm.conf.d/90-nexus-lite.conf, /etc/nexus-os-release'
   if [[ "$SKIP_UFW" == false ]]; then
     echo '[dry-run] Configure zram swap + UFW default deny incoming'
   else
@@ -127,11 +127,13 @@ if [[ "$DRY_RUN" == true ]]; then
 else
   printf 'profile=lite-512\n' > /etc/skel/.config/nexus-os/lite-profile
   chmod 0644 /etc/skel/.config/nexus-os/lite-profile
-  cat > /etc/lightdm/lightdm.conf.d/50-nexus-lite.conf <<'DM'
+  rm -f -- /etc/lightdm/lightdm.conf.d/50-nexus-lite.conf
+  cat > /etc/lightdm/lightdm.conf.d/90-nexus-lite.conf <<'DM'
 [Seat:*]
 user-session=openbox
+autologin-session=openbox
 DM
-  chmod 0644 /etc/lightdm/lightdm.conf.d/50-nexus-lite.conf
+  chmod 0644 /etc/lightdm/lightdm.conf.d/90-nexus-lite.conf
 
   if [[ "$SKIP_UFW" == true ]]; then
     cat > /etc/default/zramswap <<'CFG'
