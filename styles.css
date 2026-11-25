@@ -929,3 +929,37 @@ body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after
 @media(max-width:600px){.quantum-track-grid,.quantum-lesson-grid,.quantum-lab-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.quantum-tab,.quantum-track-card,.quantum-prob-fill{transition:none}.quantum-track-card:hover{transform:none}}
 
+/* Phase 7 Personalisation, Themes, Dock Edges, Effects & Profiles */
+:root{--dock-icon-size:43px;--dock-gap:8px;--panel-opacity:0.86;--wallpaper-fit:cover}
+.dock{gap:var(--dock-gap)}
+.dock-app{width:var(--dock-icon-size);height:var(--dock-icon-size)}
+.desktop{background-size:var(--wallpaper-fit);background-repeat:no-repeat;background-position:center}
+.desktop[data-nexus-theme="midnight"]{--bg:#0d1424;--glass:rgba(13,20,36,0.84);--line:rgba(148,197,255,0.2);--text:#eef4ff}
+.desktop[data-nexus-theme="nebula"]{--bg:#141024;--glass:rgba(20,16,36,0.84);--line:rgba(196,168,255,0.22);--text:#f4f0ff}
+.desktop[data-nexus-theme="emerald"]{--bg:#0d1914;--glass:rgba(13,25,20,0.84);--line:rgba(110,231,183,0.2);--text:#ecfdf5}
+.desktop[data-nexus-theme="solar"]{--bg:#191a20;--glass:rgba(37,38,48,0.86);--line:rgba(255,173,122,0.22);--text:#f4f0ed}
+.desktop.dock-left .dock-wrap,.desktop.dock-right .dock-wrap{top:68px;bottom:14px;display:flex;align-items:center}
+.desktop.dock-left .dock-wrap{left:14px;right:auto}
+.desktop.dock-right .dock-wrap{right:14px;left:auto}
+.desktop.dock-left .dock,.desktop.dock-right .dock{flex-direction:column}
+.desktop.dock-left .dock-separator,.desktop.dock-right .dock-separator{width:26px;height:1px;margin:3px 0}
+.desktop.dock-autohide .dock-wrap{opacity:.22;transition:opacity .2s ease,transform .2s ease}
+.desktop.dock-autohide .dock-wrap:hover,.desktop.dock-autohide .dock-wrap:focus-within{opacity:1}
+.desktop.dock-style-solid .dock{backdrop-filter:none;background:rgba(18,22,34,.96)}
+.desktop.dock-style-minimal .dock{background:rgba(15,20,35,.32);box-shadow:none}
+.desktop.hide-dock-indicators .dock-app::after{display:none}
+.desktop.hide-shortcuts .desktop-shortcuts{display:none}
+.desktop.effects-off *,.desktop.effects-off *::before,.desktop.effects-off *::after{backdrop-filter:none!important;transition:none!important;animation:none!important}
+.desktop.effects-subtle .panel,.desktop.effects-subtle .launcher,.desktop.effects-subtle .window,.desktop.effects-subtle .dock{backdrop-filter:blur(8px)}
+.desktop.effects-enhanced .panel,.desktop.effects-enhanced .launcher,.desktop.effects-enhanced .window{box-shadow:0 30px 90px rgba(0,0,0,.55)}
+.theme-preset-grid,.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(124px,1fr));gap:8px;margin:10px 0}
+.theme-preset-btn,.profile-card-btn{display:flex;flex-direction:column;gap:4px;text-align:left;padding:10px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);cursor:pointer;font-size:11px}
+.theme-preset-btn.selected,.profile-card-btn.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.theme-preset-swatch{width:100%;height:6px;border-radius:999px;display:block}
+.wallpaper-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.wallpaper-search{flex:1;min-width:140px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);font-size:12px}
+.wallpaper-fav-btn{position:absolute;top:6px;right:6px;z-index:2;border:0;border-radius:999px;width:24px;height:24px;background:rgba(12,16,28,.75);color:#ffd27d;cursor:pointer;font-size:12px;line-height:24px;text-align:center}
+.wallpaper-option{position:relative}
+.wallpaper-meta{font-size:10px;color:var(--muted);margin-top:4px;display:block}
+
+

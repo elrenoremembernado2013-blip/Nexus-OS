@@ -2,54 +2,90 @@
   const customWallpaperKey = "custom";
   const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
-  const presetWallpapers = [
+  const presetWallpapers = window.NexusPersonalisationCatalog?.WALLPAPERS || [
     {
       id: "mountain-night",
-      category: "nature",
-      label: "Mountain Night",
+      category: "space",
+      categoryLabel: "Space & Galaxies",
+      label: "Mountain Night Sky",
       aria: "Apply mountain night wallpaper",
       thumb: "https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&fit=crop&w=520&q=75",
-      alt: "Starry sky above a mountain range"
+      alt: "Starry sky above a mountain range",
+      photographer: "Benjamin Voros",
+      sourceName: "Unsplash",
+      sourceUrl: "https://unsplash.com/photos/phIFdC6lA4E",
+      license: "Unsplash License",
+      recommendedTheme: "midnight"
     },
     {
       id: "alpine",
-      category: "nature",
-      label: "Alpine",
+      category: "mountains",
+      categoryLabel: "Mountains",
+      label: "Alpine Ridge",
       aria: "Apply alpine landscape wallpaper",
       thumb: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=520&q=75",
-      alt: "Dramatic alpine mountain peaks"
+      alt: "Dramatic alpine mountain peaks",
+      photographer: "Benjamin Voros",
+      sourceName: "Unsplash",
+      sourceUrl: "https://unsplash.com/photos/phIFdC6lA4E",
+      license: "Unsplash License",
+      recommendedTheme: "arctic"
     },
     {
       id: "forest",
-      category: "nature",
-      label: "Forest",
+      category: "forests",
+      categoryLabel: "Forests & Nature",
+      label: "Sunlit Forest",
       aria: "Apply forest wallpaper",
       thumb: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=520&q=75",
-      alt: "Sunlight through a green forest"
+      alt: "Sunlight through a green forest",
+      photographer: "Lukasz Szmigiel",
+      sourceName: "Unsplash",
+      sourceUrl: "https://unsplash.com/photos/jFCViYFYcus",
+      license: "Unsplash License",
+      recommendedTheme: "emerald"
     },
     {
       id: "cosmos",
       category: "space",
-      label: "Cosmos",
+      categoryLabel: "Space & Galaxies",
+      label: "Deep Nebula",
       aria: "Apply cosmos wallpaper",
       thumb: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=520&q=75",
-      alt: "Colourful deep space nebula"
+      alt: "Colourful deep space nebula",
+      photographer: "NASA",
+      sourceName: "Unsplash / NASA",
+      sourceUrl: "https://unsplash.com/photos/rTZW4f02zY8",
+      license: "Public Domain (NASA) / Unsplash",
+      recommendedTheme: "nebula"
     },
     {
       id: "city",
-      category: "architecture",
-      label: "City Lights",
+      category: "cities",
+      categoryLabel: "Cities",
+      label: "Dusk Skyline",
       aria: "Apply city wallpaper",
       thumb: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=520&q=75",
-      alt: "City skyline at dusk"
+      alt: "City skyline at dusk",
+      photographer: "Andre Benz",
+      sourceName: "Unsplash",
+      sourceUrl: "https://unsplash.com/photos/cXU6tNxhub0",
+      license: "Unsplash License",
+      recommendedTheme: "solar"
     },
     {
       id: "modern",
       category: "architecture",
-      label: "Architecture",
+      categoryLabel: "Architecture",
+      label: "Minimalist Geometry",
       aria: "Apply architecture wallpaper",
       thumb: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=520&q=75",
-      alt: "Modern architectural structure"
+      alt: "Modern architectural structure",
+      photographer: "Joel Filipe",
+      sourceName: "Unsplash",
+      sourceUrl: "https://unsplash.com/photos/RFDP7_80v5A",
+      license: "Unsplash License",
+      recommendedTheme: "midnight"
     }
   ];
 
@@ -189,8 +225,24 @@
 
   function render() {
     const heading = (title, sub) => `<h2 class="content-title">${title}</h2><p class="content-sub">${sub}</p>`;
+    const themes = Object.values(window.NexusPersonalisationCatalog?.THEME_PRESETS || {});
+    const profiles = Object.values(window.NexusPersonalisationCatalog?.PROFILES || {});
+    const themePresetButtons = themes.map(t => `
+      <button class="theme-preset-btn" type="button" data-theme-preset="${t.id}">
+        <span class="theme-preset-swatch" style="background:linear-gradient(90deg,${t.bg},${t.accent})"></span>
+        <strong>${t.label}</strong>
+        <small>${t.description}</small>
+      </button>
+    `).join("");
+    const profileCards = profiles.map(p => `
+      <button class="profile-card-btn" type="button" data-personalisation-profile="${p.id}">
+        <strong>${p.name}</strong>
+        <small>${p.summary}</small>
+      </button>
+    `).join("");
     const wallpaperButtons = presetWallpapers.map(wp => `
-      <button class="wallpaper-option" type="button" data-wallpaper="${wp.id}" data-category="${wp.category}" aria-label="${wp.aria}">
+      <button class="wallpaper-option" type="button" data-wallpaper="${wp.id}" data-category="${wp.category}" data-title="${wp.label.toLowerCase()}" aria-label="${wp.aria}">
+        <span class="wallpaper-fav-btn" data-wallpaper-fav="${wp.id}" role="button" tabindex="0" aria-label="Favourite ${wp.label}">☆</span>
         <img loading="lazy" crossorigin="anonymous" src="${wp.thumb}" alt="${wp.alt}">
         <span>${wp.label}</span>
       </button>
@@ -201,6 +253,7 @@
         <aside class="settings-sidebar" aria-label="Settings categories">
           <p class="settings-kicker">PREFERENCES</p>
           <button class="settings-nav active" type="button" data-settings-section="appearance"><span>◐</span> Appearance</button>
+          <button class="settings-nav" type="button" data-settings-section="personalisation"><span>⊞</span> Dock & Workspaces</button>
           <button class="settings-nav" type="button" data-settings-section="performance"><span>ϟ</span> Performance</button>
           <button class="settings-nav" type="button" data-settings-section="notifications"><span>◉</span> Notifications</button>
           <button class="settings-nav" type="button" data-settings-section="accessibility"><span>◎</span> Accessibility</button>
@@ -211,9 +264,10 @@
             ${heading("Appearance", "Make NEXUS feel like your own.")}
             <div class="settings-card">
               <div class="settings-card-heading">
-                <h3>Desktop theme</h3>
-                <p>Choose the overall look of your workspace.</p>
+                <h3>NEXUS Theme Engine & mode</h3>
+                <p>Built-in themes match NEXUS Cinnamon & GTK3 packages on Linux Mint.</p>
               </div>
+              <div class="theme-preset-grid">${themePresetButtons}</div>
               <div class="theme-options">
                 <button class="theme-choice" data-theme-choice="dark" type="button">Dark</button>
                 <button class="theme-choice" data-theme-choice="light" type="button">Light</button>
@@ -224,7 +278,7 @@
             <div class="settings-card">
               <div class="settings-card-heading">
                 <h3>Accent colour</h3>
-                <p>Choose the highlight used across the interface.</p>
+                <p>Choose a preset highlight, pick any custom colour, or sample from your wallpaper.</p>
               </div>
               <div class="accent-options">
                 <button class="accent-swatch" type="button" data-accent="#ffad7a" aria-label="Copper accent" title="Copper"></button>
@@ -232,6 +286,7 @@
                 <button class="accent-swatch" type="button" data-accent="#44c9e8" aria-label="Cyan accent" title="Cyan"></button>
                 <button class="accent-swatch" type="button" data-accent="#5ed3a3" aria-label="Emerald accent" title="Emerald"></button>
                 <button class="accent-swatch" type="button" data-accent="#ee82b6" aria-label="Rose accent" title="Rose"></button>
+                <input id="customAccentPicker" type="color" value="#ffad7a" aria-label="Custom accent colour picker" title="Custom accent colour">
               </div>
               <p class="settings-hint" id="accentStatus">Copper is the default NEXUS accent.</p>
               <div class="wallpaper-accent-suggestions">
@@ -248,13 +303,37 @@
             <div class="settings-card wallpaper-card">
               <div class="settings-card-heading">
                 <h3>Desktop wallpaper</h3>
-                <p>Choose a photographic background for your workspace. Images are served by Unsplash.</p>
+                <p>Genuine photographs with verified photographer attribution and source links (no AI-generated images).</p>
+              </div>
+              <div class="wallpaper-toolbar">
+                <input id="wallpaperSearch" class="wallpaper-search" type="search" placeholder="Search wallpapers…" aria-label="Search wallpapers">
+                <select id="wallpaperFitSelect" aria-label="Wallpaper fit mode">
+                  <option value="cover">Fill (Cover)</option>
+                  <option value="contain">Fit (Contain)</option>
+                  <option value="fill">Stretch</option>
+                  <option value="center">Centre</option>
+                </select>
+                <select id="wallpaperResolutionSelect" aria-label="Wallpaper resolution">
+                  <option value="uhd">2400px UHD</option>
+                  <option value="hd">1280px HD</option>
+                </select>
+                <select id="wallpaperRotationSelect" aria-label="Automatic wallpaper rotation">
+                  <option value="off">Rotation: Off</option>
+                  <option value="30">Rotate every 30s</option>
+                  <option value="300">Rotate every 5m</option>
+                </select>
               </div>
               <div class="wallpaper-filters" role="group" aria-label="Wallpaper categories">
                 <button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="nature" type="button">Nature</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="favorites" type="button">Favourites</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="mountains" type="button">Mountains</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space & Galaxies</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="forests" type="button">Forests & Nature</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="oceans" type="button">Oceans</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="cities" type="button">Cities</button>
                 <button class="wallpaper-filter" data-wallpaper-filter="architecture" type="button">Architecture</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="abstract" type="button">Abstract</button>
+                <button class="wallpaper-filter" data-wallpaper-filter="gaming" type="button">Gaming</button>
               </div>
               <div class="wallpaper-grid" id="wallpaperGrid">
                 ${wallpaperButtons}
@@ -270,8 +349,8 @@
                 </div>
               </div>
               <div class="wallpaper-footer">
-                <p class="settings-hint" id="wallpaperStatus">Choose a wallpaper to see a larger preview before applying it.</p>
-                <a href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer">Unsplash licence</a>
+                <p class="settings-hint" id="wallpaperStatus">Choose a wallpaper to see attribution and preview before applying it.</p>
+                <a id="wallpaperAttributionLink" href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer">Unsplash & Public Domain attribution</a>
               </div>
               <dialog class="wallpaper-preview-dialog" id="wallpaperPreviewDialog" aria-labelledby="wallpaperPreviewTitle">
                 <div class="wallpaper-preview-shell">
@@ -284,6 +363,7 @@
                   </div>
                   <img id="wallpaperPreviewImage" class="wallpaper-preview-image" alt="Large preview of the selected wallpaper">
                   <p class="wallpaper-preview-caption" id="wallpaperPreviewCaption">This will become your desktop background.</p>
+                  <p class="settings-hint" id="wallpaperPreviewAttribution"></p>
                   <div class="wallpaper-preview-actions">
                     <button class="action-button preview-cancel" type="button" data-preview-close>Cancel</button>
                     <button class="action-button preview-apply" id="applyWallpaperPreview" type="button">Apply wallpaper</button>
@@ -293,8 +373,14 @@
             </div>
             <div class="settings-card">
               <div class="settings-card-heading">
-                <h3>Glass effects</h3>
-                <p>Adjust the transparency and blur of panels.</p>
+                <h3>Glass effects & animations</h3>
+                <p>Select an effect level or fine-tune backdrop blur for your hardware.</p>
+              </div>
+              <div class="theme-options" role="group" aria-label="Effect levels">
+                <button class="theme-choice" data-effect-level="off" type="button">Off</button>
+                <button class="theme-choice" data-effect-level="subtle" type="button">Subtle</button>
+                <button class="theme-choice" data-effect-level="balanced" type="button">Balanced</button>
+                <button class="theme-choice" data-effect-level="enhanced" type="button">Enhanced</button>
               </div>
               <div class="setting-row">
                 <div>
@@ -305,6 +391,88 @@
                   <input id="blurSelect" type="range" min="0" max="28" value="18">
                   <output id="blurValue">18 px</output>
                 </div>
+              </div>
+            </div>
+          </section>
+          <section class="settings-page hidden" data-settings-page="personalisation">
+            ${heading("Dock, Panel & Workspaces", "Customise layout, desktop elements, workspaces, and personalisation profiles.")}
+            <div class="settings-card">
+              <div class="settings-card-heading">
+                <h3>Personalisation profiles</h3>
+                <p>Apply a coherent preset across theme, effects, dock, and workspaces. Undo anytime.</p>
+              </div>
+              <div class="profile-grid">${profileCards}</div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                <button class="action-button" id="undoProfileBtn" type="button" disabled>Undo last profile</button>
+                <span class="settings-hint" id="profileStatus">Customising desktop preferences.</span>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-heading">
+                <h3>Dock & panel appearance</h3>
+                <p>Controls update the NEXUS dock immediately and map to Cinnamon panel settings on Linux Mint.</p>
+              </div>
+              <div class="setting-row">
+                <div><strong>Dock position</strong><small>Choose bottom, left, or right screen edge.</small></div>
+                <select id="dockPositionSelect" aria-label="Dock position">
+                  <option value="bottom">Bottom</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div><strong>Dock icon size</strong><small>Adjust icon footprint and padding.</small></div>
+                <select id="dockSizeSelect" aria-label="Dock icon size">
+                  <option value="36">Compact (36 px)</option>
+                  <option value="43">Standard (43 px)</option>
+                  <option value="52">Large (52 px)</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div><strong>Dock spacing</strong><small>Gap between pinned and running icons.</small></div>
+                <select id="dockGapSelect" aria-label="Dock icon spacing">
+                  <option value="5">Tight (5 px)</option>
+                  <option value="8">Balanced (8 px)</option>
+                  <option value="12">Wide (12 px)</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div><strong>Dock style</strong><small>Backdrop material for the dock surface.</small></div>
+                <select id="dockStyleSelect" aria-label="Dock background style">
+                  <option value="glass">Frosted Glass</option>
+                  <option value="solid">Solid Dark</option>
+                  <option value="minimal">Minimal Translucent</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div><strong>Auto-hide dock</strong><small>Fade dock until hovered or focused.</small></div>
+                <button class="switch-button" id="dockAutoHideToggle" type="button" role="switch" aria-checked="false">Off</button>
+              </div>
+              <div class="setting-row">
+                <div><strong>Running indicators</strong><small>Show dots beneath open or minimised apps.</small></div>
+                <button class="switch-button" id="dockIndicatorsToggle" type="button" role="switch" aria-checked="true">On</button>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-heading">
+                <h3>Desktop, clock & workspaces</h3>
+                <p>Configure desktop shortcuts, clock format, and Cinnamon workspace counts.</p>
+              </div>
+              <div class="setting-row">
+                <div><strong>Desktop shortcuts</strong><small>Show quick-launch icons on the desktop canvas.</small></div>
+                <button class="switch-button" id="desktopShortcutsToggle" type="button" role="switch" aria-checked="true">On</button>
+              </div>
+              <div class="setting-row">
+                <div><strong>24-hour clock</strong><small>Use 24-hour format in the top bar.</small></div>
+                <button class="switch-button" id="clock24hToggle" type="button" role="switch" aria-checked="false">Off</button>
+              </div>
+              <div class="setting-row">
+                <div><strong>Virtual workspaces (Cinnamon)</strong><small>Switch with Ctrl+Alt+Left / Right on Linux Mint.</small></div>
+                <input id="workspaceCountInput" type="number" min="1" max="8" value="4" aria-label="Virtual workspaces count">
+              </div>
+              <div class="setting-row">
+                <div><strong>Workspace names</strong><small>Comma-separated labels stored for your workspace setup.</small></div>
+                <input id="workspaceNamesInput" type="text" value="Main, Research, Gaming, Media" aria-label="Workspace names">
               </div>
             </div>
           </section>
@@ -549,11 +717,12 @@
       const item = $(`[data-wallpaper="${id}"]`);
       const imageUrl = shell?.getWallpaperUrl?.(id);
       if (!item || !imageUrl) return;
+      const wpMeta = presetWallpapers.find(w => w.id === id);
       pendingWallpaper = id;
       pendingCustomWallpaper = null;
       pendingAccent = null;
       $("#applyWallpaperPreview").textContent = "Apply wallpaper";
-      $("#wallpaperPreviewTitle").textContent = item.querySelector("span").textContent;
+      $("#wallpaperPreviewTitle").textContent = wpMeta?.label || item.querySelector("span").textContent;
       const previewImg = $("#wallpaperPreviewImage");
       previewImg.crossOrigin = "anonymous";
       previewImg.src = imageUrl;
@@ -563,6 +732,10 @@
         id === readStorage("nexus-wallpaper")
           ? "This is your currently applied wallpaper."
           : "Preview only — your desktop will not change until you apply it.";
+      const attrEl = $("#wallpaperPreviewAttribution");
+      if (attrEl && wpMeta) {
+        attrEl.textContent = `Photo by ${wpMeta.photographer} · ${wpMeta.sourceName} (${wpMeta.license}) · Recommended theme: ${wpMeta.recommendedTheme || "midnight"}`;
+      }
       if (!previewDialog.open) previewDialog.showModal();
       $("#applyWallpaperPreview").focus();
     }
@@ -635,9 +808,88 @@
       }
     });
 
+    let favSet = new Set();
+    try {
+      const rawFav = readStorage("nexus-wallpaper-favourites");
+      if (rawFav) favSet = new Set(JSON.parse(rawFav));
+    } catch {
+      favSet = new Set();
+    }
+    const syncFavouriteButtons = () => {
+      $$("[data-wallpaper-fav]").forEach(btn => {
+        const isFav = favSet.has(btn.dataset.wallpaperFav);
+        btn.textContent = isFav ? "★" : "☆";
+        btn.setAttribute("aria-pressed", String(isFav));
+      });
+    };
+    const filterWallpapers = () => {
+      const activeCat = $(".wallpaper-filter.active")?.dataset.wallpaperFilter || "all";
+      const term = ($("#wallpaperSearch")?.value || "").trim().toLowerCase();
+      $$("[data-wallpaper]").forEach(item => {
+        const catMatch =
+          activeCat === "all" ||
+          (activeCat === "favorites" ? favSet.has(item.dataset.wallpaper) : item.dataset.category === activeCat);
+        const searchMatch = !term || (item.dataset.title || "").includes(term) || item.dataset.category.includes(term);
+        item.hidden = !(catMatch && searchMatch);
+      });
+    };
+
     $$("[data-wallpaper]").forEach(item => {
-      item.addEventListener("click", () => openWallpaperPreview(item.dataset.wallpaper));
+      item.addEventListener("click", event => {
+        const favBtn = event.target.closest("[data-wallpaper-fav]");
+        if (favBtn) {
+          event.stopPropagation();
+          const wid = favBtn.dataset.wallpaperFav;
+          if (favSet.has(wid)) favSet.delete(wid);
+          else favSet.add(wid);
+          writeStorage("nexus-wallpaper-favourites", JSON.stringify([...favSet]));
+          syncFavouriteButtons();
+          filterWallpapers();
+          return;
+        }
+        openWallpaperPreview(item.dataset.wallpaper);
+      });
     });
+    syncFavouriteButtons();
+    $("#wallpaperSearch")?.addEventListener("input", filterWallpapers);
+
+    const fitSelect = $("#wallpaperFitSelect");
+    if (fitSelect) {
+      fitSelect.value = readStorage("nexus-wallpaper-fit") || "cover";
+      fitSelect.addEventListener("change", () => shell?.setWallpaperFit?.(fitSelect.value, true));
+    }
+    const resSelect = $("#wallpaperResolutionSelect");
+    if (resSelect) {
+      resSelect.value = readStorage("nexus-wallpaper-resolution") || "uhd";
+      resSelect.addEventListener("change", () => {
+        writeStorage("nexus-wallpaper-resolution", resSelect.value);
+        const cur = readStorage("nexus-wallpaper");
+        if (cur && cur !== "custom") applyWallpaper(cur, false);
+      });
+    }
+    let rotationTimer = null;
+    const rotSelect = $("#wallpaperRotationSelect");
+    const setupRotation = secondsStr => {
+      window.clearInterval(rotationTimer);
+      rotationTimer = null;
+      const sec = Number(secondsStr);
+      if (!Number.isFinite(sec) || sec <= 0) return;
+      rotationTimer = window.setInterval(() => {
+        if (unmounted || !presetWallpapers.length) return;
+        const curId = readStorage("nexus-wallpaper") || "alpine";
+        const idx = presetWallpapers.findIndex(w => w.id === curId);
+        const next = presetWallpapers[(idx + 1) % presetWallpapers.length];
+        if (next) applyWallpaper(next.id, true);
+      }, sec * 1000);
+    };
+    if (rotSelect) {
+      rotSelect.value = readStorage("nexus-wallpaper-rotation") || "off";
+      setupRotation(rotSelect.value);
+      rotSelect.addEventListener("change", () => {
+        writeStorage("nexus-wallpaper-rotation", rotSelect.value);
+        setupRotation(rotSelect.value);
+      });
+    }
     $$("[data-preview-close]").forEach(button => button.addEventListener("click", closeWallpaperPreview));
     previewDialog.addEventListener("click", event => {
       if (event.target === previewDialog) closeWallpaperPreview();
@@ -674,17 +926,16 @@
 
     $$("[data-wallpaper-filter]").forEach(filter => {
       filter.addEventListener("click", () => {
-        const category = filter.dataset.wallpaperFilter;
         $$("[data-wallpaper-filter]").forEach(item => item.classList.toggle("active", item === filter));
-        $$("[data-wallpaper]").forEach(item => {
-          item.hidden = category !== "all" && item.dataset.category !== category;
-        });
+        filterWallpapers();
       });
     });
 
     function setAccent(value) {
       document.documentElement.style.setProperty("--accent", value);
       writeStorage("nexus-accent", value);
+      const picker = $("#customAccentPicker");
+      if (picker && /^#[0-9a-f]{6}$/i.test(value)) picker.value = value;
       $$("[data-accent]").forEach(swatch => {
         const selected = swatch.dataset.accent === value;
         swatch.classList.toggle("selected", selected);
@@ -695,13 +946,61 @@
         button.classList.toggle("selected", selected);
         button.setAttribute("aria-pressed", String(selected));
       });
-      $("#accentStatus").textContent = "Accent colour updated.";
+      $("#accentStatus").textContent = "Accent colour updated (" + value + ").";
     }
 
+    $("#customAccentPicker")?.addEventListener("input", event => setAccent(event.target.value));
     $$("[data-accent]").forEach(swatch => {
       swatch.addEventListener("click", () => setAccent(swatch.dataset.accent));
     });
     setAccent(readStorage("nexus-accent") || "#ffad7a");
+
+    function applyThemePreset(presetId, syncAccent = true) {
+      const preset = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[presetId];
+      if (!preset) return;
+      shell?.setThemePreset?.(presetId, true);
+      $$("[data-theme-preset]").forEach(btn => {
+        const selected = btn.dataset.themePreset === presetId;
+        btn.classList.toggle("selected", selected);
+        btn.setAttribute("aria-pressed", String(selected));
+      });
+      applyTheme(preset.mode);
+      if (syncAccent) setAccent(preset.accent);
+    }
+    $$("[data-theme-preset]").forEach(btn => {
+      btn.addEventListener("click", () => applyThemePreset(btn.dataset.themePreset, true));
+    });
+    const savedPreset = readStorage("nexus-theme-preset");
+    if (savedPreset) {
+      $$("[data-theme-preset]").forEach(btn => {
+        const selected = btn.dataset.themePreset === savedPreset;
+        btn.classList.toggle("selected", selected);
+        btn.setAttribute("aria-pressed", String(selected));
+      });
+    }
+
+    function applyEffectLevel(level) {
+      shell?.setEffectLevel?.(level, true);
+      $$("[data-effect-level]").forEach(btn => {
+        const selected = btn.dataset.effectLevel === level;
+        btn.classList.toggle("selected", selected);
+        btn.setAttribute("aria-pressed", String(selected));
+      });
+      const blurMap = { off: "0", subtle: "8", balanced: "18", enhanced: "24" };
+      if (blurMap[level] !== undefined) {
+        blur.value = blurMap[level];
+        setBlur();
+      }
+    }
+    $$("[data-effect-level]").forEach(btn => {
+      btn.addEventListener("click", () => applyEffectLevel(btn.dataset.effectLevel));
+    });
+    const savedEffect = readStorage("nexus-effect-level") || "balanced";
+    $$("[data-effect-level]").forEach(btn => {
+      const selected = btn.dataset.effectLevel === savedEffect;
+      btn.classList.toggle("selected", selected);
+      btn.setAttribute("aria-pressed", String(selected));
+    });
 
     function applyTheme(mode) {
       const useLight =
@@ -815,13 +1114,134 @@
       });
     });
 
+    const dockPos = $("#dockPositionSelect");
+    const dockSize = $("#dockSizeSelect");
+    const dockGap = $("#dockGapSelect");
+    const dockStyle = $("#dockStyleSelect");
+    if (dockPos) {
+      dockPos.value = readStorage("nexus-dock-position") || "bottom";
+      dockPos.addEventListener("change", () => shell?.setDockPreferences?.({ position: dockPos.value }, true));
+    }
+    if (dockSize) {
+      dockSize.value = readStorage("nexus-dock-size") || "43";
+      dockSize.addEventListener("change", () => shell?.setDockPreferences?.({ size: dockSize.value }, true));
+    }
+    if (dockGap) {
+      dockGap.value = readStorage("nexus-dock-gap") || "8";
+      dockGap.addEventListener("change", () => shell?.setDockPreferences?.({ gap: dockGap.value }, true));
+    }
+    if (dockStyle) {
+      dockStyle.value = readStorage("nexus-dock-style") || "glass";
+      dockStyle.addEventListener("change", () => shell?.setDockPreferences?.({ style: dockStyle.value }, true));
+    }
+    if ($("#dockAutoHideToggle")) {
+      bindSwitch($("#dockAutoHideToggle"), readStorage("nexus-dock-autohide") === "true", en =>
+        shell?.setDockPreferences?.({ autoHide: en }, true)
+      );
+    }
+    if ($("#dockIndicatorsToggle")) {
+      bindSwitch($("#dockIndicatorsToggle"), readStorage("nexus-dock-indicators") !== "false", en =>
+        shell?.setDockPreferences?.({ showIndicators: en }, true)
+      );
+    }
+    if ($("#desktopShortcutsToggle")) {
+      bindSwitch($("#desktopShortcutsToggle"), readStorage("nexus-desktop-shortcuts") !== "false", en =>
+        shell?.setDesktopPreferences?.({ showShortcuts: en }, true)
+      );
+    }
+    if ($("#clock24hToggle")) {
+      bindSwitch($("#clock24hToggle"), readStorage("nexus-clock-24h") === "true", en =>
+        shell?.setDesktopPreferences?.({ clock24h: en }, true)
+      );
+    }
+    const wsCountInput = $("#workspaceCountInput");
+    if (wsCountInput) {
+      wsCountInput.value = readStorage("nexus-workspace-count") || "4";
+      wsCountInput.addEventListener("change", () => {
+        const clamped = Math.min(8, Math.max(1, Number(wsCountInput.value) || 4));
+        wsCountInput.value = String(clamped);
+        writeStorage("nexus-workspace-count", String(clamped));
+      });
+    }
+    const wsNamesInput = $("#workspaceNamesInput");
+    if (wsNamesInput) {
+      wsNamesInput.value = readStorage("nexus-workspace-names") || "Main, Research, Gaming, Media";
+      wsNamesInput.addEventListener("change", () => writeStorage("nexus-workspace-names", wsNamesInput.value));
+    }
+
+    let previousProfileSnapshot = null;
+    const captureSnapshot = () => ({
+      themePreset: readStorage("nexus-theme-preset") || "solar",
+      effectLevel: readStorage("nexus-effect-level") || "balanced",
+      blur: Number(readStorage("nexus-blur") || "18"),
+      reducedMotion: readStorage("nexus-reduced-motion") === "true",
+      dockPosition: readStorage("nexus-dock-position") || "bottom",
+      dockSize: readStorage("nexus-dock-size") || "43",
+      dockAutoHide: readStorage("nexus-dock-autohide") === "true",
+      workspaces: Number(readStorage("nexus-workspace-count") || "4")
+    });
+    const applyProfileObject = profile => {
+      applyThemePreset(profile.themePreset, true);
+      applyEffectLevel(profile.effectLevel);
+      blur.value = String(profile.blur);
+      setBlur();
+      setMotion(Boolean(profile.reducedMotion), true);
+      shell?.setDockPreferences?.({
+        position: profile.dockPosition,
+        size: profile.dockSize,
+        autoHide: Boolean(profile.dockAutoHide)
+      }, true);
+      if (dockPos) dockPos.value = profile.dockPosition;
+      if (dockSize) dockSize.value = String(profile.dockSize);
+      if ($("#dockAutoHideToggle")) updateSwitchState($("#dockAutoHideToggle"), Boolean(profile.dockAutoHide));
+      if (wsCountInput) {
+        wsCountInput.value = String(profile.workspaces);
+        writeStorage("nexus-workspace-count", String(profile.workspaces));
+      }
+    };
+    $$("[data-personalisation-profile]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const profile = window.NexusPersonalisationCatalog?.PROFILES?.[btn.dataset.personalisationProfile];
+        if (!profile) return;
+        previousProfileSnapshot = captureSnapshot();
+        applyProfileObject(profile);
+        $$("[data-personalisation-profile]").forEach(c => c.classList.toggle("selected", c === btn));
+        if ($("#undoProfileBtn")) $("#undoProfileBtn").disabled = false;
+        if ($("#profileStatus")) $("#profileStatus").textContent = `Applied profile: ${profile.name}`;
+      });
+    });
+    $("#undoProfileBtn")?.addEventListener("click", () => {
+      if (!previousProfileSnapshot) return;
+      applyProfileObject(previousProfileSnapshot);
+      previousProfileSnapshot = null;
+      $("#undoProfileBtn").disabled = true;
+      $$("[data-personalisation-profile]").forEach(c => c.classList.remove("selected"));
+      if ($("#profileStatus")) $("#profileStatus").textContent = "Restored previous personalisation settings.";
+    });
+
     $("#resetPreferences").addEventListener("click", async () => {
       if (!window.confirm("Reset NEXUS appearance and quick-setting preferences? Your Notes will be kept.")) return;
       [
         "nexus-accent",
         "nexus-blur",
         "nexus-theme",
+        "nexus-theme-preset",
         "nexus-wallpaper",
+        "nexus-wallpaper-fit",
+        "nexus-wallpaper-resolution",
+        "nexus-wallpaper-rotation",
+        "nexus-wallpaper-favourites",
+        "nexus-effect-level",
+        "nexus-dock-position",
+        "nexus-dock-size",
+        "nexus-dock-gap",
+        "nexus-dock-autohide",
+        "nexus-dock-style",
+        "nexus-dock-indicators",
+        "nexus-desktop-shortcuts",
+        "nexus-clock-24h",
+        "nexus-workspace-count",
+        "nexus-workspace-names",
         "nexus-reduced-motion",
         "nexus-brightness",
         "nexus-volume",
@@ -862,6 +1282,7 @@
     return () => {
       unmounted = true;
       accentSuggestionToken++;
+      window.clearInterval(rotationTimer);
       unsubscribeControls?.();
       closeWallpaperPreview();
       if (themeMedia) {

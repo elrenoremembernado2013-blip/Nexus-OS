@@ -540,6 +540,35 @@ def serve_loopback(port: int) -> None:
                     HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.INTERNAL_SERVER_ERROR,
                     {"ok": proc.returncode == 0, "message": proc.stdout.strip() or proc.stderr.strip()},
                 )
+            elif self.path == "/api/personalisation/apply":
+                cinnamon_cli = Path(__file__).resolve().parents[1] / "cinnamon" / "apply-nexus-cinnamon.sh"
+                cmd = ["bash", str(cinnamon_cli)]
+                if body.get("dryRun"):
+                    cmd.append("--dry-run")
+                if body.get("revert"):
+                    cmd.append("--revert")
+                else:
+                    if body.get("theme") in ("midnight", "nebula", "arctic", "emerald", "solar"):
+                        cmd.extend(["--theme", str(body["theme"])])
+                    if body.get("effectLevel") in ("off", "subtle", "balanced", "enhanced"):
+                        cmd.extend(["--effect-level", str(body["effectLevel"])])
+                    if body.get("dockPosition") in ("bottom", "left", "right"):
+                        cmd.extend(["--dock-position", str(body["dockPosition"])])
+                    if body.get("panelSize") in ("small", "medium", "large"):
+                        cmd.extend(["--panel-size", str(body["panelSize"])])
+                    if body.get("panelAutohide") in ("false", "true", "intel"):
+                        cmd.extend(["--panel-autohide", str(body["panelAutohide"])])
+                    if body.get("wallpaperFit") in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
+                        cmd.extend(["--wallpaper-fit", str(body["wallpaperFit"])])
+                    if isinstance(body.get("workspaces"), int) and 1 <= body["workspaces"] <= 8:
+                        cmd.extend(["--workspaces", str(body["workspaces"])])
+                    if body.get("presetProfile") in ("default", "minimal", "gaming", "productivity", "cinematic", "lightweight"):
+                        cmd.extend(["--preset-profile", str(body["presetProfile"])])
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "output": (proc.stdout + proc.stderr).strip()},
+                )
             else:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 

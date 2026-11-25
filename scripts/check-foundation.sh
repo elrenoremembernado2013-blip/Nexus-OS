@@ -17,7 +17,7 @@ else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
 fi
 
-for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md; do
+for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md; do
   [[ -f "$required" ]] || { printf 'Missing required foundation file: %s\n' "$required" >&2; exit 1; }
 done
 
@@ -66,6 +66,7 @@ bash linux/build/build-nexus-iso.sh --check >/dev/null
 bash linux/build/build-nexus-iso.sh --dry-run --with-gaming --with-dev >/dev/null
 bash linux/cinnamon/apply-nexus-cinnamon.sh --help >/dev/null
 bash linux/cinnamon/apply-nexus-cinnamon.sh --dry-run --theme nebula --profile lightweight --dock-position left --workspaces 4 >/dev/null
+bash linux/cinnamon/apply-nexus-cinnamon.sh --dry-run --preset-profile gaming --effect-level off --panel-size small --wallpaper-fit zoom --accent '#ffad7a' >/dev/null
 bash linux/cinnamon/apply-nexus-cinnamon.sh --dry-run --revert >/dev/null
 bash linux/mint/nexus-store-cli.sh --help >/dev/null
 bash linux/mint/nexus-store-cli.sh sources >/dev/null

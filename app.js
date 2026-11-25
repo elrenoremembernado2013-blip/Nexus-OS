@@ -8,14 +8,16 @@
   const windowLayer = $("#windowLayer");
   const toast = $("#toast");
 
-  const wallpaperCatalog = {
-    "mountain-night": "https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&fit=crop&w=2400&q=85",
-    alpine: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2400&q=85",
-    forest: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2400&q=85",
-    cosmos: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2400&q=85",
-    city: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2400&q=85",
-    modern: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=2400&q=85"
-  };
+  const wallpaperCatalog = Object.fromEntries(
+    (window.NexusPersonalisationCatalog?.WALLPAPERS || []).map(wp => [wp.id, wp])
+  );
+
+  function getWallpaperUrl(id) {
+    const entry = wallpaperCatalog[id];
+    if (!entry) return null;
+    const res = readStorage("nexus-wallpaper-resolution") || "uhd";
+    return res === "hd" ? (entry.hd || entry.uhd) : (entry.uhd || entry.hd);
+  }
 
   let activeCustomWallpaperUrl = null;
   let toastTimer = null;
@@ -50,7 +52,7 @@
   }
 
   function setDesktopWallpaper(id, persist = true) {
-    const image = wallpaperCatalog[id];
+    const image = getWallpaperUrl(id);
     if (!image) return false;
     setDesktopBackground(image);
     if (persist) writeStorage("nexus-wallpaper", id);
@@ -108,7 +110,8 @@
 
   function updateClock() {
     const now = new Date();
-    $("#clock").textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const use24 = readStorage("nexus-clock-24h") === "true";
+    $("#clock").textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: !use24 });
   }
   updateClock();
   window.setInterval(updateClock, 30000);
@@ -299,12 +302,81 @@
   }
   syncNativeControlBoundary();
 
+  function setThemePreset(presetId, persist = true) {
+    const preset = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[presetId];
+    if (!preset) return false;
+    desktop.dataset.nexusTheme = presetId;
+    if (persist) writeStorage("nexus-theme-preset", presetId);
+    return true;
+  }
+
+  function setWallpaperFit(fit, persist = true) {
+    const map = { cover: "cover", contain: "contain", fill: "100% 100%", center: "auto" };
+    if (!map[fit]) return false;
+    document.documentElement.style.setProperty("--wallpaper-fit", map[fit]);
+    if (persist) writeStorage("nexus-wallpaper-fit", fit);
+    return true;
+  }
+
+  function setEffectLevel(level, persist = true) {
+    if (!["off", "subtle", "balanced", "enhanced"].includes(level)) return false;
+    desktop.classList.remove("effects-off", "effects-subtle", "effects-enhanced");
+    if (level !== "balanced") desktop.classList.add("effects-" + level);
+    if (persist) writeStorage("nexus-effect-level", level);
+    return true;
+  }
+
+  function setDockPreferences(prefs = {}, persist = true) {
+    if (prefs.position && ["bottom", "left", "right"].includes(prefs.position)) {
+      desktop.classList.remove("dock-left", "dock-right");
+      if (prefs.position !== "bottom") desktop.classList.add("dock-" + prefs.position);
+      if (persist) writeStorage("nexus-dock-position", prefs.position);
+    }
+    if (prefs.size) {
+      document.documentElement.style.setProperty("--dock-icon-size", String(prefs.size) + "px");
+      if (persist) writeStorage("nexus-dock-size", String(prefs.size));
+    }
+    if (prefs.gap) {
+      document.documentElement.style.setProperty("--dock-gap", String(prefs.gap) + "px");
+      if (persist) writeStorage("nexus-dock-gap", String(prefs.gap));
+    }
+    if (typeof prefs.autoHide === "boolean") {
+      desktop.classList.toggle("dock-autohide", prefs.autoHide);
+      if (persist) writeStorage("nexus-dock-autohide", String(prefs.autoHide));
+    }
+    if (prefs.style && ["glass", "solid", "minimal"].includes(prefs.style)) {
+      desktop.classList.remove("dock-style-solid", "dock-style-minimal");
+      if (prefs.style !== "glass") desktop.classList.add("dock-style-" + prefs.style);
+      if (persist) writeStorage("nexus-dock-style", prefs.style);
+    }
+    if (typeof prefs.showIndicators === "boolean") {
+      desktop.classList.toggle("hide-dock-indicators", !prefs.showIndicators);
+      if (persist) writeStorage("nexus-dock-indicators", String(prefs.showIndicators));
+    }
+  }
+
+  function setDesktopPreferences(prefs = {}, persist = true) {
+    if (typeof prefs.showShortcuts === "boolean") {
+      desktop.classList.toggle("hide-shortcuts", !prefs.showShortcuts);
+      if (persist) writeStorage("nexus-desktop-shortcuts", String(prefs.showShortcuts));
+    }
+    if (typeof prefs.clock24h === "boolean") {
+      if (persist) writeStorage("nexus-clock-24h", String(prefs.clock24h));
+      updateClock();
+    }
+  }
+
   window.NexusDesktopShell = Object.freeze({
     setDesktopWallpaper,
-    getWallpaperUrl: id => wallpaperCatalog[id] || null,
+    getWallpaperUrl,
     setCustomDesktopWallpaper,
     clearCustomDesktopWallpaper,
     getCustomDesktopWallpaperUrl: () => activeCustomWallpaperUrl,
+    setThemePreset,
+    setWallpaperFit,
+    setEffectLevel,
+    setDockPreferences,
+    setDesktopPreferences,
     getControlState: () => ({ ...controlState }),
     setControlPreference,
     onControlChange(listener) {
@@ -719,4 +791,22 @@
   const savedTheme = readStorage("nexus-theme") || "dark";
   const systemPrefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   desktop.classList.toggle("theme-light", savedTheme === "light" || (savedTheme === "system" && systemPrefersLight));
+  const savedPreset = readStorage("nexus-theme-preset");
+  if (savedPreset) setThemePreset(savedPreset, false);
+  const savedFit = readStorage("nexus-wallpaper-fit");
+  if (savedFit) setWallpaperFit(savedFit, false);
+  const savedEffect = readStorage("nexus-effect-level");
+  if (savedEffect) setEffectLevel(savedEffect, false);
+  setDockPreferences({
+    position: readStorage("nexus-dock-position") || "bottom",
+    size: readStorage("nexus-dock-size") || "43",
+    gap: readStorage("nexus-dock-gap") || "8",
+    autoHide: readStorage("nexus-dock-autohide") === "true",
+    style: readStorage("nexus-dock-style") || "glass",
+    showIndicators: readStorage("nexus-dock-indicators") !== "false"
+  }, false);
+  setDesktopPreferences({
+    showShortcuts: readStorage("nexus-desktop-shortcuts") !== "false",
+    clock24h: readStorage("nexus-clock-24h") === "true"
+  }, false);
 })();
