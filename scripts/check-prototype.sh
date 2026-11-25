@@ -27,6 +27,7 @@ node scripts/check-browser.js
 node scripts/check-store-catalog.js
 node scripts/check-files-helpers.js
 node scripts/check-calendar.js
+node scripts/check-quantum.js
 node scripts/check-terminal-preview.js
 
 python3 - <<'PY'

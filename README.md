@@ -15,6 +15,7 @@ A lightweight browser-based desktop concept with a premium glass UI. This is **n
 - Settings: appearance, wallpaper, accent, glass, performance, notifications, accessibility, system information and native-integration status pages
 - Browser launcher (opens valid HTTP/HTTPS links in a new tab)
 - Terminal preview with an explicit unavailable-native-Bash state; no fake commands are executed
+- Quantum Learning Studio with offline lessons (quantum concepts, Spanish, French, Python), a real single-qubit state-vector lab (`H`, `X`, `Z`, measurement), local XP progress, and an offline lesson guide (not a connected AI service)
 - Gaming Hub preview
 - Basic calculator
 
