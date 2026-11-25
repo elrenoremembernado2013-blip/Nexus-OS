@@ -4,20 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
 fi
 
-for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md docs/INSTALLER_ARCHITECTURE.md docs/RECOVERY_AND_BOOT.md docs/RELEASE_ENGINEERING.md docs/HARDWARE_COMPATIBILITY.md docs/RELEASE_DASHBOARD.md; do
+for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css linux/lite/nexus-lite.conf linux/lite/lite-packages.list linux/lite/openbox/rc.xml linux/lite/openbox/tint2rc docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md docs/INSTALLER_ARCHITECTURE.md docs/RECOVERY_AND_BOOT.md docs/RELEASE_ENGINEERING.md docs/HARDWARE_COMPATIBILITY.md docs/RELEASE_DASHBOARD.md docs/NEXUS_LITE.md; do
   [[ -f "$required" ]] || { printf 'Missing required foundation file: %s\n' "$required" >&2; exit 1; }
 done
 
@@ -71,6 +71,17 @@ bash linux/build/prepare-release.sh --dry-run --stage alpha >/dev/null
 bash linux/build/prepare-release.sh --dry-run --stage beta >/dev/null
 bash linux/build/prepare-release.sh --dry-run --stage rc >/dev/null
 bash linux/build/prepare-release.sh --dry-run --stage testing >/dev/null
+bash linux/build/validate-packages.sh linux/lite/lite-packages.list >/dev/null
+bash linux/lite/apply-nexus-lite.sh --dry-run --profile lite-512 >/dev/null
+bash linux/lite/apply-nexus-lite.sh --dry-run --profile lite-1g >/dev/null
+bash linux/lite/apply-nexus-lite.sh --dry-run --profile standard-2g >/dev/null
+bash linux/lite/apply-nexus-lite.sh --dry-run --revert >/dev/null
+bash linux/lite/configure-zram.sh status >/dev/null
+bash linux/lite/configure-zram.sh --dry-run enable >/dev/null
+bash linux/lite/memory-audit.sh --json >/dev/null
+bash linux/lite/provision-nexus-lite.sh --dry-run >/dev/null
+bash linux/lite/build-nexus-lite-iso.sh --dry-run >/dev/null
+bash linux/lite/nexus-lite-install.sh --dry-run >/dev/null
 if bash linux/build/prepare-release.sh --dry-run --stage stable >/dev/null 2>&1; then
   echo 'Expected prepare-release.sh to refuse stable stage without --vm-verified' >&2
   exit 1

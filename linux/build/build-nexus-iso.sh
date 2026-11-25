@@ -7,8 +7,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-SYSTEM_CONF="$REPO_ROOT/linux/config/nexus-system.conf"
-PKG_MANIFEST="$REPO_ROOT/linux/config/mint-packages.list"
+SYSTEM_CONF="${NEXUS_SYSTEM_CONF:-$REPO_ROOT/linux/config/nexus-system.conf}"
+PKG_MANIFEST="${NEXUS_PKG_MANIFEST:-$REPO_ROOT/linux/config/mint-packages.list}"
+PROVISION_SCRIPT="${NEXUS_PROVISION_SCRIPT:-linux/mint/provision-nexus-guest.sh}"
 PREREQ_SCRIPT="$SCRIPT_DIR/check-build-prereqs.sh"
 VALIDATE_PKGS="$SCRIPT_DIR/validate-packages.sh"
 BRANDING_SCRIPT="$SCRIPT_DIR/apply-iso-branding.sh"
@@ -155,12 +156,15 @@ mounted_chroot=true
 mkdir -p -- "$squash_root/tmp/nexus-repo"
 cp -a "$REPO_ROOT/linux" "$squash_root/tmp/nexus-repo/linux"
 
-chroot_args=(--skip-ufw --autostart-firstboot --force)
-[[ "$WITH_GAMING" == true ]] && chroot_args+=(--with-gaming)
-[[ "$WITH_DEV" == true ]] && chroot_args+=(--with-dev)
+chroot_args=(--force)
+if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then
+  chroot_args=(--skip-ufw --autostart-firstboot --force)
+  [[ "$WITH_GAMING" == true ]] && chroot_args+=(--with-gaming)
+  [[ "$WITH_DEV" == true ]] && chroot_args+=(--with-dev)
+fi
 
 chroot "$squash_root" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
-  bash /tmp/nexus-repo/linux/mint/provision-nexus-guest.sh "${chroot_args[@]}"
+  bash "/tmp/nexus-repo/${PROVISION_SCRIPT}" "${chroot_args[@]}"
 chroot "$squash_root" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
   apt-get clean
 rm -rf -- "$squash_root/tmp/nexus-repo"
