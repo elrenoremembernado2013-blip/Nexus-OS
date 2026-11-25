@@ -1,5 +1,7 @@
 # Generated images, VM state, caches, and local secrets
 /build/
+__pycache__/
+*.pyc
 *.iso
 *.qcow2
 *.img
