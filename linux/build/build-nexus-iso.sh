@@ -157,9 +157,8 @@ NEXUS_BASE_ISO="$BASE_ISO" bash "$PREREQ_SCRIPT" --edition "$out_slug" --strict
 [[ -r "$MANIFEST_FILE" ]] || { printf 'Missing signed checksum manifest: %s (run bash scripts/download-linux-mint.sh --edition %s)\n' "$MANIFEST_FILE" "$out_slug" >&2; exit 1; }
 
 iso_basename="${BASE_ISO##*/}"
-expected_line="$(grep -F " ${iso_basename}" "$MANIFEST_FILE" | head -n 1 || true)"
-[[ -n "$expected_line" ]] || { printf 'No entry for %s in %s\n' "$iso_basename" "$MANIFEST_FILE" >&2; exit 1; }
-expected_sha="${expected_line%% *}"
+expected_sha="$(awk -v file="$iso_basename" '$2 == file || $2 == "*" file { print $1; exit }' "$MANIFEST_FILE")"
+[[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || { printf 'No valid SHA-256 entry for %s in %s\n' "$iso_basename" "$MANIFEST_FILE" >&2; exit 1; }
 actual_sha="$(sha256sum "$BASE_ISO" | awk '{print $1}')"
 if [[ "$expected_sha" != "$actual_sha" ]]; then
   printf 'Base ISO SHA-256 mismatch: expected %s, got %s\n' "$expected_sha" "$actual_sha" >&2
@@ -228,6 +227,8 @@ fi
 
 mkdir -p -- "$squash_root/tmp/nexus-repo"
 cp -a "$REPO_ROOT/linux" "$squash_root/tmp/nexus-repo/linux"
+cp -a "$REPO_ROOT/LICENSE" "$squash_root/tmp/nexus-repo/LICENSE"
+cp -a "$REPO_ROOT/docs" "$squash_root/tmp/nexus-repo/docs"
 
 chroot_args=(--skip-ufw --force)
 if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then

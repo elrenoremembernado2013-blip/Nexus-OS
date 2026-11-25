@@ -59,7 +59,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-bash "$REPO_ROOT/linux/build/check-build-prereqs.sh" --strict
+bash "$REPO_ROOT/linux/build/check-build-prereqs.sh" --edition lite --strict
 NEXUS_EDITION="lite" \
 NEXUS_SYSTEM_CONF="$SCRIPT_DIR/nexus-lite.conf" \
 NEXUS_PKG_MANIFEST="$LITE_MANIFEST" \
