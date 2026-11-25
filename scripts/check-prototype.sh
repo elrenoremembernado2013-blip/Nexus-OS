@@ -25,6 +25,7 @@ node scripts/check-native-services.js
 node scripts/check-calculator.js
 node scripts/check-browser.js
 node scripts/check-store-catalog.js
+node scripts/check-store-native.js
 node scripts/check-files-helpers.js
 node scripts/check-calendar.js
 node scripts/check-quantum.js

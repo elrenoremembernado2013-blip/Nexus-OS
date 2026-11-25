@@ -35,7 +35,16 @@
     return image;
   }
 
+  function packagesAvailable() {
+    try {
+      return Boolean(window.NexusNativeServices?.status("packages")?.available);
+    } catch {
+      return false;
+    }
+  }
+
   function render() {
+    const connected = packagesAvailable();
     const navGroups = [
       { title: "Discover", items: [["home", "Home"], ["discover", "Discover"]] },
       { title: "Browse", items: [["apps", "Apps"], ["games", "Games"], ["categories", "Categories"], ["collections", "Collections"]] },
@@ -51,7 +60,7 @@
               <p>${group.title}</p>
               ${group.items.map(([id, label]) => `<button type="button" class="store-nav-item" data-store-view="${id}" aria-current="false">${label}</button>`).join("")}
             </div>`).join("")}
-          <div class="store-sidebar-note"><span class="store-status-dot"></span><span>Prototype catalogue<br><small>Native package service disconnected</small></span></div>
+          <div class="store-sidebar-note"><span class="store-status-dot"></span><span>${connected ? "Linux Mint packages" : "Prototype catalogue"}<br><small>${connected ? "Native APT / Flatpak connected" : "Native package service disconnected"}</small></span></div>
         </aside>
         <div class="store-workspace">
           <header class="store-toolbar">
@@ -460,14 +469,49 @@
     function renderUpdates() {
       const wrapper = node("div", "store-page");
       const intro = node("div", "store-page-intro");
-      intro.append(node("h3", "", "Updates"), node("p", "", "Update checks require a trusted native package service."));
+      if (!packagesAvailable()) {
+        intro.append(node("h3", "", "Updates"), node("p", "", "Update checks require a trusted native package service."));
+        wrapper.append(intro);
+        const notice = node("aside", "store-trust-note");
+        notice.append(
+          node("strong", "", "Update status is unknown."),
+          node("p", "", "The Store cannot query package versions or install updates in this browser prototype. It will not report “up to date” without checking.")
+        );
+        wrapper.append(notice);
+        page.append(wrapper);
+        return;
+      }
+
+      intro.append(node("h3", "", "Updates"), node("p", "", "Updates queried from the connected Linux Mint package service (APT / Flatpak)."));
       wrapper.append(intro);
-      const notice = node("aside", "store-trust-note");
-      notice.append(
-        node("strong", "", "Update status is unknown."),
-        node("p", "", "The Store cannot query package versions or install updates in this browser prototype. It will not report “up to date” without checking.")
-      );
-      wrapper.append(notice);
+      try {
+        const updates = window.NexusNativeServices.call("packages", "checkUpdates") || [];
+        if (!updates.length) {
+          const empty = node("aside", "store-trust-note");
+          empty.append(node("strong", "", "No pending updates reported."), node("p", "", "APT and Flatpak reported no upgradable packages."));
+          wrapper.append(empty);
+        } else {
+          const list = node("div", "store-operation-list");
+          updates.forEach(item => {
+            const row = node("article", "store-operation-row");
+            const copy = node("div", "store-operation-copy");
+            copy.append(
+              node("strong", "", `${item.name || item.id} (${String(item.source || "apt").toUpperCase()})`),
+              node("small", "", `${item.currentVersion || "installed"} → ${item.newVersion || "latest"}`)
+            );
+            const btn = node("button", "action-button primary", "Update");
+            btn.type = "button";
+            btn.dataset.storeAction = "native-install";
+            btn.dataset.pkgId = item.id;
+            btn.dataset.pkgSource = item.source || "apt";
+            row.append(copy, btn);
+            list.append(row);
+          });
+          wrapper.append(list);
+        }
+      } catch (error) {
+        wrapper.append(node("p", "store-error", `Could not check updates: ${error.message}`));
+      }
       page.append(wrapper);
     }
 
@@ -530,7 +574,13 @@
       const releaseHeading = node("h4", "", "Release notes");
       main.append(releaseHeading, node("p", "store-detail-notes", application.releaseNotes));
       const metadata = node("dl", "store-detail-metadata");
+      const sourceLabel = application.installMode === "unavailable"
+        ? "External / Not packaged"
+        : application.installedByDefault
+          ? "NEXUS Desktop (bundled)"
+          : "NEXUS Internal Bundle";
       [
+        ["Source", sourceLabel],
         ["Version", application.version || "Not released"],
         ["Size", application.size],
         ["Compatibility", application.compatibility],
@@ -565,7 +615,7 @@
       page.append(wrapper);
     }
 
-    function renderPage() {
+    function renderPage({ preserveMessage = false } = {}) {
       title.textContent = routeTitles[route.view] || "NEXUS Store";
       back.disabled = history.length <= 1;
       root.querySelectorAll("[data-store-view]").forEach(button => {
@@ -573,8 +623,9 @@
         button.setAttribute("aria-current", selected ? "page" : "false");
       });
       page.replaceChildren();
-      setMessage(catalog.getStorageError());
-      if (catalog.getStorageError()) message.classList.add("error");
+      if (!preserveMessage || catalog.getStorageError()) {
+        setMessage(catalog.getStorageError(), Boolean(catalog.getStorageError()));
+      }
 
       switch (route.view) {
         case "home": renderHome(); break;
@@ -590,9 +641,48 @@
         case "downloads": renderDownloads(); break;
         case "updates": renderUpdates(); break;
         case "developer": renderDeveloperHub(); break;
-        case "search":
-          renderAppListing(catalog.getAll().filter(application => matchesSearch(application, query.trim().toLocaleLowerCase())), `Results for “${query.trim()}”`, "Matches include app names, descriptions, developers, categories and tags.", false);
+        case "search": {
+          const term = query.trim().toLocaleLowerCase();
+          const localMatches = catalog.getAll().filter(application => matchesSearch(application, term));
+          renderAppListing(localMatches, `Results for “${query.trim()}”`, "Matches include app names, descriptions, developers, categories and tags.", false);
+          if (packagesAvailable() && term) {
+            try {
+              const nativeMatches = window.NexusNativeServices.call("packages", "search", query.trim()) || [];
+              if (nativeMatches.length) {
+                const section = node("section", "store-section");
+                const heading = node("div", "store-section-heading");
+                const copy = node("div");
+                copy.append(node("h3", "", "Linux Mint packages (APT / Flatpak)"), node("p", "", "Results queried from the connected native package service."));
+                heading.append(copy);
+                const list = node("div", "store-operation-list");
+                nativeMatches.forEach(pkg => {
+                  const row = node("article", "store-operation-row");
+                  const copyBox = node("div", "store-operation-copy");
+                  copyBox.append(
+                    node("strong", "", `${pkg.name || pkg.id} · ${String(pkg.source || "apt").toUpperCase()}`),
+                    node("small", "", pkg.description || pkg.id)
+                  );
+                  const btn = node("button", pkg.installed ? "store-text-button" : "action-button primary", pkg.installed ? "Remove" : "Install");
+                  btn.type = "button";
+                  btn.dataset.storeAction = pkg.installed ? "native-remove" : "native-install";
+                  btn.dataset.pkgId = pkg.id;
+                  btn.dataset.pkgSource = pkg.source || "apt";
+                  if (pkg.installed && pkg.protected) {
+                    btn.disabled = true;
+                    btn.title = "Protected system package cannot be removed.";
+                  }
+                  row.append(copyBox, btn);
+                  list.append(row);
+                });
+                section.append(heading, list);
+                page.querySelector(".store-page")?.append(section);
+              }
+            } catch (error) {
+              page.querySelector(".store-page")?.append(node("p", "store-error", `Native package search failed: ${error.message}`));
+            }
+          }
           break;
+        }
         case "detail": renderDetail(getApplication(route.appId)); break;
         default: renderHome();
       }
@@ -636,12 +726,35 @@
       context.launchApp(application.launchTarget);
     }
 
-    function handleAction(action, id) {
+    function handleNativePackageAction(action, pkgId, pkgSource) {
+      if (!packagesAvailable()) {
+        setMessage("Native package service unavailable.", true);
+        return;
+      }
+      if (action === "native-remove" && !window.confirm(`Remove ${pkgId} (${pkgSource}) via Linux Mint package management?`)) {
+        return;
+      }
+      try {
+        const method = action === "native-remove" ? "remove" : "install";
+        const result = window.NexusNativeServices.call("packages", method, pkgSource, pkgId);
+        if (result && result.ok === false) {
+          setMessage(result.message || `Package operation failed for ${pkgId}.`, true);
+          return;
+        }
+        setMessage(result?.message || `${method === "install" ? "Installed" : "Removed"} ${pkgId} via ${pkgSource}.`);
+      } catch (error) {
+        setMessage(error.message, true);
+      }
+    }
+
+    function handleAction(action, id, dataset = {}) {
       if (action === "details") go({ view: "detail", appId: id });
       else if (action === "install") installApplication(id);
       else if (action === "remove") removeApplication(id);
       else if (action === "open") openApplication(id);
-      else if (action === "wishlist") {
+      else if (action === "native-install" || action === "native-remove") {
+        handleNativePackageAction(action, dataset.pkgId, dataset.pkgSource || "apt");
+      } else if (action === "wishlist") {
         try {
           const saved = catalog.toggleWishlist(id);
           setMessage(saved ? "Added to your wishlist." : "Removed from your wishlist.");
@@ -649,13 +762,13 @@
           setMessage(error.message, true);
         }
       }
-      if (action !== "open" && action !== "details") renderPage();
+      if (action !== "open" && action !== "details") renderPage({ preserveMessage: true });
     }
 
     root.addEventListener("click", event => {
       const actionButton = event.target.closest("[data-store-action]");
       if (actionButton && !actionButton.disabled) {
-        handleAction(actionButton.dataset.storeAction, actionButton.dataset.appId);
+        handleAction(actionButton.dataset.storeAction, actionButton.dataset.appId, actionButton.dataset);
         return;
       }
       const viewButton = event.target.closest("[data-store-view]");
