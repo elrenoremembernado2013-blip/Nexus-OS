@@ -240,7 +240,7 @@ DM
 fi
 
 # Remove casper/ubiquity live-only packages before regenerating initramfs
-chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive dpkg --purge casper lupin-casper >/dev/null 2>&1 || true
+chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive dpkg --purge --no-triggers casper lupin-casper >/dev/null 2>&1 || true
 
 # Ensure kernel & initramfs are present in /boot for update-grub
 if ! compgen -G "$TARGET/boot/vmlinuz-*" >/dev/null; then
@@ -249,11 +249,15 @@ if ! compgen -G "$TARGET/boot/vmlinuz-*" >/dev/null; then
     cp -f /cdrom/casper/vmlinuz "$TARGET/boot/vmlinuz-${kver}"
   fi
 fi
+initrd_speed_conf="$TARGET/etc/initramfs-tools/conf.d/99-nexus-fast-initrd.conf"
+mkdir -p -- "$TARGET/etc/initramfs-tools/conf.d"
+printf 'COMPRESS=gzip\nCOMPRESSLEVEL=1\n' > "$initrd_speed_conf"
 if ! compgen -G "$TARGET/boot/initrd.img-*" >/dev/null; then
-  chroot "$TARGET" env COMPRESSLEVEL=1 /usr/sbin/update-initramfs -c -k all
+  chroot "$TARGET" /usr/sbin/update-initramfs -c -k all
 else
-  chroot "$TARGET" env COMPRESSLEVEL=1 /usr/sbin/update-initramfs -u -k all
+  chroot "$TARGET" /usr/sbin/update-initramfs -u -k all
 fi
+rm -f -- "$initrd_speed_conf"
 
 # Install UEFI GRUB bootloader + fallback EFI/BOOT/BOOTX64.EFI
 log_msg "Installing UEFI GRUB bootloader onto $DISK ($PART_EFI)"

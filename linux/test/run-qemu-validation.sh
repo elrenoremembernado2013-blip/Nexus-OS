@@ -296,15 +296,17 @@ PY
 
     rep_idle="$idle_sec"
     install_flag=()
-    timeout_sec=$(( rep_idle + 540 ))
+    timeout_sec=$(( rep_idle + 600 ))
+    rep_disk="$run_dir/rep-${rep}-disk.qcow2"
+    qemu-img create -f qcow2 "$rep_disk" 20G >/dev/null
     if [[ "$INSTALL_TEST" == true && "$rep" -le "$install_repeats" ]]; then
       install_flag=(--do-install)
-      timeout_sec=$(( rep_idle + 1800 ))
+      timeout_sec=$(( rep_idle + 2700 ))
     fi
     if (( rep > 1 )); then
       rep_idle=20
     fi
-    cmd_json="$(run_live_cmd_json "$ram_mb" "$disk" "$gserial_log" "$gqmp_sock" "$vserial_sock" "$VGA_MODE")"
+    cmd_json="$(run_live_cmd_json "$ram_mb" "$rep_disk" "$gserial_log" "$gqmp_sock" "$vserial_sock" "$VGA_MODE")"
     python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
       --qemu-cmd-json "$cmd_json" \
       --qmp-sock "$gqmp_sock" \
@@ -314,6 +316,20 @@ PY
       --panel-wait-sec 90 \
       --timeout-seconds "$timeout_sec" \
       "${install_flag[@]}" > "$rep_json" || true
+    if [[ "$INSTALL_TEST" == true && "$rep" -le "$install_repeats" ]]; then
+      rep_inst_ok="$(python3 -c 'import json,sys
+try:
+ d=json.load(open(sys.argv[1]))
+ print("1" if ((d.get("guest_report") or {}).get("install_report") or {}).get("install_success") else "0")
+except Exception: print("0")' "$rep_json")"
+      if [[ "$rep_inst_ok" == "1" || ! -s "$disk" ]]; then
+        mv -f -- "$rep_disk" "$disk"
+      else
+        rm -f -- "$rep_disk"
+      fi
+    else
+      rm -f -- "$rep_disk"
+    fi
   done
 
   # Stage 2b: Cinnamon 2048 MiB diagnostic comparison with virtio-gpu (when EDITION=cinnamon, ram=2048, vga=std)

@@ -189,6 +189,7 @@ jobs:
                   "inst_sec": ir0.get("elapsed_sec"),
                   "inst_efi": ir0.get("bootloader_efi_ok"),
                   "efi_files": ir0.get("efi_files"),
+                  "live_reps": [(x.get("rep"), x.get("graphical_session_success"), x.get("application_test_success"), x.get("install_success"), (x.get("desktop_failed") or {}).get("lightdm_active")) for x in live_r],
                   "live_shots": [(s.get("name"), s.get("non_black_pct")) for s in (l0.get("screenshots") or [])],
                   "live_glx": (l0.get("desktop") or {}).get("glx_diag"),
                   "cinn_2g_virtio": r.get("cinnamon_2g_virtio_diag"),
@@ -197,6 +198,16 @@ jobs:
                   "cold_diag": r.get("cold_diag") if len(compact_boots) < 3 else None,
               }
               print(f"::notice title=NEXUS-123-{data['edition']}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
+          bad = [
+              r.get("ram_mib") for r in data["runs"]
+              if r.get("install_attempts", 0) > 0 and (
+                  (data["edition"] == "lite" and r.get("ram_mib") in (768, 1024, 2048))
+                  or (data["edition"] in ("xfce", "cinnamon") and r.get("ram_mib") == 4096)
+              ) and (r.get("install_successes", 0) == 0 or r.get("installed_boot_successes", 0) == 0)
+          ]
+          if bad:
+              print(f"::error title=NEXUS-123-FAIL-{data['edition']}::Primary tier install/installed-boot failure at RAM={bad}")
+              sys.exit(1)
           PY
 
       - name: Upload ISO, SHA-256, and build metadata (${{ matrix.edition }})

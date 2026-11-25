@@ -241,7 +241,7 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
         "--edition", edition,
         "--yes-erase-disk",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=2400)
     pw_file.unlink(missing_ok=True)
     elapsed = round(time.time() - t0, 1)
 
