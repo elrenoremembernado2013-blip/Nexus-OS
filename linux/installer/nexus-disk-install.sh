@@ -165,7 +165,7 @@ done
 
 log_msg "Formatting $PART_EFI (FAT32) and $PART_ROOT (ext4)"
 mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
-mkfs.ext4 -F -L nexus_root "$PART_ROOT" >/dev/null
+mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
 
 mkdir -p -- "$TARGET"
 mount "$PART_ROOT" "$TARGET"
@@ -249,9 +249,9 @@ if ! compgen -G "$TARGET/boot/vmlinuz-*" >/dev/null; then
   fi
 fi
 if ! compgen -G "$TARGET/boot/initrd.img-*" >/dev/null; then
-  chroot "$TARGET" /usr/sbin/update-initramfs -c -k all
+  chroot "$TARGET" env COMPRESSLEVEL=1 /usr/sbin/update-initramfs -c -k all
 else
-  chroot "$TARGET" /usr/sbin/update-initramfs -u -k all
+  chroot "$TARGET" env COMPRESSLEVEL=1 /usr/sbin/update-initramfs -u -k all
 fi
 
 # Install UEFI GRUB bootloader + fallback EFI/BOOT/BOOTX64.EFI

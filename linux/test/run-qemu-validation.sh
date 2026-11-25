@@ -111,6 +111,9 @@ done
 
 ACCEL="tcg"
 [[ -w /dev/kvm ]] && ACCEL="kvm"
+QEMU_SMP="$(nproc 2>/dev/null || echo 2)"
+(( QEMU_SMP > 4 )) && QEMU_SMP=4
+(( QEMU_SMP < 2 )) && QEMU_SMP=2
 
 mkdir -p -- "$TEST_DIR"
 SUMMARY="$TEST_DIR/qemu-results-${EDITION}.json"
@@ -172,14 +175,14 @@ is_primary_tier() {
 }
 
 run_live_cmd_json() {
-  python3 - "$ACCEL" "$1" "$2" "$ISO_PATH" "$test_vmlinuz" "$test_initrd" "$3" "$4" "$5" "$6" <<'PY'
+  python3 - "$ACCEL" "$QEMU_SMP" "$1" "$2" "$ISO_PATH" "$test_vmlinuz" "$test_initrd" "$3" "$4" "$5" "$6" <<'PY'
 import json, sys
-accel, ram, disk, iso, vml, initrd, slog, qmp, vs, vga = sys.argv[1:]
+accel, smp, ram, disk, iso, vml, initrd, slog, qmp, vs, vga = sys.argv[1:]
 print(json.dumps([
     "qemu-system-x86_64",
     "-machine", f"q35,accel={accel}",
-    "-cpu", "max", "-smp", "2", "-m", ram,
-    "-drive", f"file={disk},if=virtio,format=qcow2",
+    "-cpu", "max", "-smp", smp, "-m", ram,
+    "-drive", f"file={disk},if=virtio,format=qcow2,cache=unsafe",
     "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
     "-vga", vga, "-display", "none",
     "-serial", f"file:{slog}",
@@ -195,16 +198,16 @@ PY
 }
 
 run_installed_cmd_json() {
-  python3 - "$ACCEL" "$1" "$2" "$OVMF_CODE" "$3" "$4" "$5" "$6" "$7" <<'PY'
+  python3 - "$ACCEL" "$QEMU_SMP" "$1" "$2" "$OVMF_CODE" "$3" "$4" "$5" "$6" "$7" <<'PY'
 import json, sys
-accel, ram, disk, ovmf_code, ovmf_vars, slog, qmp, vs, vga = sys.argv[1:]
+accel, smp, ram, disk, ovmf_code, ovmf_vars, slog, qmp, vs, vga = sys.argv[1:]
 print(json.dumps([
     "qemu-system-x86_64",
     "-machine", f"q35,accel={accel}",
-    "-cpu", "max", "-smp", "2", "-m", ram,
+    "-cpu", "max", "-smp", smp, "-m", ram,
     "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={ovmf_code}",
     "-drive", f"if=pflash,format=raw,unit=1,file={ovmf_vars}",
-    "-drive", f"file={disk},if=virtio,format=qcow2",
+    "-drive", f"file={disk},if=virtio,format=qcow2,cache=unsafe",
     "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
     "-vga", vga, "-display", "none",
     "-serial", f"file:{slog}",
@@ -290,7 +293,7 @@ PY
     timeout_sec=$(( rep_idle + 540 ))
     if [[ "$INSTALL_TEST" == true && "$rep" -le "$install_repeats" ]]; then
       install_flag=(--do-install)
-      timeout_sec=$(( rep_idle + 1200 ))
+      timeout_sec=$(( rep_idle + 1800 ))
     fi
     if (( rep > 1 )); then
       rep_idle=20

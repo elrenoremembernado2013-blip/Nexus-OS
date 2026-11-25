@@ -180,6 +180,8 @@ def main():
 
     boot_cycles = []
     current_shots = []
+    partial_live_report = None
+    partial_install_report = None
     failure_data = None
     boot_shot_taken = False
     start_t = time.time()
@@ -230,6 +232,10 @@ def main():
                                 if qmp_ok:
                                     qmp.send_alt_f4()
                                 vs.sendall(b'{"cmd":"ack"}\n')
+                            elif et == "live_done":
+                                partial_live_report = ev.get("data")
+                            elif et == "install_done":
+                                partial_install_report = ev.get("data")
                             elif et == "desktop_failed":
                                 failure_data = ev.get("data")
                                 if qmp_ok:
@@ -281,6 +287,13 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
+
+    if not boot_cycles and partial_live_report is not None:
+        if partial_install_report is not None:
+            partial_live_report["install_report"] = partial_install_report
+        else:
+            partial_live_report["install_report"] = {"executed": True, "install_success": False, "reason": "install_timed_out"}
+        boot_cycles.append({"cycle": 1, "screenshots": current_shots, "guest_report": partial_live_report})
 
     first_report = boot_cycles[0]["guest_report"] if boot_cycles else None
     first_shots = boot_cycles[0]["screenshots"] if boot_cycles else current_shots

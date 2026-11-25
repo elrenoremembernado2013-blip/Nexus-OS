@@ -599,8 +599,24 @@ def main():
                     pass
 
         if do_install:
+            send_event(port_fd, "live_done", {
+                "edition": edition,
+                "mode": mode,
+                "boot_num": boot_num,
+                "desktop": desktop_info,
+                "apps": app_results,
+                "stages": stages,
+                "network": net_info,
+                "zram_status": json.loads(zram_status) if zram_status.strip().startswith("{") else {},
+                "zram_pressure": zram_pressure,
+                "installer_preflight": preflight,
+                "ubiquity_present": ubiquity_present,
+                "ubiquity_ui": ubiquity_ui,
+                "lsblk_vda_present": '"vda"' in lsblk_out,
+            })
             install_report = perform_install_and_stage_test_agent(edition, port_fd, port_file, sess)
             install_report["executed"] = True
+            send_event(port_fd, "install_done", install_report)
 
     installed_checks = {}
     persistence = {}
