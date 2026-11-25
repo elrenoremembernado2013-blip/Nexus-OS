@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Download Linux Mint 22.3 Xfce and verify its signed checksum manifest and ISO.
+# Download Linux Mint 22.3 (Xfce or Cinnamon) and verify its signed checksum manifest and ISO.
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${NEXUS_DOWNLOAD_DIR:-$ROOT_DIR/build/downloads}"
 BASE_URL="${LINUX_MINT_RELEASE_BASE_URL:-https://mirrors.kernel.org/linuxmint/stable/22.3}"
-ISO_NAME="${LINUX_MINT_ISO_NAME:-linuxmint-22.3-xfce-64bit.iso}"
+EDITION="${LINUX_MINT_EDITION:-xfce}"
+ISO_NAME="${LINUX_MINT_ISO_NAME:-}"
 SIGNING_FINGERPRINT="27DEB15644C6B3CF3BD7D291300F846BA25BAE09"
 GPG_KEYSERVER="${NEXUS_GPG_KEYSERVER:-hkps://keys.openpgp.org}"
 KEYRING_PATH="${NEXUS_MINT_KEYRING:-}"
@@ -13,24 +14,33 @@ KEYRING_PATH="${NEXUS_MINT_KEYRING:-}"
 usage() {
   cat <<'USAGE'
 Usage: bash scripts/download-linux-mint.sh
-       bash scripts/download-linux-mint.sh --output-dir DIR
+       bash scripts/download-linux-mint.sh --edition cinnamon|xfce [--output-dir DIR]
 
-Downloads the pinned Linux Mint 22.3 Xfce ISO and its SHA-256 manifest from a
-Linux Mint mirror. It checks the manifest signature against the published Linux
-Mint ISO signing-key fingerprint, then verifies the ISO digest.
+Downloads a pinned Linux Mint 22.3 ISO and its SHA-256 manifest from a Linux
+Mint mirror. Checks the manifest signature against the published Linux Mint ISO
+signing-key fingerprint, then verifies the ISO digest.
 
 Environment overrides: NEXUS_DOWNLOAD_DIR, LINUX_MINT_RELEASE_BASE_URL,
-LINUX_MINT_ISO_NAME, NEXUS_GPG_KEYSERVER, NEXUS_MINT_KEYRING.
+LINUX_MINT_EDITION, LINUX_MINT_ISO_NAME, NEXUS_GPG_KEYSERVER, NEXUS_MINT_KEYRING.
 USAGE
 }
 
 while (($#)); do
   case "$1" in
+    --edition) (($# >= 2)) || { usage >&2; exit 2; }; EDITION="$2"; shift 2 ;;
     --output-dir) (($# >= 2)) || { usage >&2; exit 2; }; OUTPUT_DIR="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+case "$EDITION" in
+  xfce|cinnamon) ;;
+  *) printf 'Unsupported --edition: %s (expected xfce or cinnamon)\n' "$EDITION" >&2; exit 2 ;;
+esac
+if [[ -z "$ISO_NAME" ]]; then
+  ISO_NAME="linuxmint-22.3-${EDITION}-64bit.iso"
+fi
 
 case "$BASE_URL" in https://*) ;; *) echo 'Release base URL must use HTTPS.' >&2; exit 2 ;; esac
 case "$GPG_KEYSERVER" in hkps://*|hkp://*) ;; *) echo 'GPG keyserver URL must use hkps:// or hkp://.' >&2; exit 2 ;; esac

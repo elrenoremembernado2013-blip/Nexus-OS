@@ -5,6 +5,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+OPENBOX_SRC=""
+if [[ -d "$SCRIPT_DIR/openbox" ]]; then
+  OPENBOX_SRC="$SCRIPT_DIR/openbox"
+elif [[ -d "/usr/local/share/nexus-os/lite/openbox" ]]; then
+  OPENBOX_SRC="/usr/local/share/nexus-os/lite/openbox"
+fi
+
 OPENBOX_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/openbox"
 TINT2_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tint2"
 STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os"
@@ -53,9 +60,9 @@ fi
 
 if [[ "$REVERT" == true ]]; then
   if [[ "$DRY_RUN" == true ]]; then
-    printf '[dry-run] Remove %s/rc.xml %s/autostart %s/tint2rc %s\n' "$OPENBOX_DIR" "$OPENBOX_DIR" "$TINT2_DIR" "$PROFILE_FILE"
+    printf '[dry-run] Remove %s/rc.xml %s/menu.xml %s/autostart %s/tint2rc %s\n' "$OPENBOX_DIR" "$OPENBOX_DIR" "$OPENBOX_DIR" "$TINT2_DIR" "$PROFILE_FILE"
   else
-    rm -f -- "$OPENBOX_DIR/rc.xml" "$OPENBOX_DIR/autostart" "$TINT2_DIR/tint2rc" "$PROFILE_FILE"
+    rm -f -- "$OPENBOX_DIR/rc.xml" "$OPENBOX_DIR/menu.xml" "$OPENBOX_DIR/autostart" "$TINT2_DIR/tint2rc" "$PROFILE_FILE"
     echo 'Removed user NEXUS Lite Openbox/tint2 configuration.'
   fi
   exit 0
@@ -67,22 +74,35 @@ if [[ "$PROFILE" == "standard-2g" ]]; then
     exit 0
   fi
   if command -v cinnamon-session >/dev/null 2>&1; then
-    exec bash "$REPO_ROOT/linux/cinnamon/apply-nexus-cinnamon.sh" --profile balanced
+    if [[ -x "$REPO_ROOT/linux/cinnamon/apply-nexus-cinnamon.sh" ]]; then
+      exec bash "$REPO_ROOT/linux/cinnamon/apply-nexus-cinnamon.sh" --profile balanced
+    elif command -v nexus-apply-cinnamon >/dev/null 2>&1; then
+      exec nexus-apply-cinnamon --profile balanced
+    fi
   else
-    exec bash "$REPO_ROOT/linux/mint/apply-nexus-xfce.sh"
+    if [[ -x "$REPO_ROOT/linux/mint/apply-nexus-xfce.sh" ]]; then
+      exec bash "$REPO_ROOT/linux/mint/apply-nexus-xfce.sh"
+    elif command -v nexus-apply-xfce >/dev/null 2>&1; then
+      exec nexus-apply-xfce
+    fi
   fi
+  echo 'Cinnamon/Xfce helper not found; install NEXUS Standard desktop tools first.' >&2
+  exit 1
 fi
 
 if [[ "$DRY_RUN" == true ]]; then
-  printf '[dry-run] Write Openbox rc.xml/autostart in %s and tint2rc in %s (profile=%s)\n' "$OPENBOX_DIR" "$TINT2_DIR" "$PROFILE"
+  printf '[dry-run] Write Openbox rc.xml/menu.xml/autostart in %s and tint2rc in %s (profile=%s)\n' "$OPENBOX_DIR" "$TINT2_DIR" "$PROFILE"
   printf '[dry-run] Record profile=%s in %s\n' "$PROFILE" "$PROFILE_FILE"
   exit 0
 fi
 
+[[ -n "$OPENBOX_SRC" ]] || { echo 'Missing Openbox template directory (checked repo and /usr/local/share/nexus-os/lite/openbox).' >&2; exit 1; }
+
 mkdir -p -- "$OPENBOX_DIR" "$TINT2_DIR" "$STATE_DIR"
-cp -f -- "$SCRIPT_DIR/openbox/rc.xml" "$OPENBOX_DIR/rc.xml"
-install -m 0755 "$SCRIPT_DIR/openbox/autostart" "$OPENBOX_DIR/autostart"
-cp -f -- "$SCRIPT_DIR/openbox/tint2rc" "$TINT2_DIR/tint2rc"
+cp -f -- "$OPENBOX_SRC/rc.xml" "$OPENBOX_DIR/rc.xml"
+cp -f -- "$OPENBOX_SRC/menu.xml" "$OPENBOX_DIR/menu.xml"
+install -m 0755 "$OPENBOX_SRC/autostart" "$OPENBOX_DIR/autostart"
+cp -f -- "$OPENBOX_SRC/tint2rc" "$TINT2_DIR/tint2rc"
 
 if [[ "$PROFILE" == "lite-1g" ]]; then
   sed -i 's/<number>2<\/number>/<number>4<\/number>/' "$OPENBOX_DIR/rc.xml"

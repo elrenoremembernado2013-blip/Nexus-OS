@@ -1,0 +1,35 @@
+# Curated APT package manifest for NEXUS Standard (Linux Mint 22.3 Cinnamon, Ubuntu 24.04 Noble base).
+# Consumed by linux/build/build-nexus-iso.sh --edition cinnamon (or standard).
+# Format: <category>:<apt-package>
+
+# Core system & security
+core:ufw
+core:unattended-upgrades
+core:ca-certificates
+core:gnupg
+core:curl
+
+# Desktop (Linux Mint Cinnamon flagship)
+desktop:cinnamon
+desktop:nemo
+desktop:gnome-terminal
+desktop:gnome-system-monitor
+desktop:gvfs-backends
+
+# NEXUS applications & store backend
+nexus:flatpak
+
+# Gaming (optional via --with-gaming)
+gaming:vulkan-tools
+gaming:mesa-vulkan-drivers
+gaming:gamemode
+gaming:steam-installer
+
+# Development (optional via --with-dev)
+development:git
+development:build-essential
+development:python3
+
+# Optional user software
+optional:libreoffice-writer
+optional:gimp

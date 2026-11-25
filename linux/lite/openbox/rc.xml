@@ -11,10 +11,18 @@
   </theme>
   <desktops><number>2</number><firstdesk>1</firstdesk><popupTime>0</popupTime></desktops>
   <resize><drawContents>no</drawContents><popupShow>Nonpixel</popupShow></resize>
+  <menu><file>menu.xml</file><hideDelay>200</hideDelay><middle>no</middle><submenuShowDelay>100</submenuShowDelay></menu>
   <keyboard>
     <keybind key="A-F4"><action name="Close"/></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
     <keybind key="C-A-t"><action name="Execute"><command>lxterminal</command></action></keybind>
     <keybind key="A-F2"><action name="Execute"><command>pcmanfm</command></action></keybind>
   </keyboard>
+  <mouse>
+    <context name="Root">
+      <mousebind button="Right" action="Press">
+        <action name="ShowMenu"><menu>root-menu</menu></action>
+      </mousebind>
+    </context>
+  </mouse>
 </openbox_config>

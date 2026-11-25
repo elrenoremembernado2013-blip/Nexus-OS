@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="NEXUS Lite">
+    <item label="Terminal (LXTerminal)">
+      <action name="Execute"><command>lxterminal</command></action>
+    </item>
+    <item label="Files (PCManFM)">
+      <action name="Execute"><command>pcmanfm</command></action>
+    </item>
+    <item label="Task Manager (LXTask)">
+      <action name="Execute"><command>lxtask</command></action>
+    </item>
+    <item label="Text Editor (Mousepad)">
+      <action name="Execute"><command>mousepad</command></action>
+    </item>
+    <separator/>
+    <item label="Memory &amp; ZRAM Audit">
+      <action name="Execute"><command>lxterminal -e sh -c 'nexus-memory-audit; echo; nexus-configure-zram status; read -r _'</command></action>
+    </item>
+    <item label="Openbox Preferences">
+      <action name="Execute"><command>obconf</command></action>
+    </item>
+    <item label="Reconfigure Openbox">
+      <action name="Reconfigure"/>
+    </item>
+    <separator/>
+    <item label="Log Out">
+      <action name="Exit"><prompt>yes</prompt></action>
+    </item>
+  </menu>
+</openbox_menu>

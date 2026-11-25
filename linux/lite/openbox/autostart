@@ -9,6 +9,8 @@ if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile" ] && grep -qx 
     nm-applet &
   fi
 fi
-if [ -x /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 ]; then
+if command -v lxpolkit >/dev/null 2>&1; then
+  lxpolkit &
+elif [ -x /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 ]; then
   /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
 fi

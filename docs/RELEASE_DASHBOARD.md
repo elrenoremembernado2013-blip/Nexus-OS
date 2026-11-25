@@ -19,6 +19,8 @@
 
 ## Blocker Summary Preventing `Stable` Promotion
 
-1. **No ISO generated in sandbox:** `gpg`, `xorriso`, `unsquashfs`, `mksquashfs`, `chroot`, and Mint mirror access are unavailable in this restricted container (`check-build-prereqs.sh`: `NOT READY`).
-2. **No VM install completed:** `qemu-system-x86_64` and `qemu-img` are absent here; live boot, Ubiquity disk partitioning, GRUB install, reboot, and post-install smoke tests remain unexecuted.
+1. **No ISO generated in sandbox:** `gpg`, `xorriso`, `unsquashfs`, `mksquashfs`, `chroot`, and Mint/Debian mirror access are blocked by sandbox egress policy (`check-build-prereqs.sh`: `NOT READY`).
+2. **No VM install or RAM matrix completed:** `qemu-system-x86_64`, `qemu-img`, and `OVMF` are absent here; multi-RAM QEMU tests (`512M / 768M / 1G / 2G / 4G`), guest `zram` pressure tests, and disposable `qcow2` installation remain unexecuted. Run `.github/workflows/iso-and-qemu-validation.yml` or `linux/test/run-qemu-validation.sh` on a full Linux host before promoting from `Development`.
 3. **No physical GPU/controller hardware:** Vulkan 3D acceleration, Steam/Proton game launch, Wi-Fi/Bluetooth/Audio drivers, and USB/Bluetooth controllers require physical or passthrough test hardware.
+
+See `docs/STANDARD_VS_LITE_EDITIONS.md` and `docs/NEXUS_LITE.md` for the separation of **NEXUS Standard (Cinnamon)**, **MADOO Xfce**, and **NEXUS Lite (Openbox + `tint2`)**.

@@ -4,20 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
 fi
 
-for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css linux/lite/nexus-lite.conf linux/lite/lite-packages.list linux/lite/openbox/rc.xml linux/lite/openbox/tint2rc docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md docs/INSTALLER_ARCHITECTURE.md docs/RECOVERY_AND_BOOT.md docs/RELEASE_ENGINEERING.md docs/HARDWARE_COMPATIBILITY.md docs/RELEASE_DASHBOARD.md docs/NEXUS_LITE.md; do
+for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/nexus-standard-cinnamon.conf linux/config/mint-packages.list linux/config/cinnamon-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css linux/lite/nexus-lite.conf linux/lite/lite-packages.list linux/lite/openbox/rc.xml linux/lite/openbox/menu.xml linux/lite/openbox/tint2rc docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md docs/GAMING_AND_PROTON.md docs/PERSONALISATION_AND_THEMES.md docs/INSTALLER_ARCHITECTURE.md docs/RECOVERY_AND_BOOT.md docs/RELEASE_ENGINEERING.md docs/HARDWARE_COMPATIBILITY.md docs/RELEASE_DASHBOARD.md docs/NEXUS_LITE.md docs/STANDARD_VS_LITE_EDITIONS.md; do
   [[ -f "$required" ]] || { printf 'Missing required foundation file: %s\n' "$required" >&2; exit 1; }
 done
 
@@ -71,7 +71,13 @@ bash linux/build/prepare-release.sh --dry-run --stage alpha >/dev/null
 bash linux/build/prepare-release.sh --dry-run --stage beta >/dev/null
 bash linux/build/prepare-release.sh --dry-run --stage rc >/dev/null
 bash linux/build/prepare-release.sh --dry-run --stage testing >/dev/null
+bash linux/build/validate-packages.sh linux/config/cinnamon-packages.list >/dev/null
 bash linux/build/validate-packages.sh linux/lite/lite-packages.list >/dev/null
+bash linux/build/build-nexus-iso.sh --edition cinnamon --dry-run >/dev/null
+bash linux/build/build-nexus-iso.sh --edition xfce --dry-run >/dev/null
+bash linux/build/build-nexus-iso.sh --edition lite --dry-run >/dev/null
+bash linux/build/verify-nexus-iso.sh --edition cinnamon --dry-run >/dev/null
+bash linux/build/verify-nexus-iso.sh --edition lite --dry-run >/dev/null
 bash linux/lite/apply-nexus-lite.sh --dry-run --profile lite-512 >/dev/null
 bash linux/lite/apply-nexus-lite.sh --dry-run --profile lite-1g >/dev/null
 bash linux/lite/apply-nexus-lite.sh --dry-run --profile standard-2g >/dev/null
@@ -79,9 +85,48 @@ bash linux/lite/apply-nexus-lite.sh --dry-run --revert >/dev/null
 bash linux/lite/configure-zram.sh status >/dev/null
 bash linux/lite/configure-zram.sh --dry-run enable >/dev/null
 bash linux/lite/memory-audit.sh --json >/dev/null
-bash linux/lite/provision-nexus-lite.sh --dry-run >/dev/null
+bash linux/lite/provision-nexus-lite.sh --dry-run --skip-ufw --purge-bloat >/dev/null
 bash linux/lite/build-nexus-lite-iso.sh --dry-run >/dev/null
 bash linux/lite/nexus-lite-install.sh --dry-run >/dev/null
+bash linux/test/guest-mem-probe.sh --dry-run >/dev/null
+bash linux/test/test-zram-pressure.sh --dry-run >/dev/null
+bash linux/test/run-qemu-validation.sh --dry-run >/dev/null
+
+# Phase 12 invariant checks: Edition isolation, Lite safety, Openbox XML, and --revert hygiene
+python3 - <<'PY'
+import xml.etree.ElementTree as ET
+from pathlib import Path
+import subprocess, tempfile, os
+
+for xml_path in ("linux/lite/openbox/rc.xml", "linux/lite/openbox/menu.xml"):
+    ET.parse(xml_path)
+
+lite_lines = Path("linux/lite/lite-packages.list").read_text(encoding="utf-8").splitlines()
+core_desktop = [l.split(":", 1)[1].strip() for l in lite_lines if l and not l.startswith("#") and l.split(":", 1)[0] in ("core", "desktop", "nexus")]
+for forbidden in ("cinnamon", "steam", "steam-installer", "picom", "firefox", "falkon"):
+    assert forbidden not in core_desktop, f"Forbidden default Lite package: {forbidden}"
+for required in ("ufw", "unattended-upgrades", "network-manager", "zram-tools", "openbox", "tint2", "pcmanfm", "lxterminal"):
+    assert required in core_desktop, f"Missing required Lite package: {required}"
+
+cin_plan = subprocess.check_output(["bash", "linux/build/build-nexus-iso.sh", "--edition", "cinnamon", "--dry-run"], text=True)
+xfce_plan = subprocess.check_output(["bash", "linux/build/build-nexus-iso.sh", "--edition", "xfce", "--dry-run"], text=True)
+lite_plan = subprocess.check_output(["bash", "linux/build/build-nexus-iso.sh", "--edition", "lite", "--dry-run"], text=True)
+assert "nexus-os-22.3-cinnamon-amd64.iso" in cin_plan and "work-cinnamon" in cin_plan
+assert "nexus-os-22.3-xfce-amd64.iso" in xfce_plan and "work-xfce" in xfce_plan
+assert "nexus-os-22.3-lite-amd64.iso" in lite_plan and "work-lite" in lite_plan
+
+with tempfile.TemporaryDirectory() as td:
+    env = dict(os.environ, XDG_CONFIG_HOME=td)
+    subprocess.run(["bash", "linux/lite/apply-nexus-lite.sh", "--profile", "lite-1g"], env=env, check=True, stdout=subprocess.DEVNULL)
+    assert (Path(td) / "openbox/rc.xml").is_file()
+    assert (Path(td) / "openbox/menu.xml").is_file()
+    assert "<number>4</number>" in (Path(td) / "openbox/rc.xml").read_text(encoding="utf-8")
+    assert "profile=lite-1g" in (Path(td) / "nexus-os/lite-profile").read_text(encoding="utf-8")
+    subprocess.run(["bash", "linux/lite/apply-nexus-lite.sh", "--revert"], env=env, check=True, stdout=subprocess.DEVNULL)
+    assert not (Path(td) / "openbox/rc.xml").exists()
+    assert not (Path(td) / "openbox/menu.xml").exists()
+    assert not (Path(td) / "tint2/tint2rc").exists()
+PY
 if bash linux/build/prepare-release.sh --dry-run --stage stable >/dev/null 2>&1; then
   echo 'Expected prepare-release.sh to refuse stable stage without --vm-verified' >&2
   exit 1

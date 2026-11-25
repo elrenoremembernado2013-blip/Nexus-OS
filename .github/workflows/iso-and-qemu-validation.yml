@@ -1,0 +1,73 @@
+name: Build NEXUS ISOs and QEMU RAM Matrix (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: "ISO edition to build & test (lite | cinnamon | xfce | both)"
+        required: true
+        default: "both"
+      boot_seconds:
+        description: "Headless QEMU boot observation window per RAM tier (seconds)"
+        required: true
+        default: "90"
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install ISO remastering and QEMU/OVMF dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bash coreutils curl gnupg xorriso squashfs-tools \
+            qemu-system-x86 qemu-utils ovmf shellcheck
+
+      - name: Download and GPG-verify Linux Mint 22.3 base ISOs
+        run: |
+          if [ "${{ github.event.inputs.edition }}" = "lite" ] || [ "${{ github.event.inputs.edition }}" = "xfce" ] || [ "${{ github.event.inputs.edition }}" = "both" ]; then
+            bash scripts/download-linux-mint.sh --edition xfce
+          fi
+          if [ "${{ github.event.inputs.edition }}" = "cinnamon" ] || [ "${{ github.event.inputs.edition }}" = "both" ]; then
+            bash scripts/download-linux-mint.sh --edition cinnamon
+          fi
+
+      - name: Build and verify NEXUS Lite ISO
+        if: github.event.inputs.edition == 'lite' || github.event.inputs.edition == 'both'
+        run: |
+          sudo bash linux/lite/build-nexus-lite-iso.sh
+          bash linux/build/verify-nexus-iso.sh --edition lite
+
+      - name: Build and verify NEXUS Standard (Cinnamon) ISO
+        if: github.event.inputs.edition == 'cinnamon' || github.event.inputs.edition == 'both'
+        run: |
+          sudo bash linux/build/build-nexus-iso.sh --edition cinnamon
+          bash linux/build/verify-nexus-iso.sh --edition cinnamon
+
+      - name: Build and verify MADOO Xfce ISO
+        if: github.event.inputs.edition == 'xfce'
+        run: |
+          sudo bash linux/build/build-nexus-iso.sh --edition xfce
+          bash linux/build/verify-nexus-iso.sh --edition xfce
+
+      - name: Run QEMU multi-RAM matrix (512M / 768M / 1G / 2G / 4G)
+        run: |
+          if [ -r build/iso/out/nexus-os-22.3-lite-amd64.iso ]; then
+            bash linux/test/run-qemu-validation.sh --edition lite --ram-matrix "512 768 1024 2048 4096" --boot-seconds "${{ github.event.inputs.boot_seconds }}"
+          fi
+          if [ -r build/iso/out/nexus-os-22.3-cinnamon-amd64.iso ]; then
+            bash linux/test/run-qemu-validation.sh --edition cinnamon --ram-matrix "2048 4096" --boot-seconds "${{ github.event.inputs.boot_seconds }}"
+          fi
+
+      - name: Upload checksums, build-info, and QEMU logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-iso-and-qemu-validation
+          path: |
+            build/iso/out/*.sha256
+            build/iso/out/*.build-info.json
+            build/qemu-test/

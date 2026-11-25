@@ -2,12 +2,13 @@
 # Excludes Cinnamon, heavy compositors, Steam, and web browsers from default 512 MB install.
 # Format: <category>:<apt-package>
 
-# Core system, security, and memory management (never removed)
+# Core system, security, networking, and memory management (never removed)
 core:ufw
 core:unattended-upgrades
 core:ca-certificates
 core:gnupg
 core:curl
+core:network-manager
 core:zram-tools
 core:policykit-1-gnome
 
@@ -28,8 +29,9 @@ desktop:xorg
 
 # NEXUS lightweight integration & CLI tools
 nexus:python3
-nexus:gvfs-backends
+nexus:gvfs
 
-# Optional browser (never installed automatically into 512 MB profile)
+# Optional extras & browsers (never installed automatically into 512 MB profile)
+optional:gvfs-backends
 optional:falkon
 optional:firefox

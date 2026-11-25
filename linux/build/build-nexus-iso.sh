@@ -1,25 +1,16 @@
 #!/usr/bin/env bash
-# Reproducible Linux Mint 22.3 Xfce live-ISO builder for NEXUS OS.
-# Unpacks a GPG- and SHA-256-verified Mint ISO, applies NEXUS config/branding/
-# packages inside an isolated squashfs staging tree under build/iso/, repacks a
-# hybrid BIOS+UEFI ISO via xorriso, and records build-info.json + SHA-256.
+# Reproducible Linux Mint 22.3 live-ISO builder for NEXUS OS (Standard Cinnamon,
+# MADOO Xfce, and Lite Openbox editions kept strictly isolated).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-SYSTEM_CONF="${NEXUS_SYSTEM_CONF:-$REPO_ROOT/linux/config/nexus-system.conf}"
-PKG_MANIFEST="${NEXUS_PKG_MANIFEST:-$REPO_ROOT/linux/config/mint-packages.list}"
-PROVISION_SCRIPT="${NEXUS_PROVISION_SCRIPT:-linux/mint/provision-nexus-guest.sh}"
 PREREQ_SCRIPT="$SCRIPT_DIR/check-build-prereqs.sh"
 VALIDATE_PKGS="$SCRIPT_DIR/validate-packages.sh"
 BRANDING_SCRIPT="$SCRIPT_DIR/apply-iso-branding.sh"
 
-DOWNLOAD_DIR="${NEXUS_DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
-BASE_ISO="${NEXUS_BASE_ISO:-$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso}"
-MANIFEST_FILE="${NEXUS_BASE_MANIFEST:-$DOWNLOAD_DIR/sha256sum.txt}"
-WORK_DIR="${NEXUS_ISO_WORK_DIR:-$REPO_ROOT/build/iso/work}"
-OUT_DIR="${NEXUS_ISO_OUT_DIR:-$REPO_ROOT/build/iso/out}"
-
+EDITION="${NEXUS_EDITION:-xfce}"
+EDITION_SET=false
 DRY_RUN=false
 CHECK_ONLY=false
 WITH_GAMING=false
@@ -29,20 +20,22 @@ usage() {
   cat <<'USAGE'
 Usage: sudo bash linux/build/build-nexus-iso.sh [OPTIONS]
 
-Prepares and builds a Linux Mint 22.3 Xfce based NEXUS OS live ISO under
-build/iso/out/ from an already verified Mint ISO (scripts/download-linux-mint.sh).
+Prepares and builds a Linux Mint 22.3 based NEXUS OS live ISO under
+build/iso/out/ from a verified Mint ISO (scripts/download-linux-mint.sh).
 
 Options:
-  --check        Check host build prerequisites and exit
-  --dry-run      Validate configuration and print exact build steps without root or tools
-  --with-gaming  Include gaming packages from linux/config/mint-packages.list
-  --with-dev     Include development packages from linux/config/mint-packages.list
-  --help, -h     Show this help message
+  --edition NAME  cinnamon | standard | xfce | lite (default: xfce unless NEXUS_EDITION set)
+  --check         Check host build prerequisites and exit
+  --dry-run       Validate configuration and print exact build steps without root or tools
+  --with-gaming   Include gaming packages (Standard/Xfce only)
+  --with-dev      Include development packages (Standard/Xfce only)
+  --help, -h      Show this help message
 USAGE
 }
 
 while (($#)); do
   case "$1" in
+    --edition) [[ $# -ge 2 ]] || { echo '--edition requires a value' >&2; exit 2; }; EDITION="$2"; EDITION_SET=true; shift 2 ;;
     --check) CHECK_ONLY=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --with-gaming) WITH_GAMING=true; shift ;;
@@ -52,30 +45,76 @@ while (($#)); do
   esac
 done
 
+case "$EDITION" in
+  standard|cinnamon)
+    default_conf="$REPO_ROOT/linux/config/nexus-standard-cinnamon.conf"
+    default_manifest="$REPO_ROOT/linux/config/cinnamon-packages.list"
+    default_provision="linux/mint/provision-nexus-guest.sh"
+    default_base_iso="linuxmint-22.3-cinnamon-64bit.iso"
+    default_work="work-cinnamon"
+    ;;
+  xfce)
+    default_conf="$REPO_ROOT/linux/config/nexus-system.conf"
+    default_manifest="$REPO_ROOT/linux/config/mint-packages.list"
+    default_provision="linux/mint/provision-nexus-guest.sh"
+    default_base_iso="linuxmint-22.3-xfce-64bit.iso"
+    default_work="work-xfce"
+    ;;
+  lite)
+    default_conf="$REPO_ROOT/linux/lite/nexus-lite.conf"
+    default_manifest="$REPO_ROOT/linux/lite/lite-packages.list"
+    default_provision="linux/lite/provision-nexus-lite.sh"
+    default_base_iso="linuxmint-22.3-xfce-64bit.iso"
+    default_work="work-lite"
+    ;;
+  *)
+    printf 'Unsupported --edition: %s (expected cinnamon, standard, xfce, or lite)\n' "$EDITION" >&2
+    exit 2
+    ;;
+esac
+
+SYSTEM_CONF="${NEXUS_SYSTEM_CONF:-$default_conf}"
+PKG_MANIFEST="${NEXUS_PKG_MANIFEST:-$default_manifest}"
+PROVISION_SCRIPT="${NEXUS_PROVISION_SCRIPT:-$default_provision}"
+DOWNLOAD_DIR="${NEXUS_DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
+BASE_ISO="${NEXUS_BASE_ISO:-$DOWNLOAD_DIR/$default_base_iso}"
+MANIFEST_FILE="${NEXUS_BASE_MANIFEST:-$DOWNLOAD_DIR/sha256sum.txt}"
+WORK_DIR="${NEXUS_ISO_WORK_DIR:-$REPO_ROOT/build/iso/$default_work}"
+OUT_DIR="${NEXUS_ISO_OUT_DIR:-$REPO_ROOT/build/iso/out}"
+
 [[ -r "$SYSTEM_CONF" ]] || { printf 'Missing system config: %s\n' "$SYSTEM_CONF" >&2; exit 1; }
 [[ -r "$PKG_MANIFEST" ]] || { printf 'Missing package manifest: %s\n' "$PKG_MANIFEST" >&2; exit 1; }
 bash "$VALIDATE_PKGS" "$PKG_MANIFEST" >/dev/null
 
 if [[ "$CHECK_ONLY" == true ]]; then
-  exec bash "$PREREQ_SCRIPT"
+  exec bash "$PREREQ_SCRIPT" --edition "$EDITION"
 fi
 
 conf_version="22.3"
-conf_edition="xfce"
+conf_edition="$EDITION"
+conf_base_edition=""
 conf_arch="x86_64"
 while IFS='=' read -r key val; do
   case "$key" in
     NEXUS_BASE_VERSION) conf_version="$val" ;;
-    NEXUS_BASE_EDITION) conf_edition="$val" ;;
+    NEXUS_BASE_EDITION) conf_base_edition="$val" ;;
+    NEXUS_EDITION) [[ "$EDITION_SET" == false ]] && conf_edition="$val" ;;
     NEXUS_TARGET_ARCH) conf_arch="$val" ;;
   esac
 done < "$SYSTEM_CONF"
+
+if [[ -n "$conf_base_edition" && "$conf_edition" != "lite" ]]; then
+  out_slug="$conf_base_edition"
+else
+  out_slug="$conf_edition"
+fi
 
 iso_arch="amd64"
 if [[ "$conf_arch" != "x86_64" ]]; then
   iso_arch="$conf_arch"
 fi
-OUT_ISO="$OUT_DIR/nexus-os-${conf_version}-${conf_edition}-${iso_arch}.iso"
+OUT_ISO="$OUT_DIR/nexus-os-${conf_version}-${out_slug}-${iso_arch}.iso"
+BUILD_INFO_PATH="${OUT_ISO}.build-info.json"
 
 packages=()
 while IFS=':' read -r category pkg; do
@@ -91,18 +130,21 @@ while IFS=':' read -r category pkg; do
 done < "$PKG_MANIFEST"
 
 if [[ "$DRY_RUN" == true ]]; then
-  echo "NEXUS OS ISO Build Plan (dry-run)"
+  echo "NEXUS OS ISO Build Plan (dry-run, edition=$out_slug)"
+  echo "  Config: $SYSTEM_CONF"
+  echo "  Package manifest: $PKG_MANIFEST"
   echo "  Base ISO: $BASE_ISO"
-  echo "  Manifest: $MANIFEST_FILE"
+  echo "  Checksum manifest: $MANIFEST_FILE"
   echo "  Work dir: $WORK_DIR"
   echo "  Output ISO: $OUT_ISO"
+  echo "  Build info: $BUILD_INFO_PATH"
   echo "  Packages (${#packages[@]}): ${packages[*]}"
-  echo "Step 1: bash $PREREQ_SCRIPT --strict"
+  echo "Step 1: bash $PREREQ_SCRIPT --edition $out_slug --strict"
   echo "Step 2: Verify $BASE_ISO SHA-256 against $MANIFEST_FILE"
   echo "Step 3: Extract ISO tree via xorriso into $WORK_DIR/iso-root and unpack casper/filesystem.squashfs via unsquashfs"
-  echo "Step 4: Mount dev/proc/sys in $WORK_DIR/squashfs-root, install packages, and apply NEXUS branding + provisioning"
+  echo "Step 4: Mount dev/proc/sys in $WORK_DIR/squashfs-root, run $PROVISION_SCRIPT, and apply $out_slug branding"
   echo "Step 5: Repack casper/filesystem.squashfs via mksquashfs -comp xz and update casper/filesystem.size + md5sum.txt"
-  echo "Step 6: Repack hybrid BIOS+UEFI ISO with xorriso to $OUT_ISO and generate .sha256 + build-info.json"
+  echo "Step 6: Repack hybrid BIOS+UEFI ISO with xorriso to $OUT_ISO and generate .sha256 + $BUILD_INFO_PATH"
   exit 0
 fi
 
@@ -111,8 +153,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-bash "$PREREQ_SCRIPT" --strict
-[[ -r "$MANIFEST_FILE" ]] || { printf 'Missing signed checksum manifest: %s (run bash scripts/download-linux-mint.sh)\n' "$MANIFEST_FILE" >&2; exit 1; }
+NEXUS_BASE_ISO="$BASE_ISO" bash "$PREREQ_SCRIPT" --edition "$out_slug" --strict
+[[ -r "$MANIFEST_FILE" ]] || { printf 'Missing signed checksum manifest: %s (run bash scripts/download-linux-mint.sh --edition %s)\n' "$MANIFEST_FILE" "$out_slug" >&2; exit 1; }
 
 iso_basename="${BASE_ISO##*/}"
 expected_line="$(grep -F " ${iso_basename}" "$MANIFEST_FILE" | head -n 1 || true)"
@@ -156,11 +198,13 @@ mounted_chroot=true
 mkdir -p -- "$squash_root/tmp/nexus-repo"
 cp -a "$REPO_ROOT/linux" "$squash_root/tmp/nexus-repo/linux"
 
-chroot_args=(--force)
+chroot_args=(--skip-ufw --force)
 if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then
   chroot_args=(--skip-ufw --autostart-firstboot --force)
   [[ "$WITH_GAMING" == true ]] && chroot_args+=(--with-gaming)
   [[ "$WITH_DEV" == true ]] && chroot_args+=(--with-dev)
+elif [[ "$PROVISION_SCRIPT" == *"provision-nexus-lite.sh" ]]; then
+  chroot_args=(--skip-ufw --purge-bloat --force)
 fi
 
 chroot "$squash_root" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
@@ -172,7 +216,7 @@ rm -rf -- "$squash_root/tmp/nexus-repo"
 cleanup
 mounted_chroot=false
 
-bash "$BRANDING_SCRIPT" --iso-root "$iso_root" --squash-root "$squash_root"
+bash "$BRANDING_SCRIPT" --iso-root "$iso_root" --squash-root "$squash_root" --edition "$out_slug"
 
 rm -f -- "$iso_root/casper/filesystem.squashfs"
 mksquashfs "$squash_root" "$iso_root/casper/filesystem.squashfs" -comp xz -noappend
@@ -187,7 +231,7 @@ printf '%s\n' "$(du -sx --block-size=1 "$squash_root" | awk '{print $1}')" > "$i
 xorriso -as mkisofs \
   -iso-level 3 \
   -full-iso9660-filenames \
-  -volid "NEXUS_OS_${conf_version}" \
+  -volid "NEXUS_${out_slug^^}_${conf_version}" \
   -eltorito-boot isolinux/isolinux.bin \
   -eltorito-catalog isolinux/boot.cat \
   -no-emul-boot -boot-load-size 4 -boot-info-table \
@@ -204,12 +248,12 @@ xorriso -as mkisofs \
 )
 
 built_sha="$(awk '{print $1}' "${OUT_ISO}.sha256")"
-cat > "$OUT_DIR/build-info.json" <<JSON
+cat > "$BUILD_INFO_PATH" <<JSON
 {
   "name": "NEXUS OS",
   "base_distro": "linuxmint",
   "base_version": "${conf_version}",
-  "edition": "${conf_edition}",
+  "edition": "${out_slug}",
   "arch": "${iso_arch}",
   "base_iso": "${iso_basename}",
   "base_iso_sha256": "${actual_sha}",
@@ -220,5 +264,6 @@ cat > "$OUT_DIR/build-info.json" <<JSON
   "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 JSON
+cp -f -- "$BUILD_INFO_PATH" "$OUT_DIR/build-info.json"
 
 printf 'Built NEXUS OS ISO: %s\n' "$OUT_ISO"
