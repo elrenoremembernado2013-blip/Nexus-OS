@@ -470,6 +470,15 @@ def serve_loopback(port: int) -> None:
                 return
             if parsed.path == "/api/telemetry":
                 self._send_json(HTTPStatus.OK, collect_telemetry_snapshot())
+            elif parsed.path == "/api/security/status":
+                sec_cli = Path(__file__).resolve().with_name("nexus-security-cli.sh")
+                proc = subprocess.run(
+                    ["bash", str(sec_cli), "status"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":

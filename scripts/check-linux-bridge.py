@@ -93,6 +93,10 @@ def main() -> None:
             f"Expected Bash PTY HTTP output, got: {output!r}"
         )
         api("/api/terminal/close", {"sessionId": sid})
+
+        sec_status = api("/api/security/status")
+        for key in ("firewall", "secure_boot", "disk_encryption", "security_updates", "account", "startup_apps"):
+            assert key in sec_status, f"Missing security status key: {key}"
     finally:
         proc.terminate()
         proc.wait(timeout=5)

@@ -153,6 +153,7 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-panel-status.sh" "$bin_dir/
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/madoo-qualify-report.sh" "$bin_dir/nexus-qualify-report"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" "$bin_dir/nexus-firstboot"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" "$bin_dir/nexus-store-cli"
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" "$bin_dir/nexus-security-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" "$bin_dir/nexus-system-bridge"
 
 for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do

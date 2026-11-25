@@ -4,20 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/build/check-build-prereqs.sh linux/build/build-nexus-iso.sh linux/cinnamon/apply-nexus-cinnamon.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/build/check-build-prereqs.sh linux/build/build-nexus-iso.sh linux/cinnamon/apply-nexus-cinnamon.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/build/check-build-prereqs.sh linux/build/build-nexus-iso.sh linux/cinnamon/apply-nexus-cinnamon.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/build/check-build-prereqs.sh linux/build/build-nexus-iso.sh linux/cinnamon/apply-nexus-cinnamon.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
 fi
 
-for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md; do
+for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css linux/branding/README.md linux/branding/nexus-logo.svg linux/branding/nexus-firstboot.desktop linux/cinnamon/themes.json linux/cinnamon/wallpapers.json linux/cinnamon/cinnamon-base.css linux/cinnamon/gtk3-base.css docs/LINUX_FOUNDATION_SETUP.md docs/ISO_BUILD.md docs/CINNAMON_DESKTOP.md docs/NEXUS_STORE.md docs/SECURITY_AND_PRIVACY.md; do
   [[ -f "$required" ]] || { printf 'Missing required foundation file: %s\n' "$required" >&2; exit 1; }
 done
 
@@ -78,6 +78,15 @@ if bash linux/mint/nexus-store-cli.sh --dry-run remove apt systemd >/dev/null 2>
 fi
 if bash linux/mint/nexus-store-cli.sh --dry-run install apt 'bad;pkg' >/dev/null 2>&1; then
   echo 'Expected nexus-store-cli.sh to reject invalid package identifier' >&2
+  exit 1
+fi
+bash linux/mint/nexus-security-cli.sh --help >/dev/null
+bash linux/mint/nexus-security-cli.sh status >/dev/null
+bash linux/mint/nexus-security-cli.sh startup-list >/dev/null
+bash linux/mint/nexus-security-cli.sh --dry-run firewall enable >/dev/null
+bash linux/mint/nexus-security-cli.sh --dry-run flatpak-revoke org.gimp.GIMP --nofilesystem=home >/dev/null
+if bash linux/mint/nexus-security-cli.sh --dry-run flatpak-revoke org.gimp.GIMP --bad-flag >/dev/null 2>&1; then
+  echo 'Expected nexus-security-cli.sh to reject unsupported Flatpak override flag' >&2
   exit 1
 fi
 python3 - <<'PY'
