@@ -10,7 +10,8 @@ This milestone establishes verified Linux Mint 22.3 Xfce installation media and 
 - Ubuntu 26.04 Desktop lists 6 GB RAM and 25 GB free storage for a comfortable experience. This is why Mint Xfce is the current desktop choice. The exact complete NEXUS memory and storage use still needs testing.
 - Guest direction: X11, Xfce, Xfwm4, GRUB, systemd; UEFI firmware via OVMF in QEMU.
 - `scripts/`: media verification, QEMU launch, and static checks.
-- `linux/config/`: declarative design defaults; not yet consumed by an image build.
+- `linux/config/`: declarative design defaults (`NEXUS_TARGET_RAM_MB` is read as the fallback default by `scripts/launch-qemu.sh`); not yet consumed by an image build.
+- `linux/xfce/` and `linux/mint/`: user-session GTK3/Xfce theme & low-resource defaults (`apply-nexus-xfce.sh`) and a read-only RAM/disk footprint reporter (`measure-footprint.sh`) for booted Linux Mint 22.3 Xfce guests.
 - `nexus-br2-external/`: retained separately for experimental Buildroot work; it is not the primary desktop.
 - `build/`: local downloads, VM state, and disk images; ignored by Git.
 

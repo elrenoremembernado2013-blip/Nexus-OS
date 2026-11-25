@@ -4,11 +4,20 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build"
+SYSTEM_CONF="$ROOT_DIR/linux/config/nexus-system.conf"
+conf_value() {
+  local key="$1" default="$2" val=""
+  if [[ -r "$SYSTEM_CONF" ]]; then
+    val="$(awk -F= -v k="$key" '$1 == k { print $2; exit }' "$SYSTEM_CONF")"
+  fi
+  printf '%s' "${val:-$default}"
+}
 DOWNLOAD_DIR="${NEXUS_DOWNLOAD_DIR:-$BUILD_DIR/downloads}"
 VM_STATE_DIR="$BUILD_DIR/qemu"
 ISO_PATH="${NEXUS_ISO_PATH:-$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso}"
 DISK_PATH="${NEXUS_DISK_PATH:-$BUILD_DIR/images/nexus-mint-22.3.qcow2}"
-RAM_MB="${NEXUS_RAM_MB:-4096}"
+DEFAULT_RAM_MB="$(conf_value NEXUS_TARGET_RAM_MB 4096)"
+RAM_MB="${NEXUS_RAM_MB:-$DEFAULT_RAM_MB}"
 CPUS="${NEXUS_CPUS:-2}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-40G}"
 ACCEL="${NEXUS_QEMU_ACCEL:-tcg}"
