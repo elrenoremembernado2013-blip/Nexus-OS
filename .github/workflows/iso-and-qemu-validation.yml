@@ -88,7 +88,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bash coreutils curl gnupg xorriso squashfs-tools \
-            qemu-system-x86 qemu-utils ovmf shellcheck cpio gzip
+            qemu-system-x86 qemu-utils ovmf shellcheck cpio gzip \
+            initramfs-tools-core zstd xz-utils
 
       - name: Validate scripts and edition configs before build
         run: |
@@ -117,13 +118,22 @@ jobs:
         run: |
           boot_sec="${{ github.event.inputs.boot_seconds || '45' }}"
           primary_idle="${{ github.event.inputs.primary_idle || '300' }}"
+          set +e
           bash linux/test/run-qemu-validation.sh \
             --edition "${{ matrix.edition }}" \
             --ram-matrix "${{ matrix.ram_matrix }}" \
             --boot-seconds "$boot_sec" \
             --idle-seconds 30 \
             --primary-idle "$primary_idle" \
-            --graphical
+            --graphical > /tmp/qemu-runner.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/qemu-runner.log
+          if [ "$rc" -ne 0 ]; then
+            err_tail="$(tail -n 15 /tmp/qemu-runner.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-QEMU-ERR-${{ matrix.edition }}::rc=${rc} ${err_tail}"
+            exit "$rc"
+          fi
           python3 - "build/qemu-test/qemu-results-${{ matrix.edition }}.json" <<'PY'
           import json, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))

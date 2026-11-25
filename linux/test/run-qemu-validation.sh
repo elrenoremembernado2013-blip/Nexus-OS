@@ -79,9 +79,9 @@ if [[ "$DRY_RUN" == true ]]; then
   exit 0
 fi
 
-for bin in qemu-system-x86_64 qemu-img xorriso cpio gzip python3; do
+for bin in qemu-system-x86_64 qemu-img xorriso cpio gzip python3 unmkinitramfs; do
   command -v "$bin" >/dev/null 2>&1 || {
-    printf 'Missing %s. On Ubuntu/Debian install: sudo apt install -y qemu-system-x86 qemu-utils ovmf xorriso\n' "$bin" >&2
+    printf 'Missing %s. On Ubuntu/Debian install: sudo apt install -y qemu-system-x86 qemu-utils ovmf xorriso initramfs-tools-core zstd xz-utils\n' "$bin" >&2
     exit 1
   }
 done
@@ -109,22 +109,47 @@ echo '{"edition":"'"$EDITION"'","iso":"'"$ISO_PATH"'","accel":"'"$ACCEL"'","grap
 
 test_vmlinuz=""
 test_initrd=""
+overlay_dir=""
 if [[ "$GRAPHICAL" == true ]]; then
   overlay_dir="$TEST_DIR/initrd-${EDITION}"
   rm -rf -- "$overlay_dir"
-  mkdir -p -- "$overlay_dir/tree/scripts/casper-bottom" "$overlay_dir/tree/nexus-test"
-  xorriso -osirrox on -indev "$ISO_PATH" \
-    -extract /casper/vmlinuz "$overlay_dir/vmlinuz" \
-    -extract /casper/initrd "$overlay_dir/orig-initrd" >/dev/null 2>&1
-  cp -f -- "$SCRIPT_DIR/casper-test-hook.sh" "$overlay_dir/tree/scripts/casper-bottom/99nexus_test_harness"
-  cp -f -- "$SCRIPT_DIR/guest-mem-probe.sh" "$overlay_dir/tree/nexus-test/guest-mem-probe.sh"
-  cp -f -- "$SCRIPT_DIR/test-zram-pressure.sh" "$overlay_dir/tree/nexus-test/test-zram-pressure.sh"
-  cp -f -- "$SCRIPT_DIR/nexus-guest-test.py" "$overlay_dir/tree/nexus-test/nexus-guest-test.py"
-  chmod 0755 "$overlay_dir/tree/scripts/casper-bottom/99nexus_test_harness" "$overlay_dir/tree/nexus-test/"*
-  (cd "$overlay_dir/tree" && find . | cpio -o -H newc --quiet | gzip -n -c > "$overlay_dir/overlay.cpio.gz")
-  cp -f -- "$overlay_dir/orig-initrd" "$overlay_dir/test-initrd.img"
-  dd if=/dev/zero bs=4 count=1 status=none >> "$overlay_dir/test-initrd.img"
-  cat "$overlay_dir/overlay.cpio.gz" >> "$overlay_dir/test-initrd.img"
+  mkdir -p -- "$overlay_dir/unpacked"
+  casper_list="$(xorriso -indev "$ISO_PATH" -find /casper -maxdepth 1 2>/dev/null || true)"
+  initrd_name=""
+  for cand in initrd.lz initrd.gz initrd.xz initrd; do
+    if printf '%s\n' "$casper_list" | grep -qE "/${cand}('|$)"; then
+      initrd_name="$cand"
+      break
+    fi
+  done
+  [[ -n "$initrd_name" ]] || { printf 'Could not locate /casper/initrd* inside %s (found: %s)\n' "$ISO_PATH" "$casper_list" >&2; exit 1; }
+  xorriso -osirrox on -indev "$ISO_PATH" -extract /casper/vmlinuz "$overlay_dir/vmlinuz" >/dev/null 2>&1
+  xorriso -osirrox on -indev "$ISO_PATH" -extract "/casper/${initrd_name}" "$overlay_dir/orig-initrd" >/dev/null 2>&1
+
+  unmkinitramfs "$overlay_dir/orig-initrd" "$overlay_dir/unpacked"
+  main_dir="$overlay_dir/unpacked"
+  [[ -d "$overlay_dir/unpacked/main" ]] && main_dir="$overlay_dir/unpacked/main"
+
+  mkdir -p -- "$main_dir/scripts/casper-bottom" "$main_dir/nexus-test"
+  cp -f -- "$SCRIPT_DIR/casper-test-hook.sh" "$main_dir/scripts/casper-bottom/99nexus_test_harness"
+  cp -f -- "$SCRIPT_DIR/guest-mem-probe.sh" "$main_dir/nexus-test/guest-mem-probe.sh"
+  cp -f -- "$SCRIPT_DIR/test-zram-pressure.sh" "$main_dir/nexus-test/test-zram-pressure.sh"
+  cp -f -- "$SCRIPT_DIR/nexus-guest-test.py" "$main_dir/nexus-test/nexus-guest-test.py"
+  chmod 0755 "$main_dir/scripts/casper-bottom/99nexus_test_harness" "$main_dir/nexus-test/"*
+  if [[ -f "$main_dir/scripts/casper-bottom/ORDER" ]]; then
+    {
+      printf '/scripts/casper-bottom/99nexus_test_harness "$@"\n'
+      printf '[ -e /conf/param.conf ] && . /conf/param.conf\n'
+    } >> "$main_dir/scripts/casper-bottom/ORDER"
+  fi
+
+  : > "$overlay_dir/test-initrd.img"
+  for early_dir in "$overlay_dir"/unpacked/early*; do
+    [[ -d "$early_dir" ]] || continue
+    (cd "$early_dir" && find . -print0 | cpio --null -o -H newc --quiet >> "$overlay_dir/test-initrd.img")
+  done
+  (cd "$main_dir" && find . -print0 | cpio --null -o -H newc --quiet | gzip -1 -c >> "$overlay_dir/test-initrd.img")
+  rm -rf -- "$overlay_dir/unpacked" "$overlay_dir/orig-initrd"
   test_vmlinuz="$overlay_dir/vmlinuz"
   test_initrd="$overlay_dir/test-initrd.img"
 fi
@@ -283,3 +308,5 @@ PY
   rm -f -- "$disk"
   printf 'QEMU %s %s MiB validation finished.\n' "$EDITION" "$ram_mb"
 done
+
+[[ -n "$overlay_dir" ]] && rm -rf -- "$overlay_dir"
