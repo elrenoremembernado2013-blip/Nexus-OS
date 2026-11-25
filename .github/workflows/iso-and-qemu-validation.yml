@@ -155,8 +155,10 @@ jobs:
                   "preflight_ok": r.get("installation_preflight_success"),
                   "wm": desk.get("wm"),
                   "panel": desk.get("panel_running"),
+                  "panel_rss": desk.get("panel_rss_mib"),
                   "res": desk.get("resolution"),
                   "alt_f4": apps.get("keyboard_alt_f4_closed"),
+                  "cleaned": apps.get("windows_closed_cleanup"),
                   "net": (r.get("network") or {}).get("nmcli_state"),
                   "stages": {k: {
                       "tot": v.get("ram_total_mib"),

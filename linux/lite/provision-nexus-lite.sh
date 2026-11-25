@@ -111,13 +111,18 @@ for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-moni
   fi
 done
 
-run_cmd install -d -m 0755 /etc/skel/.config/openbox /etc/skel/.config/tint2 /etc/skel/.config/nexus-os
+run_cmd install -d -m 0755 /etc/skel/.config/openbox /etc/skel/.config/tint2 /etc/skel/.config/autostart /etc/skel/.config/nexus-os /etc/xdg/openbox /etc/xdg/tint2
 run_cmd install -m 0644 "$SCRIPT_DIR/openbox/rc.xml" /etc/skel/.config/openbox/rc.xml
 run_cmd install -m 0644 "$SCRIPT_DIR/openbox/menu.xml" /etc/skel/.config/openbox/menu.xml
 run_cmd install -m 0755 "$SCRIPT_DIR/openbox/autostart" /etc/skel/.config/openbox/autostart
 run_cmd install -m 0644 "$SCRIPT_DIR/openbox/tint2rc" /etc/skel/.config/tint2/tint2rc
+run_cmd install -m 0644 "$SCRIPT_DIR/openbox/rc.xml" /etc/xdg/openbox/rc.xml
+run_cmd install -m 0644 "$SCRIPT_DIR/openbox/menu.xml" /etc/xdg/openbox/menu.xml
+run_cmd install -m 0755 "$SCRIPT_DIR/openbox/autostart" /etc/xdg/openbox/autostart
+run_cmd install -m 0644 "$SCRIPT_DIR/openbox/tint2rc" /etc/xdg/tint2/tint2rc
 
 if [[ "$DRY_RUN" == true ]]; then
+  echo '[dry-run] Disable heavy XDG tray autostart bloat in /etc/skel/.config/autostart/'
   echo '[dry-run] Write /etc/skel/.config/nexus-os/lite-profile, /etc/lightdm/lightdm.conf.d/90-nexus-lite.conf, /etc/nexus-os-release'
   if [[ "$SKIP_UFW" == false ]]; then
     echo '[dry-run] Configure zram swap + UFW default deny incoming'
@@ -125,6 +130,10 @@ if [[ "$DRY_RUN" == true ]]; then
     echo '[dry-run] Configure /etc/default/zramswap (skipping ufw enable inside chroot)'
   fi
 else
+  for bloat_desktop in warpinator-autostart.desktop sticky.desktop mintupdate.desktop org.gnome.Evolution-alarm-notify.desktop blueman.desktop print-applet.desktop mintwelcome.desktop xapp-sn-watcher.desktop; do
+    printf '[Desktop Entry]\nHidden=true\n' > "/etc/skel/.config/autostart/${bloat_desktop}"
+    chmod 0644 "/etc/skel/.config/autostart/${bloat_desktop}"
+  done
   printf 'profile=lite-512\n' > /etc/skel/.config/nexus-os/lite-profile
   chmod 0644 /etc/skel/.config/nexus-os/lite-profile
   rm -f -- /etc/lightdm/lightdm.conf.d/50-nexus-lite.conf

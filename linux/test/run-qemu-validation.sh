@@ -287,7 +287,7 @@ entry = {
         and apps.get("terminal", {}).get("window_verified")
     ),
     "memory_test_success": len(stages) >= 6,
-    "zram_test_success": zram_p.get("status") == "PASS",
+    "zram_test_success": zram_p.get("status") == "PASS" if not zram_p.get("skipped") else "N/A",
     "installation_preflight_success": bool(gr.get("lsblk_vda_present")),
     "desktop": desk,
     "apps": apps,

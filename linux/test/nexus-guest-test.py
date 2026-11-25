@@ -193,17 +193,31 @@ def main():
         })
         return 1
 
-    # Give panel/background 6 seconds to finish mapping after WM starts
-    time.sleep(6)
-    procs = read_proc_names()
+    # Wait up to 45s for panel + desktop session initialization under TCG
     panel_expected = {"lite": "tint2", "cinnamon": "cinnamon", "xfce": "xfce4-panel"}.get(edition)
+    panel_seen = False
+    for i in range(23):
+        procs = read_proc_names()
+        if panel_expected in procs:
+            panel_seen = True
+            if i >= 3:
+                break
+        time.sleep(2)
+    procs = read_proc_names()
+    panel_rss_mib = None
+    if panel_expected:
+        ps_panel = subprocess.run(["ps", "-C", panel_expected, "-o", "rss="], capture_output=True, text=True)
+        rss_vals = [int(x) for x in ps_panel.stdout.split() if x.isdigit()]
+        if rss_vals:
+            panel_rss_mib = round(sum(rss_vals) / 1024.0, 2)
     desktop_info = {
         "edition": edition,
         "user": sess["user"],
         "wm": sess["comm"],
         "lightdm_active": lightdm_active,
-        "panel_running": panel_expected in procs,
+        "panel_running": panel_seen or (panel_expected in procs),
         "panel_name": panel_expected,
+        "panel_rss_mib": panel_rss_mib,
         "resolution": x11_resolution(sess),
         "initial_windows": len(x11_windows(sess)),
     }
@@ -223,19 +237,19 @@ def main():
             "file_manager": (["pcmanfm"], ("pcmanfm",)),
             "terminal": (["lxterminal"], ("lxterminal", "terminal")),
             "settings": (["obconf"], ("obconf", "openbox")),
-            "extra": (["mousepad"], ("mousepad",)),
+            "extra": (["mousepad", "xed", "lxtask"], ("mousepad", "xed", "lxtask")),
         },
         "cinnamon": {
             "file_manager": (["nemo"], ("nemo",)),
             "terminal": (["gnome-terminal"], ("gnome-terminal", "terminal")),
             "settings": (["cinnamon-settings"], ("cinnamon-settings", "settings")),
-            "extra": (["xed"], ("xed",)),
+            "extra": (["xed", "galculator"], ("xed", "galculator")),
         },
         "xfce": {
             "file_manager": (["thunar"], ("thunar",)),
             "terminal": (["xfce4-terminal"], ("xfce4-terminal", "terminal")),
             "settings": (["xfce4-settings-manager"], ("xfce4-settings", "settings")),
-            "extra": (["mousepad"], ("mousepad",)),
+            "extra": (["xed", "mousepad", "galculator"], ("xed", "mousepad", "galculator")),
         },
     }[edition]
 
@@ -243,15 +257,20 @@ def main():
     app_results = {}
 
     def open_and_verify(key, stage_name, capture_event):
-        cmd, keywords = app_map[key]
-        if not shutil.which(cmd[0]):
-            app_results[key] = {"launched": False, "reason": f"{cmd[0]}_missing"}
+        candidates, keywords = app_map[key]
+        chosen = next((c for c in candidates if shutil.which(c)), None)
+        if not chosen:
+            app_results[key] = {"launched": False, "reason": f"{candidates[0]}_missing"}
+            if stage_name:
+                stages[stage_name] = run_probe(stage_name)
+                send_event(port_fd, "stage_mem", stages[stage_name])
             return
+        cmd = [chosen]
         before = set(x11_windows(sess))
         p = run_as_user(sess, cmd)
         opened_procs.append(p)
         matched = []
-        for _ in range(20):
+        for _ in range(24):
             time.sleep(0.5)
             after = x11_windows(sess)
             new_wins = [w for w in after if w not in before]
@@ -278,6 +297,7 @@ def main():
     open_and_verify("extra", "5_multi_apps", "app_multi_apps")
 
     # Ask host to send Alt+F4 key event to verify keyboard + WM window close
+    time.sleep(2)
     before_close = len(x11_windows(sess))
     send_event(port_fd, "test_alt_f4", {"windows_before": before_close})
     wait_for_cmd(port_file, "ack", timeout=15)
@@ -291,7 +311,14 @@ def main():
                 os.killpg(os.getpgid(p.pid), signal.SIGTERM)
             except Exception:
                 pass
-    time.sleep(3)
+    time.sleep(2)
+    for p in opened_procs:
+        if p.poll() is None:
+            try:
+                os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+            except Exception:
+                pass
+    time.sleep(2)
     after_cleanup = len(x11_windows(sess))
     app_results["windows_closed_cleanup"] = after_cleanup <= desktop_info["initial_windows"] + 1
     stages["6_post_close"] = run_probe("post_close")

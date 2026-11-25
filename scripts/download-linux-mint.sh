@@ -66,18 +66,24 @@ GPG_HOME="$(mktemp -d "${TMPDIR:-/tmp}/nexus-mint-gpg.XXXXXX")"
 STATUS_FILE="$GPG_HOME/verification.status"
 trap 'rm -rf -- "$GPG_HOME"' EXIT
 
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/sha256sum.txt" -o "$CHECKSUMS.part"
+curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "$BASE_URL/sha256sum.txt" -o "$CHECKSUMS.part"
 mv -- "$CHECKSUMS.part" "$CHECKSUMS"
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$BASE_URL/sha256sum.txt.gpg" -o "$SIGNATURE.part"
+curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "$BASE_URL/sha256sum.txt.gpg" -o "$SIGNATURE.part"
 mv -- "$SIGNATURE.part" "$SIGNATURE"
 if [[ -n "$KEYRING_PATH" ]]; then
   [[ -r "$KEYRING_PATH" ]] || { printf 'Mint signing keyring not readable: %s\n' "$KEYRING_PATH" >&2; exit 1; }
   gpg --batch --homedir "$GPG_HOME" --import "$KEYRING_PATH"
 else
-  if ! gpg --batch --homedir "$GPG_HOME" --keyserver "$GPG_KEYSERVER" --recv-keys "$SIGNING_FINGERPRINT"; then
-    echo "Primary keyserver $GPG_KEYSERVER failed; trying fallback hkps://keyserver.ubuntu.com..." >&2
-    gpg --batch --homedir "$GPG_HOME" --keyserver hkps://keyserver.ubuntu.com --recv-keys "$SIGNING_FINGERPRINT"
-  fi
+  key_imported=false
+  for ks in "$GPG_KEYSERVER" hkps://keyserver.ubuntu.com hkps://pgp.mit.edu; do
+    if gpg --batch --homedir "$GPG_HOME" --keyserver "$ks" --recv-keys "$SIGNING_FINGERPRINT"; then
+      key_imported=true
+      break
+    fi
+    echo "Keyserver $ks failed; trying next..." >&2
+    sleep 2
+  done
+  [[ "$key_imported" == true ]] || { echo 'Failed to fetch Mint signing key from all keyservers.' >&2; exit 1; }
 fi
 IMPORTED_FINGERPRINT="$(gpg --batch --homedir "$GPG_HOME" --with-colons --fingerprint "$SIGNING_FINGERPRINT" | awk -F: '$1 == "fpr" { print $10; exit }')"
 [[ "$IMPORTED_FINGERPRINT" == "$SIGNING_FINGERPRINT" ]] || { echo 'Linux Mint signing-key fingerprint mismatch.' >&2; exit 1; }
@@ -87,7 +93,7 @@ echo 'Verified Linux Mint checksum-manifest signature.'
 
 if [[ ! -s "$ISO_PATH" ]]; then
   echo "Downloading $ISO_NAME (large file)…"
-  curl --proto '=https' --tlsv1.2 --fail --location --show-error "$BASE_URL/$ISO_NAME" -o "$ISO_PATH.part"
+  curl --proto '=https' --tlsv1.2 --fail --location --show-error --retry 5 --retry-delay 5 --retry-all-errors "$BASE_URL/$ISO_NAME" -o "$ISO_PATH.part"
   mv -- "$ISO_PATH.part" "$ISO_PATH"
 fi
 
