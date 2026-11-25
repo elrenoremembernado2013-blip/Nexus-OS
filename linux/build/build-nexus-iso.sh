@@ -230,16 +230,21 @@ cp -a "$REPO_ROOT/linux" "$squash_root/tmp/nexus-repo/linux"
 cp -a "$REPO_ROOT/LICENSE" "$squash_root/tmp/nexus-repo/LICENSE"
 cp -a "$REPO_ROOT/docs" "$squash_root/tmp/nexus-repo/docs"
 
+chroot_env=(PATH=/usr/sbin:/usr/bin:/sbin:/bin)
 chroot_args=(--skip-ufw --force)
 if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then
   chroot_args=(--skip-ufw --autostart-firstboot --force)
   [[ "$WITH_GAMING" == true ]] && chroot_args+=(--with-gaming)
   [[ "$WITH_DEV" == true ]] && chroot_args+=(--with-dev)
+  chroot_env+=(
+    "NEXUS_SYSTEM_CONF=/tmp/nexus-repo/linux/config/${SYSTEM_CONF##*/}"
+    "NEXUS_PKG_MANIFEST=/tmp/nexus-repo/linux/config/${PKG_MANIFEST##*/}"
+  )
 elif [[ "$PROVISION_SCRIPT" == *"provision-nexus-lite.sh" ]]; then
   chroot_args=(--skip-ufw --purge-bloat --force)
 fi
 
-chroot "$squash_root" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+chroot "$squash_root" /usr/bin/env -i "${chroot_env[@]}" \
   bash "/tmp/nexus-repo/${PROVISION_SCRIPT}" "${chroot_args[@]}"
 chroot "$squash_root" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
   apt-get clean

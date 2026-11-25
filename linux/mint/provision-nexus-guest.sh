@@ -6,8 +6,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-SYSTEM_CONF="$REPO_ROOT/linux/config/nexus-system.conf"
-PKG_MANIFEST="$REPO_ROOT/linux/config/mint-packages.list"
+SYSTEM_CONF="${NEXUS_SYSTEM_CONF:-$REPO_ROOT/linux/config/nexus-system.conf}"
+PKG_MANIFEST="${NEXUS_PKG_MANIFEST:-$REPO_ROOT/linux/config/mint-packages.list}"
 
 DRY_RUN=false
 WITH_GAMING=false
@@ -143,7 +143,7 @@ fi
 share_dir="$PREFIX_DIR/share/nexus-os"
 bin_dir="$PREFIX_DIR/bin"
 
-run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$bin_dir"
+run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$bin_dir" /usr/local/share/applications
 run_cmd install -m 0644 "$REPO_ROOT/linux/xfce/nexus-dark.css" "$share_dir/xfce/nexus-dark.css"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/themes.json" "$share_dir/cinnamon/themes.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/wallpapers.json" "$share_dir/cinnamon/wallpapers.json"
