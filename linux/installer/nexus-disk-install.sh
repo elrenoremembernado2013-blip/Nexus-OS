@@ -210,12 +210,13 @@ rm -f -- "$TARGET/etc/casper.conf" \
   "$TARGET/etc/systemd/system/multi-user.target.wants/nexus-test-agent.service"
 rm -rf -- "$TARGET/usr/local/libexec/nexus-test"
 
-# Remove live user autologin overrides from casper if present
-rm -f -- "$TARGET/etc/lightdm/lightdm.conf.d/70-linuxmint.conf" \
-  "$TARGET/etc/lightdm/lightdm.conf.d/casper.conf" || true
-if [[ -f "$TARGET/etc/lightdm/lightdm.conf" ]]; then
-  sed -i '/^autologin-user=/d;/^autologin-user-timeout=/d' "$TARGET/etc/lightdm/lightdm.conf" || true
-fi
+# Remove live user autologin overrides from casper if present (keep session defaults)
+rm -f -- "$TARGET/etc/lightdm/lightdm.conf.d/casper.conf" || true
+for dm_cfg in "$TARGET/etc/lightdm/lightdm.conf" "$TARGET/etc/lightdm/lightdm.conf.d/70-linuxmint.conf"; do
+  if [[ -f "$dm_cfg" ]]; then
+    sed -i '/^autologin-user=/d;/^autologin-user-timeout=/d' "$dm_cfg" || true
+  fi
+done
 
 # Create target user (never hardcoding passwords in script)
 chroot "$TARGET" /usr/sbin/userdel -r mint >/dev/null 2>&1 || true
@@ -263,8 +264,10 @@ chroot "$TARGET" /usr/sbin/grub-install \
   --recheck \
   --no-nvram
 
-mkdir -p -- "$TARGET/boot/efi/EFI/BOOT"
+mkdir -p -- "$TARGET/boot/efi/EFI/BOOT" "$TARGET/boot/efi/EFI/ubuntu"
 cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/BOOT/"
+# Signed Ubuntu/Mint grubx64.efi looks for /EFI/ubuntu/grub.cfg even when --bootloader-id=nexus
+cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/ubuntu/"
 if [[ -f "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" ]]; then
   mv -f -- "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
 elif [[ -f "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" ]]; then

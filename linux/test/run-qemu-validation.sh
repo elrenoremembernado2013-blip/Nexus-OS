@@ -274,6 +274,12 @@ PY
   if [[ "$RELIABILITY" == true ]] && is_primary_tier "$EDITION" "$ram_mb"; then
     live_repeats=3
     install_repeats=2
+  elif [[ "$RELIABILITY" == true && "$EDITION" == "lite" && "$ram_mb" == "512" ]]; then
+    live_repeats=3
+    install_repeats=2
+  fi
+  if [[ "$EDITION" == "lite" && "$ram_mb" == "1024" ]]; then
+    install_repeats=1
   fi
 
   # Stage 2: Live graphical ISO runs + optional installation onto disposable qcow2
@@ -467,6 +473,20 @@ inst_ok_count = sum(1 for r in live_reps if r.get("install_executed") and r.get(
 inst_try_count = sum(1 for r in live_reps if r.get("install_executed"))
 boot_ok_count = sum(1 for b in installed_boots if b.get("booted_from_vda") and b.get("live_iso_absent") and b.get("graphical_session_success"))
 
+def diag_for(src_path):
+    idata = load_json(src_path)
+    slog = src_path.parent / "installed-boots" / ("warm" if "warm" in src_path.name else "cold") / "serial.log"
+    stail = []
+    if slog.is_file():
+        stail = slog.read_text(encoding="utf-8", errors="replace").splitlines()[-20:]
+    return {
+        "vm_exited_cleanly": idata.get("vm_exited_cleanly"),
+        "desktop_failed": idata.get("desktop_failed"),
+        "screenshots": idata.get("screenshots", []),
+        "cycles_count": len(idata.get("boot_cycles") or []),
+        "serial_tail": stail,
+    }
+
 entry = {
     "ram_mib": ram_mb,
     "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0 or (serial_log.stat().st_size > 0 if serial_log.is_file() else uefi_alive)),
@@ -480,6 +500,8 @@ entry = {
     "persistence_verified": any((b.get("persistence") or {}).get("persistence_verified") for b in installed_boots),
     "live_reps": live_reps,
     "installed_boots": installed_boots,
+    "warm_diag": diag_for(inst_warm_json) if inst_warm_json.is_file() else None,
+    "cold_diag": diag_for(inst_cold_json) if inst_cold_json.is_file() else None,
     "cinnamon_2g_virtio_diag": {
         "screenshots": diag_virtio.get("screenshots"),
         "glx_diag": ((diag_virtio.get("guest_report") or {}).get("desktop") or {}).get("glx_diag"),

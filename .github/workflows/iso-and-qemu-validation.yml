@@ -188,10 +188,13 @@ jobs:
                   "ub_ui": (l0.get("ubiquity_ui") or {}).get("window_verified"),
                   "inst_sec": ir0.get("elapsed_sec"),
                   "inst_efi": ir0.get("bootloader_efi_ok"),
+                  "efi_files": ir0.get("efi_files"),
                   "live_shots": [(s.get("name"), s.get("non_black_pct")) for s in (l0.get("screenshots") or [])],
                   "live_glx": (l0.get("desktop") or {}).get("glx_diag"),
                   "cinn_2g_virtio": r.get("cinnamon_2g_virtio_diag"),
                   "boots": compact_boots,
+                  "warm_diag": r.get("warm_diag") if len(compact_boots) < 2 else None,
+                  "cold_diag": r.get("cold_diag") if len(compact_boots) < 3 else None,
               }
               print(f"::notice title=NEXUS-123-{data['edition']}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
           PY

@@ -269,6 +269,20 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
         vmlinuz_ok = any((mnt / "boot").glob("vmlinuz-*"))
         initrd_ok = any((mnt / "boot").glob("initrd.img-*"))
         meta_ok = (mnt / "etc/nexus-installed.json").is_file()
+        efi_dir_files = sorted(str(p.relative_to(mnt / "boot/efi")) for p in (mnt / "boot/efi").rglob("*") if p.is_file())
+
+        # Enable ttyS0 serial console inside disposable test disk grub.cfg for CI diagnostics
+        grub_def = mnt / "etc/default/grub"
+        if grub_def.is_file():
+            gtxt = grub_def.read_text(encoding="utf-8", errors="replace")
+            if "console=ttyS0" not in gtxt:
+                gtxt += '\nGRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX console=ttyS0,115200"\n'
+                grub_def.write_text(gtxt, encoding="utf-8")
+                for mp in ("dev", "proc", "sys"):
+                    subprocess.run(["mount", "--bind", f"/{mp}", str(mnt / mp)], check=False)
+                subprocess.run(["chroot", str(mnt), "/usr/sbin/update-grub"], capture_output=True, check=False)
+                for mp in ("dev", "proc", "sys"):
+                    subprocess.run(["umount", "-lf", str(mnt / mp)], check=False)
 
         # Install ephemeral virtio-serial agent ONLY onto disposable QEMU test disk (/dev/vda2)
         test_dir = mnt / "usr/local/libexec/nexus-test"
@@ -315,6 +329,7 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
         "vmlinuz_ok": vmlinuz_ok,
         "initrd_ok": initrd_ok,
         "installed_meta_ok": meta_ok,
+        "efi_files": efi_dir_files[:20],
         "parted_lines": parted_out.splitlines()[:12],
         "blkid_lines": blkid_out.splitlines(),
     }
