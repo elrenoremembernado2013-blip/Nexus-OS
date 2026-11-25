@@ -74,7 +74,10 @@ if [[ -n "$KEYRING_PATH" ]]; then
   [[ -r "$KEYRING_PATH" ]] || { printf 'Mint signing keyring not readable: %s\n' "$KEYRING_PATH" >&2; exit 1; }
   gpg --batch --homedir "$GPG_HOME" --import "$KEYRING_PATH"
 else
-  gpg --batch --homedir "$GPG_HOME" --keyserver "$GPG_KEYSERVER" --recv-keys "$SIGNING_FINGERPRINT"
+  if ! gpg --batch --homedir "$GPG_HOME" --keyserver "$GPG_KEYSERVER" --recv-keys "$SIGNING_FINGERPRINT"; then
+    echo "Primary keyserver $GPG_KEYSERVER failed; trying fallback hkps://keyserver.ubuntu.com..." >&2
+    gpg --batch --homedir "$GPG_HOME" --keyserver hkps://keyserver.ubuntu.com --recv-keys "$SIGNING_FINGERPRINT"
+  fi
 fi
 IMPORTED_FINGERPRINT="$(gpg --batch --homedir "$GPG_HOME" --with-colons --fingerprint "$SIGNING_FINGERPRINT" | awk -F: '$1 == "fpr" { print $10; exit }')"
 [[ "$IMPORTED_FINGERPRINT" == "$SIGNING_FINGERPRINT" ]] || { echo 'Linux Mint signing-key fingerprint mismatch.' >&2; exit 1; }

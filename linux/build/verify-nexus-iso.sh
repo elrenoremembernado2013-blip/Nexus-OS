@@ -80,13 +80,21 @@ for key in ("name", "base_distro", "base_version", "edition", "arch", "output_is
 PY
 
 if command -v xorriso >/dev/null 2>&1; then
-  listing="$(xorriso -indev "$ISO_PATH" -find / -maxdepth 3 2>/dev/null || true)"
-  for required in "/casper/filesystem.squashfs" "/casper/vmlinuz" "/boot/grub/efi.img" "/isolinux/isolinux.bin"; do
+  listing="$(xorriso -indev "$ISO_PATH" -find / -maxdepth 4 2>/dev/null || true)"
+  for required in "/casper/filesystem.squashfs" "/casper/vmlinuz"; do
     printf '%s\n' "$listing" | grep -Fq "$required" || {
       printf 'Missing required live/boot entry in ISO: %s\n' "$required" >&2
       exit 1
     }
   done
+  if ! printf '%s\n' "$listing" | grep -Eq '/boot/grub/efi\.img|/efi\.img|/EFI/boot/bootx64\.efi'; then
+    echo 'Missing UEFI boot image (/boot/grub/efi.img or /EFI/boot/bootx64.efi) in ISO' >&2
+    exit 1
+  fi
+  if ! printf '%s\n' "$listing" | grep -Eq '/isolinux/isolinux\.bin|/boot/grub/i386-pc/eltorito\.img'; then
+    echo 'Missing BIOS El Torito boot image in ISO' >&2
+    exit 1
+  fi
   echo "PASS ISO structure and boot entries verified via xorriso."
 else
   echo 'WARN xorriso not installed; skipped internal ISO tree inspection.' >&2

@@ -256,22 +256,44 @@ printf '%s\n' "$(du -sx --block-size=1 "$squash_root" | awk '{print $1}')" > "$i
 (
   cd "$iso_root"
   rm -f md5sum.txt
-  find . -type f ! -path './isolinux/*' -print0 | xargs -0 md5sum > md5sum.txt
+  find . -type f ! -path './isolinux/*' ! -path './boot/grub/*' -print0 | xargs -0 md5sum > md5sum.txt
 )
 
-xorriso -as mkisofs \
-  -iso-level 3 \
-  -full-iso9660-filenames \
-  -volid "NEXUS_${out_slug^^}_${conf_version}" \
-  -eltorito-boot isolinux/isolinux.bin \
-  -eltorito-catalog isolinux/boot.cat \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
-  -eltorito-alt-boot \
-  -e boot/grub/efi.img \
-  -no-emul-boot \
-  -isohybrid-gpt-basdat \
-  -output "$OUT_ISO" \
-  "$iso_root"
+efi_img=""
+for cand in "boot/grub/efi.img" "efi.img"; do
+  if [[ -f "$iso_root/$cand" ]]; then
+    efi_img="$cand"
+    break
+  fi
+done
+
+mkisofs_args=(
+  -iso-level 3
+  -full-iso9660-filenames
+  -volid "NEXUS_${out_slug^^}_${conf_version}"
+)
+if [[ -f "$iso_root/isolinux/isolinux.bin" ]]; then
+  mkisofs_args+=(
+    -eltorito-boot isolinux/isolinux.bin
+    -eltorito-catalog isolinux/boot.cat
+    -no-emul-boot -boot-load-size 4 -boot-info-table
+  )
+elif [[ -f "$iso_root/boot/grub/i386-pc/eltorito.img" ]]; then
+  mkisofs_args+=(
+    -eltorito-boot boot/grub/i386-pc/eltorito.img
+    -no-emul-boot -boot-load-size 4 -boot-info-table
+  )
+fi
+if [[ -n "$efi_img" ]]; then
+  mkisofs_args+=(
+    -eltorito-alt-boot
+    -e "$efi_img"
+    -no-emul-boot
+    -isohybrid-gpt-basdat
+  )
+fi
+
+xorriso -as mkisofs "${mkisofs_args[@]}" -output "$OUT_ISO" "$iso_root"
 
 (
   cd "$OUT_DIR"

@@ -154,6 +154,22 @@ from pathlib import Path
 p = Path(sys.argv[1])
 data = json.loads(p.read_text(encoding="utf-8"))
 ppm = Path(sys.argv[6])
+non_black_pct = 0.0
+if ppm.is_file():
+    raw = ppm.read_bytes()
+    header_end = 0
+    nl_count = 0
+    for idx, b in enumerate(raw):
+        if b == 10:
+            nl_count += 1
+            if nl_count == 3:
+                header_end = idx + 1
+                break
+    body = raw[header_end:]
+    if len(body) >= 3:
+        sample = body[::30]
+        non_zero = sum(1 for v in sample if v > 8)
+        non_black_pct = round((non_zero / max(1, len(sample))) * 100.0, 2)
 data["runs"].append({
     "ram_mib": int(sys.argv[2]),
     "boot_marker": sys.argv[3],
@@ -161,8 +177,10 @@ data["runs"].append({
     "serial_log": sys.argv[5],
     "screendump_ppm": sys.argv[6] if ppm.is_file() else None,
     "screendump_bytes": ppm.stat().st_size if ppm.is_file() else 0,
+    "framebuffer_non_black_pct": non_black_pct,
 })
 p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY
+  rm -f -- "$disk"
   printf 'QEMU %s %s MiB -> %s (alive=%s, ppm=%s)\n' "$EDITION" "$ram_mb" "$boot_marker" "$vm_alive" "$screendump_ppm"
 done
