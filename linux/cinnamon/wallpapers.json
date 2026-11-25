@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "attributionPolicy": "Genuine photographs with photographer attribution and original source URLs; no AI-generated imagery.",
+  "categories": [
+    "Mountains",
+    "Space",
+    "Galaxies",
+    "Forests",
+    "Nature",
+    "Oceans",
+    "Cities",
+    "Architecture",
+    "Abstract",
+    "Minimalist",
+    "Gaming"
+  ],
+  "wallpapers": [
+    {
+      "id": "alpine",
+      "title": "Alpine Ridge",
+      "category": "Mountains",
+      "photographer": "Benjamin Voros",
+      "sourceName": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/phIFdC6lA4E",
+      "imageUrl": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2400&q=85",
+      "license": "Unsplash License",
+      "recommendedTheme": "arctic"
+    },
+    {
+      "id": "mountain-night",
+      "title": "Mountain Night Sky",
+      "category": "Space",
+      "photographer": "Benjamin Voros",
+      "sourceName": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/phIFdC6lA4E",
+      "imageUrl": "https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&fit=crop&w=2400&q=85",
+      "license": "Unsplash License",
+      "recommendedTheme": "midnight"
+    },
+    {
+      "id": "cosmos",
+      "title": "Deep Nebula",
+      "category": "Galaxies",
+      "photographer": "NASA",
+      "sourceName": "Unsplash / NASA",
+      "sourceUrl": "https://unsplash.com/photos/rTZW4f02zY8",
+      "imageUrl": "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2400&q=85",
+      "license": "Public Domain (NASA) / Unsplash",
+      "recommendedTheme": "nebula"
+    },
+    {
+      "id": "forest",
+      "title": "Sunlit Forest Canopy",
+      "category": "Forests",
+      "photographer": "Lukasz Szmigiel",
+      "sourceName": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/jFCViYFYcus",
+      "imageUrl": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2400&q=85",
+      "license": "Unsplash License",
+      "recommendedTheme": "emerald"
+    },
+    {
+      "id": "city",
+      "title": "Dusk Skyline",
+      "category": "Cities",
+      "photographer": "Andre Benz",
+      "sourceName": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/cXU6tNxhub0",
+      "imageUrl": "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2400&q=85",
+      "license": "Unsplash License",
+      "recommendedTheme": "solar"
+    },
+    {
+      "id": "modern",
+      "title": "Minimalist Geometry",
+      "category": "Architecture",
+      "photographer": "Joel Filipe",
+      "sourceName": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/RFDP7_80v5A",
+      "imageUrl": "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=2400&q=85",
+      "license": "Unsplash License",
+      "recommendedTheme": "midnight"
+    }
+  ]
+}
