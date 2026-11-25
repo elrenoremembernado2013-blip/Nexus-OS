@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NEXUS Welcome & First-Boot
+Comment=Configure NEXUS OS theme, wallpaper, updates, gaming, and security overview
+Exec=/usr/local/bin/nexus-firstboot
+Icon=/usr/local/share/nexus-os/nexus-logo.svg
+Terminal=true
+Categories=System;Settings;
+StartupNotify=true

@@ -104,6 +104,10 @@ def main() -> None:
 
         pers_res = api("/api/personalisation/apply", {"dryRun": True, "presetProfile": "gaming", "accent": "#ffad7a"})
         assert pers_res.get("ok") is True and "NEXUS-Solar" in pers_res.get("output", ""), pers_res
+
+        preflight = api("/api/installer/preflight")
+        for key in ("arch", "firmware", "ubiquity_available", "hardware", "requirements", "warnings"):
+            assert key in preflight, f"Missing installer preflight key: {key}"
     finally:
         proc.terminate()
         proc.wait(timeout=5)

@@ -155,6 +155,8 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" "$bin_dir/nex
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" "$bin_dir/nexus-store-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" "$bin_dir/nexus-security-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" "$bin_dir/nexus-gaming-cli"
+run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" "$bin_dir/nexus-install-preflight"
+run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" "$bin_dir/nexus-installer-launcher"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" "$bin_dir/nexus-system-bridge"
 
 for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do

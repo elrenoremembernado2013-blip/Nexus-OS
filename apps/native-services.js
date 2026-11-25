@@ -14,6 +14,7 @@
     "files",
     "terminal",
     "gaming",
+    "installer",
   ]);
 
   class NativeIntegrationUnavailableError extends Error {

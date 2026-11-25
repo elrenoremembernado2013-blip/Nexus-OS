@@ -49,6 +49,7 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "privacy-security": [["cinnamon-settings", "privacy"], ["gufw"]],
     "packages": [["mintinstall"], ["mintupdate"]],
     "gaming": [["steam"]],
+    "installer": [["nexus-installer-launcher"], ["ubiquity"]],
 }
 
 
@@ -484,6 +485,15 @@ def serve_loopback(port: int) -> None:
                 gam_cli = Path(__file__).resolve().with_name("nexus-gaming-cli.sh")
                 proc = subprocess.run(
                     ["bash", str(gam_cli), "status"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
+            elif parsed.path == "/api/installer/preflight":
+                pre_cli = Path(__file__).resolve().parents[1] / "installer" / "nexus-install-preflight.sh"
+                proc = subprocess.run(
+                    ["bash", str(pre_cli)],
                     capture_output=True,
                     text=True,
                     check=True,

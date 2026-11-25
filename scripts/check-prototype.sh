@@ -33,6 +33,7 @@ node scripts/check-settings-sections.js
 node scripts/check-security-privacy.js
 node scripts/check-gaming.js
 node scripts/check-personalisation.js
+node scripts/check-installer.js
 node scripts/check-system-monitor.js
 node scripts/check-terminal-preview.js
 

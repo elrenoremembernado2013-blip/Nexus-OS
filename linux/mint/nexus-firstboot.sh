@@ -5,15 +5,21 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPLY_SCRIPT="$SCRIPT_DIR/apply-nexus-xfce.sh"
+CINNAMON_APPLY="$(cd -- "$SCRIPT_DIR/.." && pwd)/cinnamon/apply-nexus-cinnamon.sh"
 PANEL_SCRIPT="$SCRIPT_DIR/nexus-panel-status.sh"
+SECURITY_CLI="$SCRIPT_DIR/nexus-security-cli.sh"
+GAMING_CLI="$SCRIPT_DIR/nexus-gaming-cli.sh"
 MARKER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os"
 MARKER_FILE="$MARKER_DIR/firstboot-done"
 
 PROFILE="balanced"
 THEME="dark"
+THEME_PRESET="midnight"
 DRY_RUN=false
 CHECK_UPDATES=false
 GAMING_STATUS=false
+SECURITY_SUMMARY=false
+SKIP_SETUP=false
 MARK_DONE=false
 NON_INTERACTIVE=false
 
@@ -21,19 +27,22 @@ usage() {
   cat <<'USAGE'
 Usage: bash linux/mint/nexus-firstboot.sh [OPTIONS]
 
-Per-user first-boot assistant for NEXUS OS on Linux Mint 22.3 Xfce.
-Configures visual performance mode, theme preference, security/update guidance,
-and optional gaming readiness checks without elevating privileges.
+Per-user first-boot assistant for NEXUS OS on Linux Mint (Cinnamon / Xfce).
+Configures theme preset, visual performance mode, security/update guidance,
+and gaming readiness checks without elevating privileges.
 
 Options:
-  --profile MODE      Visual performance mode: balanced | performance | lightweight
-  --theme MODE        Preferred theme: dark | light
-  --check-updates     Report APT / Mint update readiness (read-only)
-  --gaming-status     Report Vulkan, GameMode, and Steam readiness (read-only)
-  --mark-done         Write ~/.config/nexus-os/firstboot-done marker
-  --non-interactive   Apply flags without prompting
-  --dry-run           Preview actions without modifying user configuration
-  --help, -h          Show this help message
+  --profile MODE        Visual mode: balanced | performance | lightweight
+  --theme MODE          Preferred base mode: dark | light
+  --theme-preset NAME   NEXUS theme: midnight | nebula | arctic | emerald | solar
+  --check-updates       Report APT / Mint update readiness (read-only)
+  --gaming-status       Report Vulkan, GameMode, and Steam readiness (read-only)
+  --security-summary    Report firewall, Secure Boot, LUKS, and update status
+  --skip                Skip interactive setup and mark first-boot done
+  --mark-done           Write ~/.config/nexus-os/firstboot-done marker
+  --non-interactive     Apply flags without prompting
+  --dry-run             Preview actions without modifying user configuration
+  --help, -h            Show this help message
 USAGE
 }
 
@@ -45,8 +54,13 @@ while (($#)); do
     --theme)
       [[ $# -ge 2 ]] || { echo '--theme requires an argument' >&2; exit 2; }
       THEME="$2"; shift 2 ;;
+    --theme-preset)
+      [[ $# -ge 2 ]] || { echo '--theme-preset requires an argument' >&2; exit 2; }
+      THEME_PRESET="$2"; shift 2 ;;
     --check-updates) CHECK_UPDATES=true; shift ;;
     --gaming-status) GAMING_STATUS=true; shift ;;
+    --security-summary) SECURITY_SUMMARY=true; shift ;;
+    --skip) SKIP_SETUP=true; MARK_DONE=true; NON_INTERACTIVE=true; shift ;;
     --mark-done) MARK_DONE=true; shift ;;
     --non-interactive) NON_INTERACTIVE=true; shift ;;
     --dry-run) DRY_RUN=true; NON_INTERACTIVE=true; shift ;;
@@ -70,8 +84,23 @@ case "$THEME" in
   *) printf 'Invalid --theme: %s (expected dark or light)\n' "$THEME" >&2; exit 2 ;;
 esac
 
+case "$THEME_PRESET" in
+  midnight|nebula|arctic|emerald|solar) ;;
+  *) printf 'Invalid --theme-preset: %s\n' "$THEME_PRESET" >&2; exit 2 ;;
+esac
+
+if [[ "$SKIP_SETUP" == true ]]; then
+  echo 'NEXUS First-Boot: setup skipped by user (can be re-run anytime via nexus-firstboot).'
+fi
+
 if [[ "$NON_INTERACTIVE" == false && -t 0 ]]; then
-  printf 'NEXUS OS First-Boot Setup (Linux Mint 22.3 Xfce)\n'
+  printf 'NEXUS OS First-Boot Setup (Linux Mint)\n'
+  printf 'Choose theme preset [midnight|nebula|arctic|emerald|solar] (default midnight): '
+  read -r tp_choice
+  case "${tp_choice:-midnight}" in
+    nebula|arctic|emerald|solar|midnight) THEME_PRESET="${tp_choice:-midnight}" ;;
+    *) THEME_PRESET="midnight" ;;
+  esac
   printf 'Choose performance profile [1=Balanced, 2=Performance, 3=Lightweight] (default 1): '
   read -r choice
   case "${choice:-1}" in
@@ -88,22 +117,25 @@ if [[ "$NON_INTERACTIVE" == false && -t 0 ]]; then
   MARK_DONE=true
 fi
 
-echo "NEXUS First-Boot: profile=$PROFILE, theme=$THEME"
+echo "NEXUS First-Boot: preset=$THEME_PRESET, profile=$PROFILE, theme=$THEME"
 
-apply_args=()
-if [[ "$DRY_RUN" == true ]]; then
-  apply_args+=(--dry-run)
-fi
-if [[ "$PROFILE" == "lightweight" || "$PROFILE" == "performance" ]]; then
-  apply_args+=(--lightweight)
-fi
-
-if [[ -x "$APPLY_SCRIPT" ]]; then
-  bash "$APPLY_SCRIPT" "${apply_args[@]}"
-elif command -v nexus-apply-xfce >/dev/null 2>&1; then
-  nexus-apply-xfce "${apply_args[@]}"
-else
-  echo 'INFO apply-nexus-xfce helper not found; skipped Xfce CSS application.'
+if [[ "$SKIP_SETUP" == false ]]; then
+  if [[ -x "$CINNAMON_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Cinnamon* ]]; then
+    cin_args=(--theme "$THEME_PRESET" --profile "$PROFILE")
+    [[ "$DRY_RUN" == true ]] && cin_args+=(--dry-run)
+    bash "$CINNAMON_APPLY" "${cin_args[@]}"
+  else
+    apply_args=()
+    [[ "$DRY_RUN" == true ]] && apply_args+=(--dry-run)
+    [[ "$PROFILE" == "lightweight" || "$PROFILE" == "performance" ]] && apply_args+=(--lightweight)
+    if [[ -x "$APPLY_SCRIPT" ]]; then
+      bash "$APPLY_SCRIPT" "${apply_args[@]}"
+    elif command -v nexus-apply-xfce >/dev/null 2>&1; then
+      nexus-apply-xfce "${apply_args[@]}"
+    else
+      echo 'INFO desktop theme helper not found; skipped CSS application.'
+    fi
+  fi
 fi
 
 if [[ "$DRY_RUN" == true ]]; then
@@ -130,14 +162,23 @@ fi
 
 if [[ "$GAMING_STATUS" == true ]]; then
   echo '--- Gaming & Compatibility Readiness ---'
-  for tool in vulkaninfo gamemoded steam; do
-    if command -v "$tool" >/dev/null 2>&1; then
-      printf '  %s: installed\n' "$tool"
-    else
-      printf '  %s: not installed\n' "$tool"
-    fi
-  done
+  if [[ -x "$GAMING_CLI" ]]; then
+    bash "$GAMING_CLI" status
+  else
+    for tool in vulkaninfo gamemoded steam; do
+      if command -v "$tool" >/dev/null 2>&1; then
+        printf '  %s: installed\n' "$tool"
+      else
+        printf '  %s: not installed\n' "$tool"
+      fi
+    done
+  fi
   echo 'Note: Linux-native games and Proton titles depend on GPU Vulkan/OpenGL support and per-title validation.'
+fi
+
+if [[ "$SECURITY_SUMMARY" == true && -x "$SECURITY_CLI" ]]; then
+  echo '--- Security & Privacy Overview ---'
+  bash "$SECURITY_CLI" status
 fi
 
 if [[ -x "$PANEL_SCRIPT" ]]; then
