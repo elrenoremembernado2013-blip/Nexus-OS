@@ -11,6 +11,7 @@ const sectionsSource = fs.readFileSync("apps/settings-sections.js", "utf8");
 function makeNode(tag = "div") {
   const children = [];
   const attrs = {};
+  const listeners = new Map();
   return {
     tagName: tag.toUpperCase(),
     className: "",
@@ -27,6 +28,13 @@ function makeNode(tag = "div") {
     },
     append(...nodes) {
       children.push(...nodes);
+    },
+    addEventListener(type, fn) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(fn);
+    },
+    dispatch(type) {
+      for (const fn of listeners.get(type) || []) fn();
     }
   };
 }
@@ -53,7 +61,12 @@ function runWithServices(serviceIds = []) {
   vm.createContext(context);
   vm.runInContext(nativeSource, context);
   for (const id of serviceIds) {
-    context.window.NexusNativeServices.register(id, {});
+    context.window.NexusNativeServices.register(id, {
+      openControl(sectionId) {
+        context.__openedControls = context.__openedControls || [];
+        context.__openedControls.push([id, sectionId]);
+      }
+    });
   }
   vm.runInContext(sectionsSource, context);
 
@@ -66,7 +79,7 @@ function runWithServices(serviceIds = []) {
       return null;
     }
   });
-  return { sidebar, main };
+  return { sidebar, main, context };
 }
 
 {
@@ -80,11 +93,13 @@ function runWithServices(serviceIds = []) {
 }
 
 {
-  const { main } = runWithServices(["network", "power"]);
+  const { main, context } = runWithServices(["network", "power"]);
   const byId = Object.fromEntries(main.children.map(page => [page.dataset.settingsPage, page]));
   assert.equal(byId.network.children[2].children[0].textContent, "Connected");
   assert.equal(byId.power.children[2].children[0].textContent, "Connected");
   assert.equal(byId.display.children[2].children[0].textContent, "Not connected");
+  byId.network.children[2].children[3].dispatch("click");
+  assert.equal(JSON.stringify(context.__openedControls), JSON.stringify([["network", "network"]]));
 }
 
 console.log("PASS Settings system integration section boundary tests");

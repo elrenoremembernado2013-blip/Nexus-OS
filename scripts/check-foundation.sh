@@ -96,4 +96,12 @@ for item in wallpapers["wallpapers"]:
 PY
 printf 'PASS expected files, Linux Mint config, dry-run CLI checks, signed-checksum, and UEFI/QEMU wiring\n'
 
+for desktop_file in linux/branding/applications/*.desktop; do
+  [[ -f "$desktop_file" ]] || { printf 'Missing desktop entry: %s\n' "$desktop_file" >&2; exit 1; }
+  grep -Fq '[Desktop Entry]' "$desktop_file"
+done
+
+python3 -m py_compile linux/mint/nexus-system-bridge.py scripts/check-linux-bridge.py
+python3 scripts/check-linux-bridge.py
+
 bash scripts/check-prototype.sh

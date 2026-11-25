@@ -88,7 +88,7 @@ function mountMonitor(app) {
   assert.ok(html.includes("No telemetry source"));
   assert.ok(html.includes("No sample values or synthetic graphs are shown."));
   const { grid, cleanup } = mountMonitor(app);
-  assert.equal(grid.children.length, 5);
+  assert.equal(grid.children.length, 7);
   for (const card of grid.children) {
     assert.equal(card.children.at(-1).textContent, "Unavailable");
   }

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS System Monitor
+Comment=Inspect live CPU, memory, storage, and process resource usage
+Exec=sh -c 'command -v gnome-system-monitor >/dev/null 2>&1 && exec gnome-system-monitor || exec xfce4-taskmanager'
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;
+StartupNotify=true

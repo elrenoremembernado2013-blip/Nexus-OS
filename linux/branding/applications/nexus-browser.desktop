@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS Browser
+Comment=Browse the web with the Linux Mint system web browser
+Exec=x-www-browser %u
+Icon=web-browser
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
+StartupNotify=true

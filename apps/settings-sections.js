@@ -58,6 +58,20 @@
       ? "Native Linux Mint service connected."
       : "No system setting has been changed. This capability is planned for the native Linux Mint desktop.";
     card.append(status, message, note);
+    if (available) {
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "action-button";
+      openBtn.textContent = "Open Linux Mint settings";
+      openBtn.addEventListener("click", () => {
+        try {
+          window.NexusNativeServices.call(section.serviceId, "openControl", section.id);
+        } catch (err) {
+          note.textContent = err?.message || "Could not open native settings panel.";
+        }
+      });
+      card.append(openBtn);
+    }
     page.append(heading, summary, card);
     return { nav, page };
   }

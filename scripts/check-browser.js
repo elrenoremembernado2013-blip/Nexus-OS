@@ -30,4 +30,7 @@ assert.equal(browser.validateExternalUrl("ftp://example.com"), null);
 assert.equal(browser.validateExternalUrl("https://bad host"), null);
 assert.equal(browser.validateExternalUrl(""), null);
 assert.equal(browser.validateExternalUrl("http://"), null);
-console.log("PASS Browser external URL validation tests");
+assert.equal(browser.buildSearchUrl("linux mint xfce", "duckduckgo"), "https://duckduckgo.com/?q=linux%20mint%20xfce");
+assert.equal(browser.buildSearchUrl("nexus", "wikipedia"), "https://en.wikipedia.org/wiki/Special:Search?search=nexus");
+assert.equal(browser.buildSearchUrl("   "), null);
+console.log("PASS Browser external URL and search URL validation tests");

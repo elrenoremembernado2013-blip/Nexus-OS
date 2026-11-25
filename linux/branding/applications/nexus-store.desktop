@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS Store
+Comment=Browse and manage APT and Flatpak software on Linux Mint
+Exec=sh -c 'command -v mintinstall >/dev/null 2>&1 && exec mintinstall || exec xfce4-terminal -e "/usr/local/bin/nexus-store-cli --help"'
+Icon=system-software-install
+Terminal=false
+Categories=System;PackageManager;
+StartupNotify=true

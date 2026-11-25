@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS Terminal
+Comment=GNU Bash terminal on Linux Mint
+Exec=xfce4-terminal
+Icon=utilities-terminal
+Terminal=false
+Categories=System;TerminalEmulator;
+StartupNotify=true

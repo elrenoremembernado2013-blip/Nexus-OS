@@ -4,7 +4,9 @@
     { key: "memory", name: "Memory", icon: "▤", detail: "RAM usage and available memory" },
     { key: "storage", name: "Storage", icon: "▣", detail: "Mounted volumes and space usage" },
     { key: "processes", name: "Processes", icon: "≋", detail: "Running processes and resource use" },
-    { key: "network", name: "Network", icon: "⇄", detail: "Interface state and transfer activity" }
+    { key: "network", name: "Network", icon: "⇄", detail: "Interface state and transfer activity" },
+    { key: "battery", name: "Battery", icon: "ϟ", detail: "Charge level and AC power state" },
+    { key: "temperature", name: "Temperature", icon: "◌", detail: "Thermal zone sensor reading" }
   ];
 
   function telemetryAvailable() {
