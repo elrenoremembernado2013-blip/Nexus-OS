@@ -3,12 +3,17 @@
 # Runs strictly as the logged-in desktop user; never elevates privileges.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 APPLY_SCRIPT="$SCRIPT_DIR/apply-nexus-xfce.sh"
-CINNAMON_APPLY="$(cd -- "$SCRIPT_DIR/.." && pwd)/cinnamon/apply-nexus-cinnamon.sh"
+[[ -x "$APPLY_SCRIPT" ]] || APPLY_SCRIPT="$(command -v nexus-apply-xfce || true)"
+CINNAMON_APPLY="$(cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd)/cinnamon/apply-nexus-cinnamon.sh"
+[[ -x "$CINNAMON_APPLY" ]] || CINNAMON_APPLY="$(command -v nexus-apply-cinnamon || true)"
 PANEL_SCRIPT="$SCRIPT_DIR/nexus-panel-status.sh"
+[[ -x "$PANEL_SCRIPT" ]] || PANEL_SCRIPT="$(command -v nexus-panel-status || true)"
 SECURITY_CLI="$SCRIPT_DIR/nexus-security-cli.sh"
+[[ -x "$SECURITY_CLI" ]] || SECURITY_CLI="$(command -v nexus-security-cli || true)"
 GAMING_CLI="$SCRIPT_DIR/nexus-gaming-cli.sh"
+[[ -x "$GAMING_CLI" ]] || GAMING_CLI="$(command -v nexus-gaming-cli || true)"
 MARKER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os"
 MARKER_FILE="$MARKER_DIR/firstboot-done"
 

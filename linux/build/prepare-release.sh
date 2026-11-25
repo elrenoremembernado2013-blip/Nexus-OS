@@ -21,7 +21,7 @@ Prepares release metadata (nexus-release-manifest.json) from a built ISO's
 build-info.json. Never marks an image 'stable' without --vm-verified.
 
 Options:
-  --stage STAGE     Release stage: development | testing | stable (default: development)
+  --stage STAGE     Release stage: development | alpha | beta | rc | testing | stable (default: development)
   --version VER     NEXUS OS release version (default: 0.3.0)
   --vm-verified     Confirm live VM boot + Ubiquity installation test passed
   --build-info PATH Override build-info.json input path
@@ -45,7 +45,7 @@ while (($#)); do
 done
 
 case "$STAGE" in
-  development|testing|stable) ;;
+  development|alpha|beta|rc|testing|stable) ;;
   *) printf 'Invalid --stage: %s\n' "$STAGE" >&2; exit 2 ;;
 esac
 

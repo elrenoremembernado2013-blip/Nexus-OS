@@ -4,8 +4,9 @@
 # passwords, and never silently partitions or erases any disk.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 PREFLIGHT="$SCRIPT_DIR/nexus-install-preflight.sh"
+[[ -x "$PREFLIGHT" ]] || PREFLIGHT="$(command -v nexus-install-preflight || true)"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/nexus-os"
 LOG_FILE="$LOG_DIR/installer.log"
 

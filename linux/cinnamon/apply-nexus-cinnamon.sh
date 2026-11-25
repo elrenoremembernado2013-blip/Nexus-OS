@@ -4,7 +4,7 @@
 # Runs strictly as the desktop user; never touches system files or requires root.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 THEMES_JSON="$SCRIPT_DIR/themes.json"
 CINNAMON_TEMPLATE="$SCRIPT_DIR/cinnamon-base.css"
 GTK3_TEMPLATE="$SCRIPT_DIR/gtk3-base.css"

@@ -1,8 +1,9 @@
 [Desktop Entry]
+Version=1.0
 Type=Application
 Name=NEXUS Terminal
 Comment=GNU Bash terminal on Linux Mint
-Exec=xfce4-terminal
+Exec=sh -c 'command -v gnome-terminal >/dev/null 2>&1 && exec gnome-terminal || command -v xfce4-terminal >/dev/null 2>&1 && exec xfce4-terminal || exec x-terminal-emulator'
 Icon=utilities-terminal
 Terminal=false
 Categories=System;TerminalEmulator;

@@ -4,11 +4,14 @@
 # overclocking settings; Steam install/remove delegates via Polkit (pkexec).
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 STORE_CLI="$SCRIPT_DIR/nexus-store-cli.sh"
+[[ -x "$STORE_CLI" ]] || STORE_CLI="$(command -v nexus-store-cli || true)"
 XFCE_APPLY="$SCRIPT_DIR/apply-nexus-xfce.sh"
+[[ -x "$XFCE_APPLY" ]] || XFCE_APPLY="$(command -v nexus-apply-xfce || true)"
 CINNAMON_APPLY="$REPO_ROOT/linux/cinnamon/apply-nexus-cinnamon.sh"
+[[ -x "$CINNAMON_APPLY" ]] || CINNAMON_APPLY="$(command -v nexus-apply-cinnamon || true)"
 STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os"
 GAMING_STATE_FILE="$STATE_DIR/gaming-mode.state"
 

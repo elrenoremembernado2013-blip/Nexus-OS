@@ -53,6 +53,16 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
 }
 
 
+def resolve_helper(repo_rel: str, installed_name: str) -> list[str]:
+    candidate = REPO_ROOT / repo_rel
+    if candidate.is_file():
+        return ["bash", str(candidate)]
+    installed = shutil.which(installed_name)
+    if installed:
+        return [installed]
+    raise FileNotFoundError(f"Missing helper {repo_rel} and {installed_name}")
+
+
 def read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8", errors="replace").strip()
@@ -473,27 +483,24 @@ def serve_loopback(port: int) -> None:
             if parsed.path == "/api/telemetry":
                 self._send_json(HTTPStatus.OK, collect_telemetry_snapshot())
             elif parsed.path == "/api/security/status":
-                sec_cli = Path(__file__).resolve().with_name("nexus-security-cli.sh")
                 proc = subprocess.run(
-                    ["bash", str(sec_cli), "status"],
+                    resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["status"],
                     capture_output=True,
                     text=True,
                     check=True,
                 )
                 self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
             elif parsed.path == "/api/gaming/status":
-                gam_cli = Path(__file__).resolve().with_name("nexus-gaming-cli.sh")
                 proc = subprocess.run(
-                    ["bash", str(gam_cli), "status"],
+                    resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["status"],
                     capture_output=True,
                     text=True,
                     check=True,
                 )
                 self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
             elif parsed.path == "/api/installer/preflight":
-                pre_cli = Path(__file__).resolve().parents[1] / "installer" / "nexus-install-preflight.sh"
                 proc = subprocess.run(
-                    ["bash", str(pre_cli)],
+                    resolve_helper("linux/installer/nexus-install-preflight.sh", "nexus-install-preflight"),
                     capture_output=True,
                     text=True,
                     check=True,
@@ -540,9 +547,8 @@ def serve_loopback(port: int) -> None:
                 if mode_action not in ("enable", "disable"):
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid gaming mode action"})
                     return
-                gam_cli = Path(__file__).resolve().with_name("nexus-gaming-cli.sh")
                 proc = subprocess.run(
-                    ["bash", str(gam_cli), "gaming-mode", mode_action],
+                    resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["gaming-mode", mode_action],
                     capture_output=True,
                     text=True,
                 )
@@ -551,8 +557,7 @@ def serve_loopback(port: int) -> None:
                     {"ok": proc.returncode == 0, "message": proc.stdout.strip() or proc.stderr.strip()},
                 )
             elif self.path == "/api/personalisation/apply":
-                cinnamon_cli = Path(__file__).resolve().parents[1] / "cinnamon" / "apply-nexus-cinnamon.sh"
-                cmd = ["bash", str(cinnamon_cli)]
+                cmd = resolve_helper("linux/cinnamon/apply-nexus-cinnamon.sh", "nexus-apply-cinnamon")
                 if body.get("dryRun"):
                     cmd.append("--dry-run")
                 if body.get("revert"):

@@ -143,11 +143,18 @@ fi
 share_dir="$PREFIX_DIR/share/nexus-os"
 bin_dir="$PREFIX_DIR/bin"
 
-run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/config" "$share_dir/branding" "$bin_dir"
+run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$bin_dir"
 run_cmd install -m 0644 "$REPO_ROOT/linux/xfce/nexus-dark.css" "$share_dir/xfce/nexus-dark.css"
+run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/themes.json" "$share_dir/cinnamon/themes.json"
+run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/wallpapers.json" "$share_dir/cinnamon/wallpapers.json"
+run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/cinnamon-base.css" "$share_dir/cinnamon/cinnamon-base.css"
+run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/gtk3-base.css" "$share_dir/cinnamon/gtk3-base.css"
+run_cmd install -m 0755 "$REPO_ROOT/linux/cinnamon/apply-nexus-cinnamon.sh" "$share_dir/cinnamon/apply-nexus-cinnamon.sh"
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" "$share_dir/branding/nexus-logo.svg"
 run_cmd install -m 0644 "$SYSTEM_CONF" "$share_dir/config/nexus-system.conf"
+run_cmd install -m 0644 "$REPO_ROOT/LICENSE" "$share_dir/LICENSE"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/apply-nexus-xfce.sh" "$bin_dir/nexus-apply-xfce"
+run_cmd ln -sf "$share_dir/cinnamon/apply-nexus-cinnamon.sh" "$bin_dir/nexus-apply-cinnamon"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/measure-footprint.sh" "$bin_dir/nexus-measure-footprint"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-panel-status.sh" "$bin_dir/nexus-panel-status"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/madoo-qualify-report.sh" "$bin_dir/nexus-qualify-report"
@@ -167,11 +174,15 @@ done
 if [[ "$DRY_RUN" == true ]]; then
   printf '[dry-run] Write /etc/nexus-os-release (preserving /etc/os-release)\n'
 else
+  detected_de="xfce"
+  if command -v cinnamon-session >/dev/null 2>&1; then
+    detected_de="cinnamon"
+  fi
   cat > /etc/nexus-os-release <<META
 NEXUS_NAME="NEXUS OS"
 NEXUS_BASE_DISTRO="$os_id"
 NEXUS_BASE_CODENAME="$os_codename"
-NEXUS_DESKTOP="xfce"
+NEXUS_DESKTOP="$detected_de"
 NEXUS_GAMING_PROVISIONED="$WITH_GAMING"
 NEXUS_DEV_PROVISIONED="$WITH_DEV"
 META
