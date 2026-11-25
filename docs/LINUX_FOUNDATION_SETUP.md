@@ -10,8 +10,8 @@ This milestone establishes verified Linux Mint 22.3 Xfce installation media and 
 - Ubuntu 26.04 Desktop lists 6 GB RAM and 25 GB free storage for a comfortable experience. This is why Mint Xfce is the current desktop choice. The exact complete NEXUS memory and storage use still needs testing.
 - Guest direction: X11, Xfce, Xfwm4, GRUB, systemd; UEFI firmware via OVMF in QEMU.
 - `scripts/`: media verification, QEMU launch, and static checks.
-- `linux/config/`: declarative design defaults (`NEXUS_TARGET_RAM_MB` is read as the fallback default by `scripts/launch-qemu.sh`); not yet consumed by an image build.
-- `linux/xfce/` and `linux/mint/`: user-session GTK3/Xfce theme & low-resource defaults (`apply-nexus-xfce.sh`), a focused `xfce4-genmon-plugin` panel status helper (`nexus-panel-status.sh`), a read-only RAM/disk footprint reporter (`measure-footprint.sh`), and a read-only MADOO live-media qualification reporter (`madoo-qualify-report.sh`) for booted Linux Mint 22.3 Xfce guests.
+- `linux/config/`: declarative design defaults (`NEXUS_TARGET_RAM_MB` is read as the fallback default by `scripts/launch-qemu.sh`) and the curated Linux Mint package manifest (`mint-packages.list`).
+- `linux/xfce/` and `linux/mint/`: user-session GTK3/Xfce theme & low-resource defaults (`apply-nexus-xfce.sh`), guest provisioning baseline (`provision-nexus-guest.sh`, dry-run checked locally; requires a booted Mint guest for live execution), per-user first-boot setup (`nexus-firstboot.sh`), a focused `xfce4-genmon-plugin` panel status helper (`nexus-panel-status.sh`), a read-only RAM/disk footprint reporter (`measure-footprint.sh`), and a read-only MADOO live-media qualification reporter (`madoo-qualify-report.sh`).
 - `nexus-br2-external/`: retained separately for experimental Buildroot work; it is not the primary desktop.
 - `build/`: local downloads, VM state, and disk images; ignored by Git.
 

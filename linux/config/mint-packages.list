@@ -1,0 +1,20 @@
+# Curated APT package manifest for Linux Mint 22.3 Xfce (Ubuntu 24.04 Noble base).
+# Consumed by linux/mint/provision-nexus-guest.sh.
+# Format: <section>:<apt-package>
+
+# Core desktop panel, security, and verification tools
+core:ufw
+core:unattended-upgrades
+core:xfce4-genmon-plugin
+core:ca-certificates
+core:gnupg
+core:curl
+
+# Application store / Flatpak support
+store:flatpak
+
+# Optional gaming & graphics compatibility (--with-gaming)
+gaming:vulkan-tools
+gaming:mesa-vulkan-drivers
+gaming:gamemode
+gaming:steam-installer

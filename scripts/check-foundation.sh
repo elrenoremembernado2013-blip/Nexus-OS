@@ -4,20 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
 fi
 
-for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/xfce/nexus-dark.css docs/LINUX_FOUNDATION_SETUP.md; do
+for required in .gitignore LICENSE package.json linux/config/README.md linux/config/nexus-system.conf linux/config/mint-packages.list linux/xfce/nexus-dark.css docs/LINUX_FOUNDATION_SETUP.md; do
   [[ -f "$required" ]] || { printf 'Missing required foundation file: %s\n' "$required" >&2; exit 1; }
 done
 
@@ -54,6 +54,11 @@ bash linux/mint/nexus-panel-status.sh --json >/dev/null
 bash linux/mint/madoo-qualify-report.sh --help >/dev/null
 bash linux/mint/madoo-qualify-report.sh --plain >/dev/null
 bash linux/mint/madoo-qualify-report.sh --markdown >/dev/null
+bash linux/mint/provision-nexus-guest.sh --help >/dev/null
+bash linux/mint/provision-nexus-guest.sh --dry-run >/dev/null
+bash linux/mint/provision-nexus-guest.sh --dry-run --with-gaming --autostart-firstboot >/dev/null
+bash linux/mint/nexus-firstboot.sh --help >/dev/null
+bash linux/mint/nexus-firstboot.sh --dry-run --profile lightweight --theme dark --check-updates --gaming-status --mark-done >/dev/null
 printf 'PASS expected files, Linux Mint config, dry-run CLI checks, signed-checksum, and UEFI/QEMU wiring\n'
 
 bash scripts/check-prototype.sh
