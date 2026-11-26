@@ -133,6 +133,7 @@ bash linux/test/run-qemu-validation.sh --dry-run >/dev/null
 bash linux/test/run-qemu-validation.sh --edition lite-lxqt --install-test --reliability --dry-run >/dev/null
 bash linux/test/run-phase125-tests.sh --dry-run >/dev/null
 bash linux/test/run-phase130-tests.sh --dry-run >/dev/null
+python3 linux/test/qemu-graphical-runner.py --help | grep -Fq 'dualboot'
 
 # Phase 12 invariant checks: Edition isolation, Lite Openbox/LXQt sync & safety, Openbox XML, and --revert hygiene
 python3 - <<'PY'

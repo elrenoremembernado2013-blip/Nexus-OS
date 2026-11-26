@@ -282,34 +282,46 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
         extra_diag["dirty_mount_created"] = True
     elif install_mode == "dualboot":
         # Simulate an existing Windows/OS disk: vda1=512M ESP with Microsoft EFI stub, vda2=4G NTFS (or FAT32 fallback), vda3=15G+ target root
-        subprocess.run(["wipefs", "-af", "/dev/vda"], capture_output=True, check=False)
-        subprocess.run(["parted", "-s", "/dev/vda", "mklabel", "gpt"], check=True)
-        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "ESP", "fat32", "1MiB", "513MiB"], check=True)
-        subprocess.run(["parted", "-s", "/dev/vda", "set", "1", "esp", "on"], check=True)
-        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "Windows", "ntfs", "513MiB", "4609MiB"], check=True)
-        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "nexus_root", "ext4", "4609MiB", "100%"], check=True)
-        subprocess.run(["partprobe", "/dev/vda"], capture_output=True, check=False)
-        subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
-        subprocess.run(["mkfs.vfat", "-F", "32", "-n", "ESP", "/dev/vda1"], capture_output=True, check=True)
-        emnt = Path("/mnt/nexus-esp-prep")
-        emnt.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["mount", "/dev/vda1", str(emnt)], check=True)
-        (emnt / "EFI/Microsoft/Boot").mkdir(parents=True, exist_ok=True)
-        (emnt / "EFI/Microsoft/Boot/bootmgfw.efi").write_text("SIMULATED_WINDOWS_BOOTMGR\n", encoding="utf-8")
-        subprocess.run(["umount", str(emnt)], check=True)
-        if shutil.which("mkfs.ntfs"):
-            subprocess.run(["mkfs.ntfs", "-Q", "-F", "-L", "Windows", "/dev/vda2"], capture_output=True, check=True)
-            extra_diag["simulated_os_fs"] = "ntfs"
-        else:
-            subprocess.run(["mkfs.vfat", "-F", "32", "-n", "WINOS", "/dev/vda2"], capture_output=True, check=True)
-            extra_diag["simulated_os_fs"] = "vfat_fallback"
-        wmnt = Path("/mnt/nexus-win-prep")
-        wmnt.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["mount", "/dev/vda2", str(wmnt)], check=True)
-        (wmnt / "Windows/System32").mkdir(parents=True, exist_ok=True)
-        (wmnt / "Windows/System32/winload.efi").write_text("SIMULATED_WINLOAD\n", encoding="utf-8")
-        (wmnt / "dualboot-ntfs-marker.txt").write_text("windows-os-preserved\n", encoding="utf-8")
-        subprocess.run(["umount", str(wmnt)], check=True)
+        try:
+            subprocess.run(["wipefs", "-af", "/dev/vda"], capture_output=True, check=False)
+            subprocess.run(["parted", "-s", "/dev/vda", "mklabel", "gpt"], check=True)
+            subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "ESP", "fat32", "1MiB", "513MiB"], check=True)
+            subprocess.run(["parted", "-s", "/dev/vda", "set", "1", "esp", "on"], check=True)
+            subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "Windows", "ntfs", "513MiB", "4609MiB"], check=True)
+            subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "nexus_root", "ext4", "4609MiB", "100%"], check=True)
+            subprocess.run(["partprobe", "/dev/vda"], capture_output=True, check=False)
+            subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
+            subprocess.run(["mkfs.vfat", "-F", "32", "-n", "ESP", "/dev/vda1"], capture_output=True, check=True)
+            emnt = Path("/mnt/nexus-esp-prep")
+            emnt.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["mount", "/dev/vda1", str(emnt)], check=True)
+            (emnt / "EFI/Microsoft/Boot").mkdir(parents=True, exist_ok=True)
+            (emnt / "EFI/Microsoft/Boot/bootmgfw.efi").write_text("SIMULATED_WINDOWS_BOOTMGR\n", encoding="utf-8")
+            subprocess.run(["umount", str(emnt)], check=True)
+            if shutil.which("mkfs.ntfs"):
+                subprocess.run(["mkfs.ntfs", "-Q", "-F", "-L", "Windows", "/dev/vda2"], capture_output=True, check=True)
+                extra_diag["simulated_os_fs"] = "ntfs"
+            else:
+                subprocess.run(["mkfs.vfat", "-F", "32", "-n", "WINOS", "/dev/vda2"], capture_output=True, check=True)
+                extra_diag["simulated_os_fs"] = "vfat_fallback"
+            subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
+            wmnt = Path("/mnt/nexus-win-prep")
+            wmnt.mkdir(parents=True, exist_ok=True)
+            mounted_win = False
+            for m_cmd in (["mount", "/dev/vda2", str(wmnt)], ["mount", "-t", "ntfs-3g", "/dev/vda2", str(wmnt)], ["mount", "-t", "ntfs3", "/dev/vda2", str(wmnt)]):
+                if subprocess.run(m_cmd, capture_output=True).returncode == 0:
+                    mounted_win = True
+                    break
+            if not mounted_win:
+                raise RuntimeError("Failed to mount simulated /dev/vda2 OS partition")
+            (wmnt / "Windows/System32").mkdir(parents=True, exist_ok=True)
+            (wmnt / "Windows/System32/winload.efi").write_text("SIMULATED_WINLOAD\n", encoding="utf-8")
+            (wmnt / "dualboot-ntfs-marker.txt").write_text("windows-os-preserved\n", encoding="utf-8")
+            subprocess.run(["umount", str(wmnt)], check=True)
+            subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
+        except Exception as exc:
+            pw_file.unlink(missing_ok=True)
+            return {"install_success": False, "install_mode": install_mode, "reason": f"dualboot_prep_error: {exc}", **extra_diag}
         # Verify nexus-install-preflight detects simulated dual-boot layout before installing
         if shutil.which("nexus-install-preflight"):
             pf_res = subprocess.run(["nexus-install-preflight", "--json"], capture_output=True, text=True, timeout=20)
@@ -397,9 +409,11 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
             extra_diag["dualboot_efi_preserved"] = (mnt / "boot/efi/EFI/Microsoft/Boot/bootmgfw.efi").is_file()
             wmnt = Path("/mnt/nexus-win-verify")
             wmnt.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["mount", "-o", "ro", "/dev/vda2", str(wmnt)], check=True)
-            extra_diag["dualboot_os_part_preserved"] = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
-            subprocess.run(["umount", str(wmnt)], check=True)
+            for m_cmd in (["mount", "-o", "ro", "/dev/vda2", str(wmnt)], ["mount", "-t", "ntfs-3g", "-o", "ro", "/dev/vda2", str(wmnt)], ["mount", "-t", "ntfs3", "-o", "ro", "/dev/vda2", str(wmnt)]):
+                if subprocess.run(m_cmd, capture_output=True).returncode == 0:
+                    extra_diag["dualboot_os_part_preserved"] = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
+                    subprocess.run(["umount", str(wmnt)], capture_output=True)
+                    break
 
         # Enable ttyS0 serial console inside disposable test disk grub.cfg for CI diagnostics
         grub_def = mnt / "etc/default/grub"
@@ -852,9 +866,11 @@ def main():
         if root_src == "/dev/vda3" and Path("/dev/vda2").exists():
             wmnt = Path("/mnt/nexus-win-check")
             wmnt.mkdir(parents=True, exist_ok=True)
-            if subprocess.run(["mount", "-o", "ro", "/dev/vda2", str(wmnt)], capture_output=True).returncode == 0:
-                dualboot_os_part_preserved = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
-                subprocess.run(["umount", str(wmnt)], capture_output=True)
+            for m_cmd in (["mount", "-o", "ro", "/dev/vda2", str(wmnt)], ["mount", "-t", "ntfs-3g", "-o", "ro", "/dev/vda2", str(wmnt)], ["mount", "-t", "ntfs3", "-o", "ro", "/dev/vda2", str(wmnt)]):
+                if subprocess.run(m_cmd, capture_output=True).returncode == 0:
+                    dualboot_os_part_preserved = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
+                    subprocess.run(["umount", str(wmnt)], capture_output=True)
+                    break
         installed_checks = {
             "root_source": root_src,
             "booted_from_vda": root_src.startswith("/dev/vda") or luks_active,

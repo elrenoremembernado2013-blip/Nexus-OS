@@ -151,7 +151,7 @@ def main():
     ap.add_argument("--panel-wait-sec", type=int, default=90)
     ap.add_argument("--timeout-seconds", type=int, default=900)
     ap.add_argument("--do-install", action="store_true")
-    ap.add_argument("--install-mode", choices=["guided", "manual", "recovery", "luks"], default="guided")
+    ap.add_argument("--install-mode", choices=["guided", "manual", "recovery", "dualboot", "luks"], default="guided")
     ap.add_argument("--luks-passphrase-file", default="")
     ap.add_argument("--luks-test-wrong-pass", action="store_true")
     ap.add_argument("--serial-sock", default="")
