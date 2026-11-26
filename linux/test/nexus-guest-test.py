@@ -398,6 +398,16 @@ def main():
     stages = {}
     stages["1_post_login"] = run_probe("post_login")
     send_event(port_fd, "stage_mem", stages["1_post_login"])
+    if shutil.which("xset"):
+        try:
+            subprocess.run(
+                ["su", "-s", "/bin/sh", sess["user"], "-c", f"DISPLAY={sess['display']} xset s off -dpms"],
+                env={**os.environ, "DISPLAY": sess["display"], "XAUTHORITY": sess["xauthority"]},
+                capture_output=True,
+                timeout=5,
+            )
+        except Exception:
+            pass
 
     # Wait up to panel_wait_sec for panel + desktop window to actually map in X11
     panel_expected = {"lite": "tint2", "lite-lxqt": "lxqt-panel", "cinnamon": "cinnamon", "xfce": "xfce4-panel"}.get(edition)
@@ -411,7 +421,9 @@ def main():
         if edition == "lite":
             panel_win_mapped = ("tint2" in win_txt) or (panel_expected in procs and len(wins) >= 1)
         elif edition == "lite-lxqt":
-            panel_win_mapped = ("lxqt-panel" in win_txt or "pcmanfm-qt" in win_txt) or (panel_expected in procs and len(wins) >= 1)
+            panel_win_mapped = ("lxqt-panel" in win_txt and "pcmanfm-qt" in win_txt) or (
+                i >= 15 and ("lxqt-panel" in win_txt or (panel_expected in procs and len(wins) >= 1))
+            )
         elif edition == "cinnamon":
             panel_win_mapped = ("desktop" in win_txt or "muffin" in win_txt or "cinnamon" in win_txt) and len(wins) >= 2
         else:

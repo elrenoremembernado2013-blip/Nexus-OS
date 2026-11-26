@@ -67,11 +67,19 @@ jobs:
                   "upload_iso": True,
               },
               {
-                  "job_slug": "lite-lxqt-low",
+                  "job_slug": "lite-lxqt-512",
                   "edition": "lite-lxqt",
                   "base_edition": "xfce",
-                  "ram_matrix": "512 768",
-                  "install_ram_matrix": "512 768",
+                  "ram_matrix": "512",
+                  "install_ram_matrix": "512",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "lite-lxqt-768",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "ram_matrix": "768",
+                  "install_ram_matrix": "768",
                   "upload_iso": False,
               },
               {

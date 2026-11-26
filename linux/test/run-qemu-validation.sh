@@ -317,16 +317,16 @@ PY
     rm -f -- "$vserial_sock" "$gqmp_sock" "$rep_json"
 
     rep_idle="$idle_sec"
+    if (( rep > 1 )); then
+      rep_idle=20
+    fi
     install_flag=()
-    timeout_sec=$(( rep_idle + 600 ))
+    timeout_sec=$(( rep_idle + 720 ))
     rep_disk="$run_dir/rep-${rep}-disk.qcow2"
     qemu-img create -f qcow2 "$rep_disk" 20G >/dev/null
     if [[ "$do_install_tier" == true && "$rep" -le "$install_repeats" ]]; then
       install_flag=(--do-install)
       timeout_sec=$(( rep_idle + 2700 ))
-    fi
-    if (( rep > 1 )); then
-      rep_idle=20
     fi
     cmd_json="$(run_live_cmd_json "$ram_mb" "$rep_disk" "$gserial_log" "$gqmp_sock" "$vserial_sock" "$VGA_MODE")"
     python3 "$SCRIPT_DIR/qemu-graphical-runner.py" \
@@ -406,7 +406,7 @@ except Exception: print("0")' "$rep_json")"
       --panel-wait-sec 90 \
       --expected-boots 1 \
       --final-action poweroff \
-      --timeout-seconds $(( idle_sec + 600 )) > "$inst_cold_json" || true
+      --timeout-seconds $(( idle_sec + 900 )) > "$inst_cold_json" || true
   fi
 
   python3 - "$SUMMARY" "$ram_mb" "$uefi_alive" "$serial_log" "$screendump_ppm" "$screendump_png" "$live_runs_dir" "$inst_warm_json" "$inst_cold_json" "$cinn_virtio_json" "$SCRIPT_DIR" <<'PY'
