@@ -355,7 +355,7 @@ for mode in ("manual", "recovery"):
             "manual_extra_part_preserved": ir.get("manual_extra_part_preserved"),
             "installed_boot_ok": bool(ic.get("booted_from_vda") and ic.get("live_iso_absent")),
             "extra_partition_preserved_after_boot": ic.get("extra_partition_preserved"),
-            "persistence_verified": bool(per.get("persistence_verified")),
+            "persistence_verified": per.get("persistence_verified"),
             "failed_systemd_units": ic.get("failed_systemd_units"),
         }
 

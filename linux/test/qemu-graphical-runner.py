@@ -201,9 +201,10 @@ def main():
     }
     wrong_sent_this_boot = False
     correct_sent_this_boot = False
+    prompts_seen_this_boot = 0
 
     def poll_serial_luks():
-        nonlocal serial_buf, wrong_sent_this_boot, correct_sent_this_boot
+        nonlocal serial_buf, wrong_sent_this_boot, correct_sent_this_boot, prompts_seen_this_boot
         if not serial_s:
             return
         try:
@@ -220,12 +221,13 @@ def main():
             if wrong_sent_this_boot and not luks_diag["wrong_passphrase_rejected"]:
                 if any(m in low for m in ("bad password", "no key available", "try again", "failed to setup")):
                     luks_diag["wrong_passphrase_rejected"] = True
-            # Detect LUKS passphrase prompt (each prompt adds new text ending with ':')
+            # Detect LUKS passphrase prompt (each prompt in current boot increments prompts_seen_this_boot)
             prompt_hits = sum(serial_buf.count(p) for p in ("Please unlock disk", "Enter passphrase for"))
-            if prompt_hits > luks_diag["prompts_count"] and serial_buf.rstrip().endswith(":"):
+            if prompt_hits > prompts_seen_this_boot and serial_buf.rstrip().endswith(":"):
                 luks_diag["prompt_seen"] = True
-                luks_diag["prompts_count"] = prompt_hits
-                if args.luks_test_wrong_pass and not wrong_sent_this_boot:
+                prompts_seen_this_boot = prompt_hits
+                luks_diag["prompts_count"] += 1
+                if args.luks_test_wrong_pass and not wrong_sent_this_boot and not luks_diag["wrong_passphrase_rejected"]:
                     wrong_sent_this_boot = True
                     serial_s.sendall(b"wrong-passphrase-neg-test\n")
                 elif luks_pass and not correct_sent_this_boot:
@@ -334,6 +336,8 @@ def main():
                                     vs.sendall(b'{"cmd":"reboot"}\n')
                                     cycle_idx += 1
                                     boot_shot_taken = False
+                                    serial_buf = ""
+                                    prompts_seen_this_boot = 0
                                     wrong_sent_this_boot = False
                                     correct_sent_this_boot = False
                                     start_t = time.time()

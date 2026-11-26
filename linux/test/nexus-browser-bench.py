@@ -181,6 +181,10 @@ def x_env(sess):
     env = dict(os.environ)
     env["DISPLAY"] = sess["display"]
     env["XAUTHORITY"] = sess["xauthority"]
+    env["HOME"] = sess["home"]
+    env["USER"] = sess["user"]
+    env["LOGNAME"] = sess["user"]
+    env["XDG_RUNTIME_DIR"] = f"/run/user/{sess['uid']}"
     if sess.get("dbus"):
         env["DBUS_SESSION_BUS_ADDRESS"] = sess["dbus"]
     return env
@@ -209,7 +213,7 @@ def x11_windows(sess):
     return [l.strip() for l in res.stdout.splitlines() if l.strip().startswith("0x") and '"' in l]
 
 
-def kill_browser(proc_names, main_procs):
+def kill_browser(uid, proc_names, main_procs):
     for p in main_procs:
         if p.poll() is None:
             try:
@@ -218,25 +222,26 @@ def kill_browser(proc_names, main_procs):
                 pass
     time.sleep(3)
     for name in proc_names:
-        subprocess.run(["pkill", "-TERM", "-f", name], capture_output=True)
+        subprocess.run(["pkill", "-u", str(uid), "-TERM", "-f", name], capture_output=True)
     time.sleep(2)
     for name in proc_names:
-        subprocess.run(["pkill", "-KILL", "-f", name], capture_output=True)
+        subprocess.run(["pkill", "-u", str(uid), "-KILL", "-f", name], capture_output=True)
 
 
-def run_browser_suite(sess, port_fd=None, port_file=None):
+def run_browser_suite(sess, port_fd=None, port_file=None, send_event=None, wait_for_cmd=None):
     srv = BenchHTTPServer()
     base = f"http://127.0.0.1:{srv.port}"
     urls = [f"{base}/page1.html", f"{base}/page2.html", f"{base}/page3.html", f"{base}/page4.html"]
 
     candidates = [
-        ("falkon", "falkon", ["falkon"], lambda u, first: ["falkon", "--no-remote", u] if first else ["falkon", "--new-tab", u]),
-        ("firefox", "firefox", ["firefox", "isolated", "web content"], lambda u, first: ["firefox", "--new-instance", u] if first else ["firefox", "--new-tab", u]),
+        ("falkon", "falkon", ["falkon", "qtwebengine"]),
+        ("firefox", "firefox", ["firefox", "isolated", "web content"]),
     ]
+    sys_ram_mib = read_mem_snapshot([])["ram_total_mib"]
     results = {}
 
     try:
-        for bname, bin_name, proc_keys, cmd_fn in candidates:
+        for bname, bin_name, proc_keys in candidates:
             if not shutil.which(bin_name):
                 results[bname] = {"available": False, "reason": f"{bin_name}_not_installed"}
                 continue
@@ -245,6 +250,8 @@ def run_browser_suite(sess, port_fd=None, port_file=None):
             prof_dir = Path(sess["home"]) / f".nexus-bench-{bname}"
             shutil.rmtree(prof_dir, ignore_errors=True)
             prof_dir.mkdir(parents=True, exist_ok=True)
+            if bname == "falkon":
+                shutil.rmtree(Path(sess["home"]) / ".config/falkon/profiles" / f"nexus-bench-{bname}", ignore_errors=True)
             pw = pwd.getpwuid(sess["uid"])
             os.chown(prof_dir, pw.pw_uid, pw.pw_gid)
 
@@ -331,18 +338,20 @@ def run_browser_suite(sess, port_fd=None, port_file=None):
                 }
 
             if port_fd is not None and port_file is not None:
-                # Notify host runner so QMP can capture screenshot while max tabs are open
-                msg = {"event": f"browser_{bname}_max", "ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "data": {"browser": bname, "stable_tabs": stable_tabs}}
-                os.write(port_fd, (json.dumps(msg) + "\n").encode("utf-8"))
-                # Wait briefly for ack
-                ack_dl = time.time() + 10
-                while time.time() < ack_dl:
-                    ln = port_file.readline()
-                    if ln:
-                        break
-                    time.sleep(0.2)
+                if send_event and wait_for_cmd:
+                    send_event(port_fd, f"browser_{bname}_max", {"browser": bname, "stable_tabs": stable_tabs})
+                    wait_for_cmd(port_file, "ack", timeout=15)
+                else:
+                    msg = {"event": f"browser_{bname}_max", "ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "data": {"browser": bname, "stable_tabs": stable_tabs}}
+                    os.write(port_fd, (json.dumps(msg) + "\n").encode("utf-8"))
+                    ack_dl = time.time() + 10
+                    while time.time() < ack_dl:
+                        ln = port_file.readline()
+                        if ln:
+                            break
+                        time.sleep(0.2)
 
-            kill_browser([bin_name, "Web Content", "QtWebEngineProcess"], procs)
+            kill_browser(sess["uid"], [bin_name, "Web Content", "QtWebEngineProcess"], procs)
             time.sleep(10)
             post_close = read_mem_snapshot(proc_keys)
             shutil.rmtree(prof_dir, ignore_errors=True)
@@ -363,7 +372,7 @@ def run_browser_suite(sess, port_fd=None, port_file=None):
     finally:
         srv.stop()
 
-    return results
+    return {"system_ram_mib": sys_ram_mib, "browsers": results}
 
 
 if __name__ == "__main__":

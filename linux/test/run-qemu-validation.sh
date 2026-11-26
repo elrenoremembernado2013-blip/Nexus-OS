@@ -336,7 +336,7 @@ PY
       --vserial-sock "$vserial_sock" \
       --out-dir "$rep_dir" \
       --idle-seconds "$rep_idle" \
-      --panel-wait-sec 90 \
+      --panel-wait-sec 120 \
       --timeout-seconds "$timeout_sec" \
       "${install_flag[@]}" > "$rep_json" || true
     if [[ "$do_install_tier" == true && "$rep" -le "$install_repeats" ]]; then

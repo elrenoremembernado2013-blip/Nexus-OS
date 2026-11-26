@@ -341,23 +341,34 @@ jobs:
               for tier, tdata in sorted((bench.get("tiers") or {}).items()):
                   compact = {"rc": bench.get("browsers_installed_rc"), "falkon": bench.get("falkon_bin"), "firefox": bench.get("firefox_bin"), "sys_ram": tdata.get("system_ram_mib"), "browsers": {}}
                   for bname, bres in (tdata.get("browsers") or {}).items():
+                      st = bres.get("stages") or {}
+                      steps = []
+                      for sk, tnum in (("tab_1", 1), ("tabs_2", 2), ("tabs_4", 4), ("tabs_6", 6)):
+                          sv = st.get(sk) or {}
+                          sn = sv.get("snapshot") or {}
+                          steps.append({
+                              "t": tnum,
+                              "load_ms": sv.get("page_load_ms") if tnum == 1 else sv.get("avg_page_load_ms"),
+                              "rss": sn.get("browser_rss_mib"),
+                              "used": sn.get("ram_used_mib"),
+                              "sw": sn.get("swap_used_mib"),
+                              "zr": sn.get("zram_ratio"),
+                              "cpu": sn.get("cpu_pct"),
+                              "alive": sv.get("alive", sn.get("browser_procs", 0) > 0),
+                              "oom": sv.get("oom_delta", 0),
+                          })
+                      pc = bres.get("post_close") or {}
                       compact["browsers"][bname] = {
-                          "ok": bres.get("installed_ok"),
+                          "ok": bool(bres.get("available") and bres.get("window_mapped")),
                           "start_s": bres.get("startup_sec"),
                           "tabs_ok": bres.get("stable_tabs_max"),
-                          "oom": bres.get("oom_kills_during_run"),
+                          "oom": bres.get("oom_kills_delta"),
                           "crashes": bres.get("crashes"),
-                          "post_rss": bres.get("post_close_browser_rss_mib"),
-                          "post_used": (bres.get("post_close_mem") or {}).get("used_ram_mib"),
-                          "steps": [{
-                              "t": s.get("target_tabs"),
-                              "load_ms": s.get("load_elapsed_ms"),
-                              "rss": s.get("browser_rss_mib"),
-                              "used": (s.get("mem") or {}).get("used_ram_mib"),
-                              "sw": (s.get("mem") or {}).get("swap_used_mib"),
-                              "cpu": (s.get("mem") or {}).get("cpu_usage_pct"),
-                              "alive": s.get("process_alive"),
-                          } for s in (bres.get("steps") or [])],
+                          "delta_6t": bres.get("ram_delta_6tabs_mib"),
+                          "retained": bres.get("ram_retained_post_close_mib"),
+                          "post_rss": pc.get("browser_rss_mib"),
+                          "post_used": pc.get("ram_used_mib"),
+                          "steps": steps,
                       }
                   print(f"::notice title=NEXUS-125-BENCH-{slug}-{tier}::" + json.dumps(compact, separators=(",", ":")))
           bad = []
@@ -366,6 +377,14 @@ jobs:
                   bad.append(f"unenc:{m}")
           if luks and not (luks.get("install_success") and luks.get("boot1_from_luks") and luks.get("boot2_from_luks") and luks.get("boot2_persistence_verified") and (luks.get("luks_unlock_diag") or {}).get("wrong_passphrase_rejected")):
               bad.append("luks")
+          if bench:
+              tiers = bench.get("tiers") or {}
+              if not tiers:
+                  bad.append("bench:no_tiers")
+              for tier, tdata in tiers.items():
+                  bs = tdata.get("browsers") or {}
+                  if not bs.get("falkon", {}).get("available") or not bs.get("firefox", {}).get("available"):
+                      bad.append(f"bench:{tier}:missing_results")
           if bad:
               print(f"::error title=NEXUS-125-FAIL-{slug}::Failures: {bad}")
               sys.exit(1)

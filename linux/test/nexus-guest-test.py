@@ -339,7 +339,10 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
         if install_mode == "luks":
             extra_diag["crypttab_ok"] = (mnt / "etc/crypttab").is_file()
             extra_diag["luks_recovery_guide_ok"] = (mnt / "usr/local/share/nexus-os/luks-recovery-guide.txt").is_file()
-            extra_diag["crypto_luks_blkid"] = "crypto_LUKS" in blkid_out
+            extra_diag["crypto_luks_blkid"] = (
+                "crypto_LUKS" in blkid_out
+                or subprocess.run(["cryptsetup", "isLuks", "/dev/vda3"], capture_output=True).returncode == 0
+            )
         if install_mode == "manual":
             dmnt = Path("/mnt/nexus-data-verify")
             dmnt.mkdir(parents=True, exist_ok=True)
