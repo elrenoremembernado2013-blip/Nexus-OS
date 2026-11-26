@@ -1,49 +1,228 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "last_updated_utc": "2026-11-24T00:00:00Z",
   "foundation": "Ubuntu 24.04 Noble / Linux Mint 22.3 (x86_64)",
   "status_taxonomy": [
+    "verified",
+    "partially_verified",
+    "supported_untested",
     "detected",
-    "supported",
-    "tested",
-    "partially_tested",
     "unknown",
     "unsupported"
   ],
-  "policy": "Detection alone never implies Tested or Supported on bare metal. QEMU/OVMF runs classify only virtualized VirtIO/QEMU devices as tested (QEMU); real physical hardware remains detected/supported/partially_tested/unknown until physical qualification runs.",
+  "policy": "Detection alone never implies Tested or Verified on bare metal. QEMU/OVMF runs classify only virtualized VirtIO/QEMU devices as verified in qemu_ovmf_tcg; physical hardware components remain supported_untested or untested until physical qualification runs are contributed and audited.",
   "drivers": {
     "gpu": {
-      "bochs-drm": {"status": "tested", "scope": "qemu_ovmf_vga_std", "notes": "QEMU std VGA verified in CI (1280x800)."},
-      "virtio-pci": {"status": "tested", "scope": "qemu_virtio_gpu", "notes": "QEMU virtio-gpu verified in CI."},
-      "virtio_gpu": {"status": "tested", "scope": "qemu_virtio_gpu", "notes": "QEMU virtio-gpu verified in CI."},
-      "i915": {"status": "supported", "scope": "bare_metal_untested", "notes": "Ubuntu Noble Intel graphics driver; hardware-dependent until physical test."},
-      "xe": {"status": "supported", "scope": "bare_metal_untested", "notes": "Ubuntu Noble modern Intel graphics driver; hardware-dependent."},
-      "amdgpu": {"status": "supported", "scope": "bare_metal_untested", "notes": "Ubuntu Noble open-source AMD Radeon + RADV Vulkan driver."},
-      "radeon": {"status": "partially_tested", "scope": "bare_metal_untested", "notes": "Legacy AMD GPUs; Vulkan support limited."},
-      "nouveau": {"status": "partially_tested", "scope": "bare_metal_untested", "notes": "Basic open-source NVIDIA display; proprietary mintdrivers recommended for 3D/Proton."},
-      "nvidia": {"status": "supported", "scope": "proprietary_driver_required", "notes": "Supported via Ubuntu/Mint Driver Manager."}
+      "bochs-drm": {"status": "tested", "scope": "qemu_ovmf_vga_std", "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "Cinnamon llvmpipe >30s initial frame latency under -vga std.", "evidence": "CI Run 45808626482 & 45722286627", "notes": "QEMU std VGA verified in CI (1280x800)."},
+      "virtio-pci": {"status": "tested", "scope": "qemu_virtio_gpu", "tested_editions": ["cinnamon"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "Software llvmpipe under TCG CPU emulation.", "evidence": "CI Run 45722286627", "notes": "QEMU virtio-gpu verified in CI."},
+      "virtio_gpu": {"status": "tested", "scope": "qemu_virtio_gpu", "tested_editions": ["cinnamon"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "None in QEMU 90s diagnostic.", "evidence": "CI Run 45722286627", "notes": "QEMU virtio-gpu verified in CI."},
+      "i915": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (i915/*.bin)"], "known_issues": "Bare-metal HDMI/DP hotplug and GuC/HuC firmware loading untested.", "evidence": "Ubuntu Noble 6.8 kernel driver shipped", "notes": "Intel integrated graphics driver; hardware-dependent until physical test."},
+      "xe": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (xe/*.bin)"], "known_issues": "Modern Intel Arc/Core Ultra GPU; bare-metal untested.", "evidence": "Ubuntu Noble kernel driver shipped", "notes": "Modern Intel graphics driver; hardware-dependent."},
+      "amdgpu": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (amdgpu/*.bin)"], "known_issues": "Bare-metal VRR, sleep/resume, and Vulkan RADV untested.", "evidence": "Ubuntu Noble kernel + Mesa RADV shipped", "notes": "Open-source AMD Radeon + RADV Vulkan driver."},
+      "radeon": {"status": "partially_tested", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (radeon/*.bin)"], "known_issues": "Legacy pre-GCN/GCN1 cards lack full Vulkan support.", "evidence": "Ubuntu Noble kernel driver shipped", "notes": "Legacy AMD GPUs; Vulkan support limited."},
+      "nouveau": {"status": "partially_tested", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (nvidia/*)"], "known_issues": "Limited reclocking and no full Vulkan/Proton acceleration on newer GPUs.", "evidence": "Ubuntu Noble kernel driver shipped", "notes": "Open-source NVIDIA fallback; proprietary mintdrivers recommended."},
+      "nvidia": {"status": "supported", "scope": "proprietary_driver_required", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["nvidia-driver-* (non-free APT)"], "known_issues": "Requires post-install or live Driver Manager setup; Secure Boot MOK enrollment needed if SB enabled.", "evidence": "Linux Mint mintdrivers available", "notes": "Supported via Ubuntu/Mint Driver Manager."}
     },
     "storage": {
-      "virtio_blk": {"status": "tested", "scope": "qemu_vda", "notes": "QEMU VirtIO block storage verified across install + 3 reboots."},
-      "virtio-pci": {"status": "tested", "scope": "qemu_vda", "notes": "QEMU VirtIO PCI storage verified."},
-      "nvme": {"status": "supported", "scope": "bare_metal_untested", "notes": "Linux kernel NVMe driver; physical NVMe install untested."},
-      "ahci": {"status": "supported", "scope": "bare_metal_untested", "notes": "Standard SATA AHCI driver."},
-      "mmc_block": {"status": "partially_tested", "scope": "chromebook_emmc_untested", "notes": "Required for MADOO eMMC; physical eMMC install untested."}
+      "virtio_blk": {"status": "tested", "scope": "qemu_vda", "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "None in QEMU.", "evidence": "CI Run 45808626482 & 45722286627", "notes": "QEMU VirtIO block storage verified across install + 3 reboots."},
+      "virtio-pci": {"status": "tested", "scope": "qemu_vda", "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "None in QEMU.", "evidence": "CI Run 45808626482", "notes": "QEMU VirtIO PCI storage verified."},
+      "nvme": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Physical NVMe APST power states and RAID/VMD BIOS modes untested.", "evidence": "Ubuntu Noble nvme kernel module", "notes": "Linux kernel NVMe driver; physical NVMe install untested."},
+      "ahci": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Physical SATA SSD/HDD untested.", "evidence": "Ubuntu Noble ahci kernel module", "notes": "Standard SATA AHCI driver."},
+      "mmc_block": {"status": "partially_tested", "scope": "chromebook_emmc_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Chromebook eMMC HS400 timing and 32 GB capacity constraints untested on bare metal.", "evidence": "Ubuntu Noble mmc_block module", "notes": "Required for MADOO eMMC; physical eMMC install untested."}
     },
     "network": {
-      "virtio_net": {"status": "tested", "scope": "qemu_virtio_net", "notes": "QEMU VirtIO NIC verified via NetworkManager."},
-      "e1000e": {"status": "supported", "scope": "bare_metal_untested", "notes": "Intel Gigabit Ethernet."},
-      "r8169": {"status": "supported", "scope": "bare_metal_untested", "notes": "Realtek Gigabit Ethernet."},
-      "iwlwifi": {"status": "supported", "scope": "bare_metal_untested", "notes": "Intel Wi-Fi (requires linux-firmware iwlwifi blobs)."},
-      "ath10k_pci": {"status": "supported", "scope": "bare_metal_untested", "notes": "Qualcomm Atheros Wi-Fi."},
-      "ath11k_pci": {"status": "supported", "scope": "bare_metal_untested", "notes": "Qualcomm Atheros Wi-Fi 6."},
-      "mt7921e": {"status": "supported", "scope": "bare_metal_untested", "notes": "MediaTek Wi-Fi 6."},
-      "brcmfmac": {"status": "partially_tested", "scope": "firmware_dependent", "notes": "Broadcom Wi-Fi may require external NVRAM/firmware blobs."}
+      "virtio_net": {"status": "tested", "scope": "qemu_virtio_net", "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "QEMU SLIRP NAT only.", "evidence": "CI Run 45808626482", "notes": "QEMU VirtIO NIC verified via NetworkManager."},
+      "e1000e": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Bare-metal link negotiation untested.", "evidence": "Ubuntu Noble e1000e module", "notes": "Intel Gigabit Ethernet."},
+      "r8169": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (rtl_nic/*)"], "known_issues": "Some RTL8125/RTL8168 revisions depend on firmware blobs.", "evidence": "Ubuntu Noble r8169 module", "notes": "Realtek Gigabit Ethernet."},
+      "iwlwifi": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (iwlwifi-*.ucode)"], "known_issues": "Physical Wi-Fi association, 5/6 GHz bands, and suspend recovery untested.", "evidence": "Ubuntu Noble iwlwifi + linux-firmware", "notes": "Intel Wi-Fi (requires linux-firmware iwlwifi blobs)."},
+      "ath10k_pci": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (ath10k/*)"], "known_issues": "Physical Wi-Fi association untested.", "evidence": "Ubuntu Noble ath10k_pci", "notes": "Qualcomm Atheros Wi-Fi."},
+      "ath11k_pci": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (ath11k/*)"], "known_issues": "Physical Wi-Fi 6 association untested.", "evidence": "Ubuntu Noble ath11k_pci", "notes": "Qualcomm Atheros Wi-Fi 6."},
+      "mt7921e": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (mediatek/*)"], "known_issues": "Physical Wi-Fi 6/Bluetooth combo suspend untested.", "evidence": "Ubuntu Noble mt7921e", "notes": "MediaTek Wi-Fi 6."},
+      "rtw88_8822ce": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (rtw88/*)"], "known_issues": "Realtek PCIe Wi-Fi power-save stability varies by laptop OEM.", "evidence": "Ubuntu Noble rtw88", "notes": "Realtek 8822CE Wi-Fi."},
+      "brcmfmac": {"status": "partially_tested", "scope": "firmware_dependent", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (brcm/*) / NVRAM"], "known_issues": "Broadcom chips often require OEM-specific NVRAM or broadcom-sta-dkms.", "evidence": "Ubuntu Noble brcmfmac", "notes": "Broadcom Wi-Fi may require external NVRAM/firmware blobs."}
+    },
+    "bluetooth": {
+      "btusb": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["linux-firmware (intel/ibt-*, qca/*, mediatek/*)"], "known_issues": "BLE pairing and A2DP/HFP Bluetooth audio untested.", "evidence": "Ubuntu Noble btusb + bluez", "notes": "Standard USB/PCIe Bluetooth HCI driver."}
     },
     "audio": {
-      "snd_hda_intel": {"status": "supported", "scope": "bare_metal_untested", "notes": "Standard Intel/AMD HDA audio via PipeWire/PulseAudio."},
-      "snd_sof_pci_intel_tgl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "notes": "Intel SOF audio requires UCM topology verification on MADOO."},
-      "snd_sof_pci_intel_icl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "notes": "Intel SOF audio requires UCM topology verification."},
-      "snd_sof_pci_intel_apl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "notes": "Intel Gemini/Apollo Lake SOF audio requires Chromebook topology check."}
+      "snd_hda_intel": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Speaker/headphone jack sense and mic array routing untested on physical laptops.", "evidence": "Ubuntu Noble snd_hda_intel + PipeWire", "notes": "Standard Intel/AMD HDA audio via PipeWire/PulseAudio."},
+      "snd_sof_pci_intel_tgl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["firmware-sof-signed"], "known_issues": "Intel Tiger Lake SOF audio requires UCM topology verification on bare metal.", "evidence": "Ubuntu Noble SOF modules", "notes": "Intel SOF audio requires UCM topology verification."},
+      "snd_sof_pci_intel_icl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["firmware-sof-signed"], "known_issues": "Intel Ice Lake SOF audio requires UCM topology verification.", "evidence": "Ubuntu Noble SOF modules", "notes": "Intel SOF audio requires UCM topology verification."},
+      "snd_sof_pci_intel_apl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": ["firmware-sof-signed", "Chromebook UCM2"], "known_issues": "HP Chromebook x360 14b (MADOO) Gemini/Apollo Lake SOF speakers & DMIC require bare-metal audio check.", "evidence": "Ubuntu Noble SOF modules", "notes": "Intel Gemini/Apollo Lake SOF audio requires Chromebook topology check."}
+    },
+    "input": {
+      "i2c_hid_acpi": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Two-finger scroll, tap-to-click, and palm rejection require physical touchpad testing.", "evidence": "Ubuntu Noble i2c_hid_acpi + libinput", "notes": "Modern laptop I2C precision touchpads."},
+      "psmouse": {"status": "partially_tested", "scope": "qemu_ps2_mouse", "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"], "test_environment": "qemu_ovmf_tcg", "required_firmware": [], "known_issues": "Only QEMU PS/2 pointer nudges tested; physical Synaptics/ELAN gestures untested.", "evidence": "CI Run 45808626482", "notes": "PS/2 pointer / legacy touchpad."}
+    },
+    "usb": {
+      "xhci_hcd": {"status": "supported", "scope": "bare_metal_untested", "tested_editions": [], "test_environment": "none_bare_metal", "required_firmware": [], "known_issues": "Physical USB-A/USB-C hotplug, USB-C DisplayPort alt-mode, and webcams untested.", "evidence": "Ubuntu Noble xhci_hcd", "notes": "USB 3.x host controller driver."}
     }
-  }
+  },
+  "categories": [
+    {
+      "id": "intel_igpu",
+      "label": "Intel Integrated Graphics",
+      "drivers": ["i915", "xe"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "supported_untested",
+      "required_firmware": ["linux-firmware (i915/*.bin, xe/*.bin)"],
+      "known_issues": "Not tested on physical Intel iGPU hardware; HDMI/DP hotplug and video decode unverified.",
+      "evidence": "Driver shipped in Ubuntu 24.04 Noble / Linux Mint 22.3 kernel"
+    },
+    {
+      "id": "amd_gpu",
+      "label": "AMD Radeon Graphics",
+      "drivers": ["amdgpu", "radeon"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "supported_untested",
+      "required_firmware": ["linux-firmware (amdgpu/*.bin)"],
+      "known_issues": "Not tested on physical AMD hardware; RADV Vulkan and sleep/resume unverified.",
+      "evidence": "amdgpu + Mesa RADV shipped in base OS"
+    },
+    {
+      "id": "nvidia_gpu",
+      "label": "NVIDIA Discrete / Hybrid Graphics",
+      "drivers": ["nouveau", "nvidia"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "partially_verified",
+      "required_firmware": ["nvidia-driver-* (optional proprietary)", "MOK key if Secure Boot enabled"],
+      "known_issues": "nouveau lacks full Vulkan/Proton performance; proprietary driver + Optimus PRIME untested on physical laptops.",
+      "evidence": "mintdrivers package tooling available; no physical NVIDIA test run"
+    },
+    {
+      "id": "qemu_virtual_gpu",
+      "label": "QEMU Virtual Display (bochs-drm / virtio-gpu)",
+      "drivers": ["bochs-drm", "virtio_gpu", "virtio-pci"],
+      "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"],
+      "test_environment": "qemu_ovmf_tcg",
+      "compatibility_status": "verified",
+      "required_firmware": [],
+      "known_issues": "QEMU virtualized display only; does not qualify physical GPUs. Cinnamon llvmpipe >30s frame delay under -vga std.",
+      "evidence": "QMP screenshots verified across 45808626482 & 45722286627"
+    },
+    {
+      "id": "wifi_adapters",
+      "label": "Wi-Fi Adapters",
+      "drivers": ["iwlwifi", "ath10k_pci", "ath11k_pci", "mt7921e", "rtw88_8822ce", "brcmfmac"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "supported_untested",
+      "required_firmware": ["linux-firmware"],
+      "known_issues": "QEMU tests VirtIO wired NAT only; physical WPA2/WPA3 association, rfkill, and Broadcom/Realtek USB dongles untested.",
+      "evidence": "Kernel drivers & linux-firmware shipped; physical RF untested"
+    },
+    {
+      "id": "bluetooth_adapters",
+      "label": "Bluetooth Adapters",
+      "drivers": ["btusb"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "supported_untested",
+      "required_firmware": ["linux-firmware (btusb blobs)"],
+      "known_issues": "Pairing, BLE HID, and A2DP audio profiles untested.",
+      "evidence": "bluez + btusb shipped in base OS; no Bluetooth device attached in QEMU"
+    },
+    {
+      "id": "audio_devices_sof",
+      "label": "Audio Devices & Intel SOF DSP",
+      "drivers": ["snd_hda_intel", "snd_sof_pci_intel_tgl", "snd_sof_pci_intel_icl", "snd_sof_pci_intel_apl"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "partially_verified",
+      "required_firmware": ["firmware-sof-signed", "alsa-ucm-conf"],
+      "known_issues": "Chromebook MADOO and modern Intel SOF DSP topologies often need UCM2 quirks; unverified on real hardware.",
+      "evidence": "PipeWire/ALSA packages shipped; QEMU runs headless without physical codec"
+    },
+    {
+      "id": "speakers_microphones",
+      "label": "Laptop Speakers & Internal Microphones",
+      "drivers": ["snd_hda_intel", "snd_sof_pci"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "untested",
+      "required_firmware": ["alsa-ucm-conf / sof-firmware"],
+      "known_issues": "Internal DMIC mute LEDs, smart-amp speakers, and headset jack detection are untested.",
+      "evidence": "None (requires physical acoustic capture/playback test)"
+    },
+    {
+      "id": "touchpads_multitouch",
+      "label": "Touchpads & Multi-Touch Gestures",
+      "drivers": ["i2c_hid_acpi", "hid_multitouch", "psmouse"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "untested",
+      "required_firmware": [],
+      "known_issues": "QEMU only simulates PS/2 relative pointer; two-finger scroll, pinch, and palm rejection untested on real touchpads.",
+      "evidence": "libinput + xserver-xorg-input-libinput shipped; physical touchpad untested"
+    },
+    {
+      "id": "usb_peripherals",
+      "label": "USB Ports & Peripherals",
+      "drivers": ["xhci_hcd", "usb_storage", "usbhid", "uvcvideo"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "supported_untested",
+      "required_firmware": [],
+      "known_issues": "Physical USB-A/USB-C hotplug, external webcams, and USB-C DP alt-mode untested.",
+      "evidence": "Standard kernel USB stack shipped"
+    },
+    {
+      "id": "battery_power_management",
+      "label": "Battery Reporting & Power Management",
+      "drivers": ["battery", "ac", "intel_pstate", "amd_pstate"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "untested",
+      "required_firmware": [],
+      "known_issues": "QEMU runs without virtual ACPI battery; upower discharge rates, charge thresholds, and lxqt-powermanagement idle dim untested on laptops.",
+      "evidence": "sysfs BAT* reader tested in diagnostics script; real laptop battery untested"
+    },
+    {
+      "id": "suspend_resume",
+      "label": "Suspend (s2idle / S3 deep) & Resume",
+      "drivers": ["acpi_pm", "s2idle"],
+      "tested_editions": [],
+      "test_environment": "none_bare_metal",
+      "compatibility_status": "untested",
+      "required_firmware": [],
+      "known_issues": "Lid-close suspend, Wi-Fi/GPU/audio wake reliability, and s2idle battery drain are untested on physical hardware.",
+      "evidence": "None (not tested on bare metal)"
+    },
+    {
+      "id": "internal_storage",
+      "label": "Internal Storage (QEMU VirtIO vs NVMe / SATA / eMMC)",
+      "drivers": ["virtio_blk", "nvme", "ahci", "mmc_block"],
+      "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"],
+      "test_environment": "qemu_ovmf_tcg",
+      "compatibility_status": "partially_verified",
+      "required_firmware": [],
+      "known_issues": "virtio_blk (/dev/vda) verified in QEMU; physical NVMe, SATA AHCI, and Chromebook eMMC (/dev/mmcblk*) remain untested on bare metal.",
+      "evidence": "QEMU /dev/vda GPT+ext4 installs verified; physical disks untested"
+    },
+    {
+      "id": "uefi_boot",
+      "label": "64-bit UEFI Boot",
+      "drivers": ["efifb", "efivars", "grub-efi-amd64"],
+      "tested_editions": ["cinnamon", "xfce", "lite", "lite-lxqt"],
+      "test_environment": "qemu_ovmf_tcg",
+      "compatibility_status": "partially_verified",
+      "required_firmware": [],
+      "known_issues": "OVMF UEFI verified across live ISO & installed boots; real OEM UEFI NVRAM boot-order quirks and Legacy BIOS untested.",
+      "evidence": "OVMF if=pflash boots verified in QEMU CI"
+    },
+    {
+      "id": "secure_boot_shim",
+      "label": "UEFI Secure Boot & Signed Shim",
+      "drivers": ["shimx64.efi", "grubx64.efi"],
+      "tested_editions": [],
+      "test_environment": "qemu_ovmf_non_sb",
+      "compatibility_status": "partially_verified",
+      "required_firmware": ["Ubuntu/Mint signed shimx64.efi"],
+      "known_issues": "CI OVMF runs with Secure Boot disabled; enforced Secure Boot signature chain and DKMS MOK enrollment are untested.",
+      "evidence": "EFI/ubuntu/grub.cfg + shim copy logic verified in installer; Secure Boot enforcement untested"
+    }
+  ]
 }

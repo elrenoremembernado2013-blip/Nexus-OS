@@ -151,6 +151,7 @@ if [[ "$GRAPHICAL" == true ]]; then
   cp -f -- "$SCRIPT_DIR/guest-mem-probe.sh" "$main_dir/nexus-test/guest-mem-probe.sh"
   cp -f -- "$SCRIPT_DIR/test-zram-pressure.sh" "$main_dir/nexus-test/test-zram-pressure.sh"
   cp -f -- "$SCRIPT_DIR/nexus-guest-test.py" "$main_dir/nexus-test/nexus-guest-test.py"
+  [[ -f "$SCRIPT_DIR/nexus-browser-bench.py" ]] && cp -f -- "$SCRIPT_DIR/nexus-browser-bench.py" "$main_dir/nexus-test/nexus-browser-bench.py"
   chmod 0755 "$main_dir/scripts/casper-bottom/99nexus_test_harness" "$main_dir/nexus-test/"*
   if [[ -f "$main_dir/scripts/casper-bottom/ORDER" ]]; then
     {

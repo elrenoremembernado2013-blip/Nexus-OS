@@ -21,6 +21,7 @@ mkdir -p "$rootmnt/usr/local/libexec/nexus-test" "$rootmnt/etc/systemd/system/mu
 cp -f /nexus-test/guest-mem-probe.sh "$rootmnt/usr/local/libexec/nexus-test/guest-mem-probe.sh"
 cp -f /nexus-test/test-zram-pressure.sh "$rootmnt/usr/local/libexec/nexus-test/test-zram-pressure.sh"
 cp -f /nexus-test/nexus-guest-test.py "$rootmnt/usr/local/libexec/nexus-test/nexus-guest-test.py"
+[ -f /nexus-test/nexus-browser-bench.py ] && cp -f /nexus-test/nexus-browser-bench.py "$rootmnt/usr/local/libexec/nexus-test/nexus-browser-bench.py" || true
 chmod 0755 "$rootmnt/usr/local/libexec/nexus-test/"*
 
 cat > "$rootmnt/etc/systemd/system/nexus-test-agent.service" <<'UNIT'

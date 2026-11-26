@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/installer/nexus-disk-install.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/lite/scripts/apply-nexus-lite-lxqt.sh linux/lite/scripts/provision-nexus-lite-lxqt.sh linux/lite/scripts/build-nexus-lite-lxqt-iso.sh linux/hardware/nexus-hw-inventory.sh linux/hardware/nexus-hw-diagnostics.sh linux/security/nexus-security-audit.sh linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/casper-test-hook.sh; do
+for script in scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/installer/nexus-disk-install.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/lite/scripts/apply-nexus-lite-lxqt.sh linux/lite/scripts/provision-nexus-lite-lxqt.sh linux/lite/scripts/build-nexus-lite-lxqt-iso.sh linux/hardware/nexus-hw-inventory.sh linux/hardware/nexus-hw-diagnostics.sh linux/security/nexus-security-audit.sh linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/run-phase125-tests.sh linux/test/casper-test-hook.sh; do
   [[ -f "$script" ]] || { printf 'Missing required script: %s\n' "$script" >&2; exit 1; }
   bash -n "$script"
   printf 'PASS bash syntax: %s\n' "$script"
 done
 
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/installer/nexus-disk-install.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/lite/scripts/apply-nexus-lite-lxqt.sh linux/lite/scripts/provision-nexus-lite-lxqt.sh linux/lite/scripts/build-nexus-lite-lxqt-iso.sh linux/hardware/nexus-hw-inventory.sh linux/hardware/nexus-hw-diagnostics.sh linux/security/nexus-security-audit.sh linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/casper-test-hook.sh
+  shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh linux/mint/apply-nexus-xfce.sh linux/mint/measure-footprint.sh linux/mint/nexus-panel-status.sh linux/mint/madoo-qualify-report.sh linux/mint/provision-nexus-guest.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-store-cli.sh linux/mint/nexus-security-cli.sh linux/mint/nexus-gaming-cli.sh linux/installer/nexus-install-preflight.sh linux/installer/nexus-installer-launcher.sh linux/installer/nexus-disk-install.sh linux/build/check-build-prereqs.sh linux/build/validate-packages.sh linux/build/apply-iso-branding.sh linux/build/build-nexus-iso.sh linux/build/verify-nexus-iso.sh linux/build/prepare-release.sh linux/cinnamon/apply-nexus-cinnamon.sh linux/lite/apply-nexus-lite.sh linux/lite/configure-zram.sh linux/lite/memory-audit.sh linux/lite/provision-nexus-lite.sh linux/lite/build-nexus-lite-iso.sh linux/lite/nexus-lite-install.sh linux/lite/openbox/autostart linux/lite/scripts/apply-nexus-lite-lxqt.sh linux/lite/scripts/provision-nexus-lite-lxqt.sh linux/lite/scripts/build-nexus-lite-lxqt-iso.sh linux/hardware/nexus-hw-inventory.sh linux/hardware/nexus-hw-diagnostics.sh linux/security/nexus-security-audit.sh linux/test/guest-mem-probe.sh linux/test/test-zram-pressure.sh linux/test/run-qemu-validation.sh linux/test/run-phase125-tests.sh linux/test/casper-test-hook.sh
   printf 'PASS shellcheck lint on foundation scripts\n'
 else
   printf 'INFO shellcheck not installed; skipping shell lint\n'
@@ -99,9 +99,12 @@ bash linux/lite/nexus-lite-install.sh --dry-run >/dev/null
 bash linux/hardware/nexus-hw-inventory.sh --json >/dev/null
 bash linux/hardware/nexus-hw-inventory.sh --markdown >/dev/null
 bash linux/hardware/nexus-hw-diagnostics.sh --json >/dev/null
+bash linux/hardware/nexus-hw-diagnostics.sh --contribute-template >/dev/null
 bash linux/security/nexus-security-audit.sh --json >/dev/null
 bash linux/security/nexus-security-audit.sh --repo-only --repo . --strict >/dev/null
 bash linux/installer/nexus-disk-install.sh --disk /dev/vda --dry-run >/dev/null
+bash linux/installer/nexus-disk-install.sh --disk /dev/vda --efi-part /dev/vda1 --root-part /dev/vda2 --dry-run >/dev/null
+bash linux/installer/nexus-disk-install.sh --disk /dev/vda --luks --dry-run >/dev/null
 if bash linux/installer/nexus-disk-install.sh --disk /dev/vda >/dev/null 2>&1; then
   printf 'FAIL nexus-disk-install.sh must refuse execution without --yes-erase-disk\n' >&2
   exit 1
@@ -114,6 +117,7 @@ bash linux/test/guest-mem-probe.sh --dry-run >/dev/null
 bash linux/test/test-zram-pressure.sh --dry-run >/dev/null
 bash linux/test/run-qemu-validation.sh --dry-run >/dev/null
 bash linux/test/run-qemu-validation.sh --edition lite-lxqt --install-test --reliability --dry-run >/dev/null
+bash linux/test/run-phase125-tests.sh --dry-run >/dev/null
 
 # Phase 12 invariant checks: Edition isolation, Lite Openbox/LXQt sync & safety, Openbox XML, and --revert hygiene
 python3 - <<'PY'
@@ -233,7 +237,7 @@ for desktop_file in linux/branding/applications/*.desktop; do
   grep -Fq '[Desktop Entry]' "$desktop_file"
 done
 
-python3 -m py_compile linux/mint/nexus-system-bridge.py scripts/check-linux-bridge.py linux/test/nexus-guest-test.py linux/test/qemu-graphical-runner.py linux/lite/scripts/nexus-lite-compare.py
+python3 -m py_compile linux/mint/nexus-system-bridge.py scripts/check-linux-bridge.py linux/test/nexus-guest-test.py linux/test/qemu-graphical-runner.py linux/test/nexus-browser-bench.py linux/lite/scripts/nexus-lite-compare.py
 python3 scripts/check-linux-bridge.py
 
 bash scripts/check-prototype.sh

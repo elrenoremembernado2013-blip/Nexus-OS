@@ -16,6 +16,8 @@ core:grub-efi-amd64-bin
 core:efibootmgr
 core:parted
 core:dosfstools
+core:cryptsetup
+core:cryptsetup-initramfs
 
 # Curated Lubuntu/Ubuntu Noble LXQt + Openbox desktop (installed with --no-install-recommends)
 desktop:openbox

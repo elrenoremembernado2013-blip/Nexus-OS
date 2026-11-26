@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Safe, auditable live-to-disk installer for NEXUS OS (Linux Mint 22.3 / Noble).
-# Designed for low-RAM CLI installation (NEXUS Lite 512M/768M) and automated
-# disposable-disk VM testing without hardcoded credentials or host-disk risk.
+# Supports guided GPT+UEFI, manual partition selection (--efi-part / --root-part),
+# optional LUKS2 full-disk encryption (--luks --luks-passphrase-file), and
+# interrupted-install recovery without hardcoded credentials or host-disk risk.
 set -euo pipefail
 
 DISK=""
+EFI_PART=""
+ROOT_PART=""
+KEEP_EFI=false
+LUKS_ENABLED=false
+LUKS_PASS_FILE=""
 HOSTNAME_NEW="nexus-os"
 USERNAME_NEW="nexus"
 PASSWORD_HASH=""
@@ -14,32 +20,43 @@ YES_ERASE=false
 DRY_RUN=false
 EDITION_OVERRIDE=""
 LOG_FILE="/var/log/nexus-install.log"
+CRYPT_NAME="nexus_crypt"
 
 usage() {
   cat <<'USAGE'
 Usage: sudo bash linux/installer/nexus-disk-install.sh --disk /dev/sdX [OPTIONS]
 
 Installs the booted NEXUS OS live filesystem onto a target block device with
-GPT + EFI System Partition (512 MiB FAT32) + ext4 root, UUID /etc/fstab,
-initramfs regeneration, and UEFI GRUB bootloader.
+UEFI FAT32 ESP + ext4 root (or LUKS2 encrypted root with separate /boot),
+UUID /etc/fstab, initramfs regeneration, and UEFI GRUB bootloader.
 
 Options:
-  --disk DEV              Target block device (e.g. /dev/vda) [required]
-  --hostname NAME         Installed system hostname (default: nexus-os)
-  --user NAME             Primary sudo user to create (default: nexus)
-  --password-hash HASH    Pre-hashed password (e.g. from openssl passwd -6)
-  --password-file PATH    File containing plaintext password (read & hashed at runtime, never logged)
-  --autologin             Configure LightDM autologin for the created user
-  --edition NAME          Override edition metadata (lite | lite-lxqt | cinnamon | xfce)
-  --yes-erase-disk        Required confirmation to partition and format --disk
-  --dry-run               Print plan and safety checks without touching any disk
-  --help, -h              Show this help message
+  --disk DEV                    Target block device (e.g. /dev/vda) [required]
+  --efi-part DEV                Use pre-created EFI System Partition (manual partitioning)
+  --root-part DEV               Use pre-created root partition (manual partitioning)
+  --keep-efi                    Do not reformat --efi-part (preserve existing EFI files)
+  --luks                        Enable LUKS2 root encryption (creates ESP + /boot + LUKS2 /)
+  --luks-passphrase-file PATH   File containing LUKS passphrase (read & removed by caller, never logged)
+  --hostname NAME               Installed system hostname (default: nexus-os)
+  --user NAME                   Primary sudo user to create (default: nexus)
+  --password-hash HASH          Pre-hashed password (e.g. from openssl passwd -6)
+  --password-file PATH          File containing plaintext password (read & hashed at runtime, never logged)
+  --autologin                   Configure LightDM autologin for the created user
+  --edition NAME                Override edition metadata (lite | lite-lxqt | cinnamon | xfce)
+  --yes-erase-disk              Required confirmation to format/install onto target
+  --dry-run                     Print plan and safety checks without touching any disk
+  --help, -h                    Show this help message
 USAGE
 }
 
 while (($#)); do
   case "$1" in
     --disk) [[ $# -ge 2 ]] || { echo '--disk requires a device path' >&2; exit 2; }; DISK="$2"; shift 2 ;;
+    --efi-part) [[ $# -ge 2 ]] || { echo '--efi-part requires a device path' >&2; exit 2; }; EFI_PART="$2"; shift 2 ;;
+    --root-part) [[ $# -ge 2 ]] || { echo '--root-part requires a device path' >&2; exit 2; }; ROOT_PART="$2"; shift 2 ;;
+    --keep-efi) KEEP_EFI=true; shift ;;
+    --luks) LUKS_ENABLED=true; shift ;;
+    --luks-passphrase-file) [[ $# -ge 2 ]] || { echo '--luks-passphrase-file requires a path' >&2; exit 2; }; LUKS_PASS_FILE="$2"; shift 2 ;;
     --hostname) [[ $# -ge 2 ]] || { echo '--hostname requires a value' >&2; exit 2; }; HOSTNAME_NEW="$2"; shift 2 ;;
     --user) [[ $# -ge 2 ]] || { echo '--user requires a value' >&2; exit 2; }; USERNAME_NEW="$2"; shift 2 ;;
     --password-hash) [[ $# -ge 2 ]] || { echo '--password-hash requires a hash' >&2; exit 2; }; PASSWORD_HASH="$2"; shift 2 ;;
@@ -57,11 +74,27 @@ done
 [[ "$HOSTNAME_NEW" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]] || { echo 'Invalid --hostname.' >&2; exit 2; }
 [[ "$USERNAME_NEW" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { echo 'Invalid --user.' >&2; exit 2; }
 
+if [[ -n "$EFI_PART" || -n "$ROOT_PART" ]]; then
+  [[ -n "$EFI_PART" && -n "$ROOT_PART" ]] || { echo 'Manual partitioning requires both --efi-part and --root-part.' >&2; exit 2; }
+  [[ "$EFI_PART" != "$ROOT_PART" ]] || { echo '--efi-part and --root-part must be distinct partitions.' >&2; exit 2; }
+fi
+
+if [[ "$LUKS_ENABLED" == true && -n "$EFI_PART" ]]; then
+  echo '--luks automated layout currently requires whole-disk guided partitioning (cannot combine with --efi-part).' >&2
+  exit 2
+fi
+
 if [[ "$DRY_RUN" == true || "$YES_ERASE" == false ]]; then
   echo "NEXUS Disk Installer Plan (dry-run / unconfirmed):"
   echo "  Target disk: $DISK"
-  echo "  Partitioning: GPT -> 512 MiB FAT32 ESP (/boot/efi) + ext4 root (/)"
-  echo "  User: $USERNAME_NEW (hostname: $HOSTNAME_NEW, autologin: $AUTOLOGIN)"
+  if [[ -n "$EFI_PART" ]]; then
+    echo "  Partitioning: Manual -> EFI=$EFI_PART (keep=$KEEP_EFI), root=$ROOT_PART (ext4)"
+  elif [[ "$LUKS_ENABLED" == true ]]; then
+    echo "  Partitioning: GPT -> 512 MiB FAT32 ESP (/boot/efi) + 1024 MiB ext4 (/boot) + LUKS2 encrypted root (/)"
+  else
+    echo "  Partitioning: Guided GPT -> 512 MiB FAT32 ESP (/boot/efi) + ext4 root (/)"
+  fi
+  echo "  User: $USERNAME_NEW (hostname: $HOSTNAME_NEW, autologin: $AUTOLOGIN, luks: $LUKS_ENABLED)"
   echo "  Safety: Pass --yes-erase-disk as root inside a live ISO to execute."
   if [[ "$DRY_RUN" == true ]]; then
     exit 0
@@ -73,8 +106,8 @@ fi
 [[ "$(id -u)" -eq 0 ]] || { echo 'Installation requires root privileges (sudo).' >&2; exit 1; }
 [[ -b "$DISK" ]] || { printf 'Target is not a block device: %s\n' "$DISK" >&2; exit 1; }
 
-# Safety check: refuse if target disk holds /, /rofs, /cdrom, or any active mount
-if lsblk -n -o MOUNTPOINT "$DISK" 2>/dev/null | grep -qE '^(/|/rofs|/cdrom|/boot|/home)'; then
+# Safety check: refuse if target disk holds /, /rofs, /cdrom, or any active host mount
+if lsblk -n -o MOUNTPOINT "$DISK" 2>/dev/null | grep -qE '^(/|/rofs|/cdrom|/boot|/home)$'; then
   printf 'SAFETY ABORT: %s has active system mountpoints!\n' "$DISK" >&2
   exit 1
 fi
@@ -99,6 +132,12 @@ for cmd in parted mkfs.vfat mkfs.ext4 blkid chroot grub-install update-grub; do
   command -v "$cmd" >/dev/null 2>&1 || { printf 'Missing required installer tool: %s\n' "$cmd" >&2; exit 1; }
 done
 
+if [[ "$LUKS_ENABLED" == true ]]; then
+  command -v cryptsetup >/dev/null 2>&1 || { echo 'Missing required cryptsetup tool for --luks.' >&2; exit 1; }
+  [[ -n "$LUKS_PASS_FILE" && -r "$LUKS_PASS_FILE" ]] || { echo '--luks requires a readable --luks-passphrase-file PATH.' >&2; exit 2; }
+  [[ -s "$LUKS_PASS_FILE" ]] || { echo '--luks-passphrase-file cannot be empty.' >&2; exit 2; }
+fi
+
 if [[ -n "$PASSWORD_FILE" ]]; then
   [[ -r "$PASSWORD_FILE" ]] || { printf 'Password file unreadable: %s\n' "$PASSWORD_FILE" >&2; exit 1; }
   if command -v openssl >/dev/null 2>&1; then
@@ -117,6 +156,7 @@ EDITION="${EDITION:-lite}"
 
 TARGET="/mnt/nexus-install-target"
 mounted=false
+crypt_opened=false
 cleanup() {
   if [[ "$mounted" == true ]]; then
     umount -lf "$TARGET/dev/pts" 2>/dev/null || true
@@ -125,7 +165,11 @@ cleanup() {
     umount -lf "$TARGET/sys" 2>/dev/null || true
     umount -lf "$TARGET/run" 2>/dev/null || true
     umount -lf "$TARGET/boot/efi" 2>/dev/null || true
+    umount -lf "$TARGET/boot" 2>/dev/null || true
     umount -lf "$TARGET" 2>/dev/null || true
+  fi
+  if [[ "$crypt_opened" == true ]] && command -v cryptsetup >/dev/null 2>&1; then
+    cryptsetup luksClose "$CRYPT_NAME" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -138,38 +182,128 @@ log_msg() {
   printf '%s\n' "$line" >> "$LOG_FILE"
 }
 
-log_msg "Starting NEXUS OS installation (edition=$EDITION disk=$DISK source=$SOURCE_MODE user=$USERNAME_NEW)"
-
-# Partition disk (GPT: 512MiB EFI + rest ext4 root)
-wipefs -af "$DISK" >/dev/null 2>&1 || true
-parted -s "$DISK" mklabel gpt
-parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
-parted -s "$DISK" set 1 esp on
-parted -s "$DISK" mkpart root ext4 513MiB 100%
-partprobe "$DISK" || true
-udevadm settle || sleep 2
-
-if [[ "$DISK" == *nvme* || "$DISK" == *mmcblk* || "$DISK" == *loop* ]]; then
-  PART_EFI="${DISK}p1"
-  PART_ROOT="${DISK}p2"
-else
-  PART_EFI="${DISK}1"
-  PART_ROOT="${DISK}2"
+# Interrupted-install recovery: detach any stale mounts or LUKS mapper left by a previous aborted run
+if mountpoint -q "$TARGET" 2>/dev/null || [[ -d "$TARGET/boot" ]]; then
+  log_msg "Recovering from prior stale target mounts under $TARGET"
+  mounted=true
+  cleanup
+  mounted=false
+fi
+if [[ -e "/dev/mapper/$CRYPT_NAME" ]] && command -v cryptsetup >/dev/null 2>&1; then
+  log_msg "Closing stale LUKS mapper /dev/mapper/$CRYPT_NAME"
+  cryptsetup luksClose "$CRYPT_NAME" 2>/dev/null || true
 fi
 
-for _ in $(seq 1 15); do
-  [[ -b "$PART_EFI" && -b "$PART_ROOT" ]] && break
-  sleep 1
-done
-[[ -b "$PART_EFI" && -b "$PART_ROOT" ]] || { echo "Partitions did not appear on $DISK ($PART_EFI, $PART_ROOT)." >&2; exit 1; }
+is_manual=false
+layout_name="guided"
+if [[ -n "$EFI_PART" ]]; then
+  is_manual=true
+  layout_name="manual"
+elif [[ "$LUKS_ENABLED" == true ]]; then
+  layout_name="guided_luks2"
+fi
 
-log_msg "Formatting $PART_EFI (FAT32) and $PART_ROOT (ext4)"
-mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
-mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
+log_msg "Starting NEXUS OS installation (edition=$EDITION disk=$DISK source=$SOURCE_MODE user=$USERNAME_NEW luks=$LUKS_ENABLED manual=$is_manual)"
+
+PART_BOOT=""
+PART_LUKS=""
+LUKS_UUID=""
+
+if [[ -n "$EFI_PART" ]]; then
+  # Manual partitioning path: validate existing partitions and preserve partition table
+  [[ -b "$EFI_PART" && -b "$ROOT_PART" ]] || { echo "Specified manual partitions do not exist ($EFI_PART, $ROOT_PART)." >&2; exit 1; }
+  [[ "$(lsblk -n -d -o TYPE "$EFI_PART" 2>/dev/null || true)" == "part" ]] || { echo "$EFI_PART is not a partition." >&2; exit 1; }
+  [[ "$(lsblk -n -d -o TYPE "$ROOT_PART" 2>/dev/null || true)" == "part" ]] || { echo "$ROOT_PART is not a partition." >&2; exit 1; }
+  PART_EFI="$EFI_PART"
+  PART_ROOT="$ROOT_PART"
+  if [[ "$KEEP_EFI" == false ]]; then
+    log_msg "Formatting manual EFI partition $PART_EFI (FAT32)"
+    mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+  else
+    log_msg "Preserving existing manual EFI partition $PART_EFI (--keep-efi)"
+  fi
+  log_msg "Formatting manual root partition $PART_ROOT (ext4)"
+  mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
+else
+  # Guided partitioning (standard or LUKS2)
+  wipefs -af "$DISK" >/dev/null 2>&1 || true
+  parted -s "$DISK" mklabel gpt
+  parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
+  parted -s "$DISK" set 1 esp on
+  if [[ "$LUKS_ENABLED" == true ]]; then
+    parted -s "$DISK" mkpart boot ext4 513MiB 1537MiB
+    parted -s "$DISK" mkpart cryptroot ext4 1537MiB 100%
+  else
+    parted -s "$DISK" mkpart root ext4 513MiB 100%
+  fi
+  partprobe "$DISK" || true
+  udevadm settle || sleep 2
+
+  if [[ "$DISK" == *nvme* || "$DISK" == *mmcblk* || "$DISK" == *loop* ]]; then
+    PART_EFI="${DISK}p1"
+    if [[ "$LUKS_ENABLED" == true ]]; then
+      PART_BOOT="${DISK}p2"
+      PART_LUKS="${DISK}p3"
+    else
+      PART_ROOT="${DISK}p2"
+    fi
+  else
+    PART_EFI="${DISK}1"
+    if [[ "$LUKS_ENABLED" == true ]]; then
+      PART_BOOT="${DISK}2"
+      PART_LUKS="${DISK}3"
+    else
+      PART_ROOT="${DISK}2"
+    fi
+  fi
+
+  for _ in $(seq 1 15); do
+    if [[ "$LUKS_ENABLED" == true ]]; then
+      [[ -b "$PART_EFI" && -b "$PART_BOOT" && -b "$PART_LUKS" ]] && break
+    else
+      [[ -b "$PART_EFI" && -b "$PART_ROOT" ]] && break
+    fi
+    sleep 1
+  done
+
+  if [[ "$LUKS_ENABLED" == true ]]; then
+    [[ -b "$PART_EFI" && -b "$PART_BOOT" && -b "$PART_LUKS" ]] || { echo "LUKS partitions did not appear on $DISK." >&2; exit 1; }
+    log_msg "Formatting $PART_EFI (FAT32) and $PART_BOOT (ext4 /boot)"
+    mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+    mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_boot "$PART_BOOT" >/dev/null
+    log_msg "Formatting $PART_LUKS as LUKS2 (argon2id 64 MiB memory bound for low-RAM reliability)"
+    cryptsetup luksFormat \
+      --type luks2 \
+      --cipher aes-xts-plain64 \
+      --key-size 512 \
+      --hash sha256 \
+      --pbkdf argon2id \
+      --pbkdf-memory 65536 \
+      --iter-time 400 \
+      --batch-mode \
+      --key-file "$LUKS_PASS_FILE" \
+      "$PART_LUKS"
+    cryptsetup luksOpen --key-file "$LUKS_PASS_FILE" "$PART_LUKS" "$CRYPT_NAME"
+    crypt_opened=true
+    PART_ROOT="/dev/mapper/$CRYPT_NAME"
+    LUKS_UUID="$(blkid -s UUID -o value "$PART_LUKS")"
+    log_msg "Formatting decrypted root $PART_ROOT (ext4)"
+    mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
+  else
+    [[ -b "$PART_EFI" && -b "$PART_ROOT" ]] || { echo "Partitions did not appear on $DISK ($PART_EFI, $PART_ROOT)." >&2; exit 1; }
+    log_msg "Formatting $PART_EFI (FAT32) and $PART_ROOT (ext4)"
+    mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+    mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
+  fi
+fi
 
 mkdir -p -- "$TARGET"
 mount "$PART_ROOT" "$TARGET"
 mounted=true
+if [[ -n "$PART_BOOT" ]]; then
+  mkdir -p -- "$TARGET/boot"
+  mount "$PART_BOOT" "$TARGET/boot"
+fi
 mkdir -p -- "$TARGET/boot/efi"
 mount "$PART_EFI" "$TARGET/boot/efi"
 
@@ -191,11 +325,40 @@ mount --bind /run "$TARGET/run"
 uuid_root="$(blkid -s UUID -o value "$PART_ROOT")"
 uuid_efi="$(blkid -s UUID -o value "$PART_EFI")"
 
-cat > "$TARGET/etc/fstab" <<FSTAB
+if [[ "$LUKS_ENABLED" == true ]]; then
+  uuid_boot="$(blkid -s UUID -o value "$PART_BOOT")"
+  cat > "$TARGET/etc/crypttab" <<CRYPTTAB
+# <target name> <source device> <key file> <options>
+${CRYPT_NAME} UUID=${LUKS_UUID} none luks,discard
+CRYPTTAB
+  cat > "$TARGET/etc/fstab" <<FSTAB
+# /etc/fstab: static file system information for NEXUS OS (LUKS2 encrypted root)
+/dev/mapper/${CRYPT_NAME}  /          ext4  errors=remount-ro  0  1
+UUID=${uuid_boot}          /boot      ext4  defaults           0  2
+UUID=${uuid_efi}           /boot/efi  vfat  umask=0077         0  1
+FSTAB
+  mkdir -p -- "$TARGET/etc/cryptsetup-initramfs" "$TARGET/usr/local/share/nexus-os"
+  printf 'CRYPTSETUP=y\n' > "$TARGET/etc/cryptsetup-initramfs/conf-hook"
+  cat > "$TARGET/usr/local/share/nexus-os/luks-recovery-guide.txt" <<GUIDE
+NEXUS OS LUKS2 Recovery Guide
+=============================
+1. Back up the LUKS2 header to external offline storage immediately after install:
+     sudo cryptsetup luksHeaderBackup /dev/disk/by-uuid/${LUKS_UUID} --header-backup-file nexus-luks-header.img
+2. Add a secondary recovery passphrase in an unused key slot:
+     sudo cryptsetup luksAddKey /dev/disk/by-uuid/${LUKS_UUID}
+3. Inspect key slots without exposing secrets:
+     sudo cryptsetup luksDump /dev/disk/by-uuid/${LUKS_UUID}
+4. If the system cannot unlock automatically on boot, boot a NEXUS live ISO and run:
+     sudo cryptsetup luksOpen /dev/disk/by-uuid/${LUKS_UUID} ${CRYPT_NAME}
+GUIDE
+  chmod 0644 "$TARGET/usr/local/share/nexus-os/luks-recovery-guide.txt"
+else
+  cat > "$TARGET/etc/fstab" <<FSTAB
 # /etc/fstab: static file system information for NEXUS OS
 UUID=${uuid_root}  /          ext4  errors=remount-ro  0  1
 UUID=${uuid_efi}   /boot/efi  vfat  umask=0077         0  1
 FSTAB
+fi
 
 printf '%s\n' "$HOSTNAME_NEW" > "$TARGET/etc/hostname"
 cat > "$TARGET/etc/hosts" <<HOSTS
@@ -226,7 +389,6 @@ fi
 if [[ -n "$PASSWORD_HASH" ]]; then
   printf '%s:%s\n' "$USERNAME_NEW" "$PASSWORD_HASH" | chroot "$TARGET" /usr/sbin/chpasswd -e
 else
-  # Lock password only if neither hash nor file was provided; interactive login uses passwd
   chroot "$TARGET" /usr/bin/passwd -d "$USERNAME_NEW" >/dev/null 2>&1 || true
 fi
 
@@ -285,11 +447,14 @@ if [[ -f "$TARGET/etc/default/grub" ]]; then
 fi
 chroot "$TARGET" /usr/sbin/update-grub
 
-# Mark installed system metadata
+# Mark installed system metadata (zero secrets or passphrases stored)
 cat > "$TARGET/etc/nexus-installed.json" <<META
 {
   "edition": "${EDITION}",
   "disk": "${DISK}",
+  "layout": "${layout_name}",
+  "encrypted": ${LUKS_ENABLED},
+  "luks_uuid": "${LUKS_UUID}",
   "root_uuid": "${uuid_root}",
   "efi_uuid": "${uuid_efi}",
   "user": "${USERNAME_NEW}",
@@ -297,8 +462,3 @@ cat > "$TARGET/etc/nexus-installed.json" <<META
   "installed_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 META
-
-sync
-cleanup
-mounted=false
-log_msg "NEXUS OS installation completed cleanly on $DISK ($PART_ROOT)"

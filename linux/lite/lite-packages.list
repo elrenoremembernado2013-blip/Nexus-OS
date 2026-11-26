@@ -16,6 +16,8 @@ core:grub-efi-amd64-bin
 core:efibootmgr
 core:parted
 core:dosfstools
+core:cryptsetup
+core:cryptsetup-initramfs
 
 # Minimal Openbox + tint2 desktop (no Cinnamon, no picom compositor by default)
 desktop:openbox

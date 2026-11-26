@@ -224,7 +224,7 @@ def verify_persistence(sess, boot_num, edition):
     }
 
 
-def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
+def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, install_mode="guided", luks_pass=None):
     disk_inst = shutil.which("nexus-disk-install") or "/usr/local/bin/nexus-disk-install"
     if not Path(disk_inst).is_file():
         return {"install_success": False, "reason": "nexus-disk-install_missing"}
@@ -234,7 +234,7 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
     pw_file.write_text(secrets.token_urlsafe(18) + "\n", encoding="utf-8")
     os.chmod(pw_file, 0o600)
 
-    t0 = time.time()
+    extra_diag = {"install_mode": install_mode}
     cmd = [
         "bash", disk_inst,
         "--disk", "/dev/vda",
@@ -245,27 +245,85 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
         "--edition", edition,
         "--yes-erase-disk",
     ]
+
+    luks_pw_file = None
+    if install_mode == "manual":
+        # Create custom 3-partition GPT layout: vda1=512M ESP, vda2=14G root, vda3=extra data partition
+        subprocess.run(["wipefs", "-af", "/dev/vda"], capture_output=True, check=False)
+        subprocess.run(["parted", "-s", "/dev/vda", "mklabel", "gpt"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "ESP", "fat32", "1MiB", "513MiB"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "set", "1", "esp", "on"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "root", "ext4", "513MiB", "14849MiB"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "nexus_data", "ext4", "14849MiB", "100%"], check=True)
+        subprocess.run(["partprobe", "/dev/vda"], capture_output=True, check=False)
+        subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
+        subprocess.run(["mkfs.ext4", "-F", "-L", "nexus_data", "/dev/vda3"], capture_output=True, check=True)
+        dmnt = Path("/mnt/nexus-data-prep")
+        dmnt.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["mount", "/dev/vda3", str(dmnt)], check=True)
+        (dmnt / "preserve-check.txt").write_text("manual-partition-preserved\n", encoding="utf-8")
+        subprocess.run(["umount", str(dmnt)], check=True)
+        cmd.extend(["--efi-part", "/dev/vda1", "--root-part", "/dev/vda2"])
+    elif install_mode == "recovery":
+        # Simulate an interrupted/dirty prior installation + verify unconfirmed guard refuses
+        refusal = subprocess.run(["bash", disk_inst, "--disk", "/dev/vda"], capture_output=True, text=True)
+        extra_diag["refused_without_confirm"] = refusal.returncode != 0
+        subprocess.run(["wipefs", "-af", "/dev/vda"], capture_output=True, check=False)
+        subprocess.run(["parted", "-s", "/dev/vda", "mklabel", "gpt"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "ESP", "fat32", "1MiB", "513MiB"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "dirty", "ext4", "513MiB", "4096MiB"], check=True)
+        subprocess.run(["partprobe", "/dev/vda"], capture_output=True, check=False)
+        subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
+        subprocess.run(["mkfs.ext4", "-F", "/dev/vda2"], capture_output=True, check=True)
+        dirty_mnt = Path("/mnt/nexus-install-target")
+        dirty_mnt.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["mount", "/dev/vda2", str(dirty_mnt)], check=True)
+        (dirty_mnt / "partial-failed.txt").write_text("interrupted-install-artifact\n", encoding="utf-8")
+        extra_diag["dirty_mount_created"] = True
+    elif install_mode == "luks":
+        if not luks_pass:
+            pw_file.unlink(missing_ok=True)
+            return {"install_success": False, "reason": "missing_ephemeral_luks_passphrase"}
+        luks_pw_file = Path("/tmp/.nexus-ephemeral-luks-pw")
+        luks_pw_file.write_text(luks_pass, encoding="utf-8")
+        os.chmod(luks_pw_file, 0o600)
+        cmd.extend(["--luks", "--luks-passphrase-file", str(luks_pw_file)])
+
+    t0 = time.time()
     res = subprocess.run(cmd, capture_output=True, text=True, timeout=2400)
     pw_file.unlink(missing_ok=True)
+    if luks_pw_file is not None and install_mode != "luks":
+        luks_pw_file.unlink(missing_ok=True)
     elapsed = round(time.time() - t0, 1)
 
     if res.returncode != 0:
+        if luks_pw_file is not None:
+            luks_pw_file.unlink(missing_ok=True)
         return {
             "install_success": False,
             "install_method": "nexus-disk-install",
+            "install_mode": install_mode,
             "elapsed_sec": elapsed,
             "returncode": res.returncode,
             "stderr_tail": res.stderr.splitlines()[-15:],
             "stdout_tail": res.stdout.splitlines()[-15:],
         }
 
-    # Verify target disk partitions, EFI bootloader, kernel, initrd, and install test-only hook on disposable vda2
+    # Verify target disk partitions, EFI bootloader, kernel, initrd, and stage test-only hook on disposable target
     parted_out = subprocess.run(["parted", "-s", "/dev/vda", "print"], capture_output=True, text=True).stdout
-    blkid_out = subprocess.run(["blkid", "/dev/vda1", "/dev/vda2"], capture_output=True, text=True).stdout
+    blkid_out = subprocess.run(["blkid", "/dev/vda1", "/dev/vda2"] + (["/dev/vda3"] if Path("/dev/vda3").exists() else []), capture_output=True, text=True).stdout
 
     mnt = Path("/mnt/nexus-verify-target")
     mnt.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["mount", "/dev/vda2", str(mnt)], check=True)
+    crypt_opened_here = False
+    if install_mode == "luks":
+        subprocess.run(["cryptsetup", "luksOpen", "--key-file", str(luks_pw_file), "/dev/vda3", "nexus_crypt"], check=True)
+        luks_pw_file.unlink(missing_ok=True)
+        crypt_opened_here = True
+        subprocess.run(["mount", "/dev/mapper/nexus_crypt", str(mnt)], check=True)
+        subprocess.run(["mount", "/dev/vda2", str(mnt / "boot")], check=True)
+    else:
+        subprocess.run(["mount", "/dev/vda2", str(mnt)], check=True)
     subprocess.run(["mount", "/dev/vda1", str(mnt / "boot" / "efi")], check=True)
     try:
         efi_ok = (mnt / "boot/efi/EFI/BOOT/BOOTX64.EFI").is_file()
@@ -274,13 +332,26 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
         initrd_ok = any((mnt / "boot").glob("initrd.img-*"))
         meta_ok = (mnt / "etc/nexus-installed.json").is_file()
         efi_dir_files = sorted(str(p.relative_to(mnt / "boot/efi")) for p in (mnt / "boot/efi").rglob("*") if p.is_file())
+        if install_mode == "luks":
+            extra_diag["crypttab_ok"] = (mnt / "etc/crypttab").is_file()
+            extra_diag["luks_recovery_guide_ok"] = (mnt / "usr/local/share/nexus-os/luks-recovery-guide.txt").is_file()
+            extra_diag["crypto_luks_blkid"] = "crypto_LUKS" in blkid_out
+        if install_mode == "manual":
+            dmnt = Path("/mnt/nexus-data-verify")
+            dmnt.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["mount", "/dev/vda3", str(dmnt)], check=True)
+            extra_diag["manual_extra_part_preserved"] = (dmnt / "preserve-check.txt").is_file()
+            subprocess.run(["umount", str(dmnt)], check=True)
 
         # Enable ttyS0 serial console inside disposable test disk grub.cfg for CI diagnostics
         grub_def = mnt / "etc/default/grub"
         if grub_def.is_file():
             gtxt = grub_def.read_text(encoding="utf-8", errors="replace")
+            if install_mode == "luks":
+                gtxt = gtxt.replace("quiet splash", "")
             if "console=ttyS0" not in gtxt:
-                gtxt += '\nGRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX console=ttyS0,115200"\n'
+                gtxt += '\nGRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX console=tty1 console=ttyS0,115200"\n'
+            if install_mode == "luks" or "console=ttyS0" in gtxt:
                 grub_def.write_text(gtxt, encoding="utf-8")
                 for mp in ("dev", "proc", "sys"):
                     subprocess.run(["mount", "--bind", f"/{mp}", str(mnt / mp)], check=False)
@@ -288,10 +359,10 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
                 for mp in ("dev", "proc", "sys"):
                     subprocess.run(["umount", "-lf", str(mnt / mp)], check=False)
 
-        # Install ephemeral virtio-serial agent ONLY onto disposable QEMU test disk (/dev/vda2)
+        # Install ephemeral virtio-serial agent ONLY onto disposable QEMU test disk
         test_dir = mnt / "usr/local/libexec/nexus-test"
         test_dir.mkdir(parents=True, exist_ok=True)
-        for fn in ("guest-mem-probe.sh", "test-zram-pressure.sh", "nexus-guest-test.py"):
+        for fn in ("guest-mem-probe.sh", "test-zram-pressure.sh", "nexus-guest-test.py", "nexus-browser-bench.py"):
             src = Path("/usr/local/libexec/nexus-test") / fn
             if src.is_file():
                 shutil.copy2(src, test_dir / fn)
@@ -322,11 +393,16 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess):
     finally:
         subprocess.run(["sync"], check=False)
         subprocess.run(["umount", str(mnt / "boot" / "efi")], check=False)
+        if install_mode == "luks":
+            subprocess.run(["umount", str(mnt / "boot")], check=False)
         subprocess.run(["umount", str(mnt)], check=False)
+        if crypt_opened_here:
+            subprocess.run(["cryptsetup", "luksClose", "nexus_crypt"], check=False)
 
     return {
         "install_success": bool(efi_ok and grub_cfg_ok and vmlinuz_ok and initrd_ok and meta_ok),
         "install_method": "nexus-disk-install",
+        **extra_diag,
         "elapsed_sec": elapsed,
         "bootloader_efi_ok": efi_ok,
         "grub_cfg_ok": grub_cfg_ok,
@@ -364,6 +440,10 @@ def main():
     cfg = wait_for_cmd(port_file, "run_suite", timeout=30)
     idle_seconds = int(cfg.get("idle_seconds", 30))
     do_install = bool(cfg.get("do_install", False))
+    install_mode = str(cfg.get("install_mode", "guided"))
+    luks_pass = cfg.get("luks_passphrase")
+    install_browsers = bool(cfg.get("install_browsers", False))
+    browser_bench = bool(cfg.get("browser_bench", False))
     check_ubiquity_ui = bool(cfg.get("check_ubiquity_ui", mode == "live"))
     panel_wait_sec = int(cfg.get("panel_wait_sec", 90))
 
@@ -681,19 +761,38 @@ def main():
                 "sec_summary": sec_summary,
                 "lsblk_vda_present": '"vda"' in lsblk_out,
             })
-            install_report = perform_install_and_stage_test_agent(edition, port_fd, port_file, sess)
+            install_report = perform_install_and_stage_test_agent(
+                edition, port_fd, port_file, sess,
+                install_mode=install_mode,
+                luks_pass=luks_pass,
+            )
             install_report["executed"] = True
             send_event(port_fd, "install_done", install_report)
 
     installed_checks = {}
     persistence = {}
+    browser_bench_result = {}
     if mode == "installed":
         root_src = subprocess.run(["findmnt", "-n", "-o", "SOURCE", "/"], capture_output=True, text=True).stdout.strip()
         failed_units = subprocess.run(["systemctl", "--failed", "--no-legend"], capture_output=True, text=True).stdout.strip().splitlines()
         err_lines = subprocess.run(["journalctl", "-p", "err", "-b", "--no-pager", "-q"], capture_output=True, text=True).stdout.strip().splitlines()
+        luks_active = root_src.startswith("/dev/mapper/nexus_crypt")
+        luks_guide = Path("/usr/local/share/nexus-os/luks-recovery-guide.txt").is_file()
+        crypttab_ok = Path("/etc/crypttab").is_file()
+        extra_part_preserved = False
+        if Path("/dev/vda3").exists() and not luks_active:
+            dmnt = Path("/mnt/nexus-extra-check")
+            dmnt.mkdir(parents=True, exist_ok=True)
+            if subprocess.run(["mount", "-o", "ro", "/dev/vda3", str(dmnt)], capture_output=True).returncode == 0:
+                extra_part_preserved = (dmnt / "preserve-check.txt").is_file()
+                subprocess.run(["umount", str(dmnt)], capture_output=True)
         installed_checks = {
             "root_source": root_src,
-            "booted_from_vda": root_src.startswith("/dev/vda"),
+            "booted_from_vda": root_src.startswith("/dev/vda") or luks_active,
+            "booted_from_luks": luks_active,
+            "crypttab_present": crypttab_ok,
+            "luks_recovery_guide_present": luks_guide,
+            "extra_partition_preserved": extra_part_preserved,
             "live_iso_absent": not Path("/rofs").exists() and not Path("/cdrom/casper/filesystem.squashfs").exists(),
             "efi_boot_ok": Path("/boot/efi/EFI/BOOT/BOOTX64.EFI").is_file(),
             "grub_cfg_ok": Path("/boot/grub/grub.cfg").is_file(),
@@ -704,6 +803,31 @@ def main():
             "journal_err_sample": err_lines[:8],
         }
         persistence = verify_persistence(sess, boot_num, edition)
+
+        if install_browsers and boot_num == 1:
+            subprocess.run(["apt-get", "update"], capture_output=True, text=True, timeout=300)
+            bres = subprocess.run(
+                ["apt-get", "install", "-y", "--no-install-recommends", "falkon", "firefox"],
+                capture_output=True, text=True, timeout=600,
+            )
+            installed_checks["browsers_installed_rc"] = bres.returncode
+            installed_checks["falkon_bin"] = bool(shutil.which("falkon"))
+            installed_checks["firefox_bin"] = bool(shutil.which("firefox"))
+
+        if browser_bench:
+            bench_path = Path("/usr/local/libexec/nexus-test/nexus-browser-bench.py")
+            if bench_path.is_file():
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("nexus_browser_bench", str(bench_path))
+                bmod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(bmod)
+                browser_bench_result = bmod.run_browser_suite(
+                    sess, port_fd, port_file,
+                    send_event=send_event,
+                    wait_for_cmd=wait_for_cmd,
+                )
+            else:
+                browser_bench_result = {"error": "nexus-browser-bench.py missing"}
 
     send_event(port_fd, "complete", {
         "edition": edition,
@@ -721,6 +845,7 @@ def main():
         "install_report": install_report,
         "installed_checks": installed_checks,
         "persistence": persistence,
+        "browser_bench": browser_bench_result,
         "hw_summary": hw_summary,
         "sec_summary": sec_summary,
         "lsblk_vda_present": '"vda"' in lsblk_out,

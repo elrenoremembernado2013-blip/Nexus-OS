@@ -151,9 +151,19 @@ def main():
     ap.add_argument("--panel-wait-sec", type=int, default=90)
     ap.add_argument("--timeout-seconds", type=int, default=900)
     ap.add_argument("--do-install", action="store_true")
+    ap.add_argument("--install-mode", choices=["guided", "manual", "recovery", "luks"], default="guided")
+    ap.add_argument("--luks-passphrase-file", default="")
+    ap.add_argument("--luks-test-wrong-pass", action="store_true")
+    ap.add_argument("--serial-sock", default="")
+    ap.add_argument("--install-browsers", action="store_true")
+    ap.add_argument("--browser-bench", action="store_true")
     ap.add_argument("--expected-boots", type=int, default=1)
     ap.add_argument("--final-action", choices=["quit", "poweroff"], default="quit")
     args = ap.parse_args()
+
+    luks_pass = None
+    if args.luks_passphrase_file:
+        luks_pass = Path(args.luks_passphrase_file).read_text(encoding="utf-8").splitlines()[0] + "\n"
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -163,16 +173,80 @@ def main():
     qmp = QmpClient(Path(args.qmp_sock))
     qmp_ok = qmp.connect(timeout=25)
 
+    serial_s = None
+    if args.serial_sock:
+        sp = Path(args.serial_sock)
+        for _ in range(40):
+            if sp.exists():
+                try:
+                    serial_s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    serial_s.settimeout(0.2)
+                    serial_s.connect(str(sp))
+                    break
+                except OSError:
+                    serial_s = None
+            time.sleep(0.25)
+
     vserial_path = Path(args.vserial_sock)
     vs = None
     deadline = time.time() + args.timeout_seconds
+    serial_buf = ""
+    luks_diag = {
+        "prompt_seen": False,
+        "wrong_passphrase_tested": bool(args.luks_test_wrong_pass and luks_pass),
+        "wrong_passphrase_rejected": False,
+        "correct_passphrase_sent": False,
+        "unlocked_confirmed": False,
+        "prompts_count": 0,
+    }
+    wrong_sent_this_boot = False
+    correct_sent_this_boot = False
+
+    def poll_serial_luks():
+        nonlocal serial_buf, wrong_sent_this_boot, correct_sent_this_boot
+        if not serial_s:
+            return
+        try:
+            data = serial_s.recv(4096)
+            if not data:
+                return
+            txt = data.decode("utf-8", "replace")
+            if luks_pass:
+                txt = txt.replace(luks_pass.strip(), "[REDACTED]")
+            serial_buf = (serial_buf + txt)[-8192:]
+            low = serial_buf.lower()
+            if any(m in low for m in ("cryptsetup: nexus_crypt: set up successfully", "set up successfully")):
+                luks_diag["unlocked_confirmed"] = True
+            if wrong_sent_this_boot and not luks_diag["wrong_passphrase_rejected"]:
+                if any(m in low for m in ("bad password", "no key available", "try again", "failed to setup")):
+                    luks_diag["wrong_passphrase_rejected"] = True
+            # Detect LUKS passphrase prompt (each prompt adds new text ending with ':')
+            prompt_hits = sum(serial_buf.count(p) for p in ("Please unlock disk", "Enter passphrase for"))
+            if prompt_hits > luks_diag["prompts_count"] and serial_buf.rstrip().endswith(":"):
+                luks_diag["prompt_seen"] = True
+                luks_diag["prompts_count"] = prompt_hits
+                if args.luks_test_wrong_pass and not wrong_sent_this_boot:
+                    wrong_sent_this_boot = True
+                    serial_s.sendall(b"wrong-passphrase-neg-test\n")
+                elif luks_pass and not correct_sent_this_boot:
+                    if args.luks_test_wrong_pass and wrong_sent_this_boot:
+                        luks_diag["wrong_passphrase_rejected"] = True
+                    correct_sent_this_boot = True
+                    luks_diag["correct_passphrase_sent"] = True
+                    serial_s.sendall(luks_pass.encode("utf-8"))
+        except socket.timeout:
+            pass
+        except OSError:
+            pass
+
     while time.time() < deadline and not vserial_path.exists():
-        time.sleep(0.3)
+        poll_serial_luks()
+        time.sleep(0.25)
     if vserial_path.exists():
         for _ in range(40):
             try:
                 vs = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                vs.settimeout(2)
+                vs.settimeout(0.5)
                 vs.connect(str(vserial_path))
                 break
             except OSError:
@@ -192,6 +266,7 @@ def main():
         while time.time() < deadline:
             if proc.poll() is not None:
                 break
+            poll_serial_luks()
             if qmp_ok and not boot_shot_taken and (time.time() - start_t) >= 25:
                 current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_00_boot_progress"))
                 boot_shot_taken = True
@@ -216,15 +291,20 @@ def main():
                                     "cmd": "run_suite",
                                     "idle_seconds": args.idle_seconds,
                                     "do_install": args.do_install,
+                                    "install_mode": args.install_mode,
+                                    "install_browsers": args.install_browsers,
+                                    "browser_bench": args.browser_bench,
                                     "panel_wait_sec": args.panel_wait_sec,
                                 }
+                                if luks_pass and args.do_install and args.install_mode == "luks":
+                                    cfg["luks_passphrase"] = luks_pass
                                 vs.sendall((json.dumps(cfg) + "\n").encode("utf-8"))
                             elif et == "desktop_ready":
                                 if qmp_ok:
                                     qmp.nudge_mouse()
                                     current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_01_desktop_initial"))
                                 vs.sendall(b'{"cmd":"ack"}\n')
-                            elif et in ("app_file_manager", "app_terminal", "app_settings", "app_multi_apps", "ubiquity_ui"):
+                            elif et in ("app_file_manager", "app_terminal", "app_settings", "app_multi_apps", "ubiquity_ui", "browser_falkon_max", "browser_firefox_max"):
                                 if qmp_ok:
                                     current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_02_{et}"))
                                 vs.sendall(b'{"cmd":"ack"}\n')
@@ -254,6 +334,8 @@ def main():
                                     vs.sendall(b'{"cmd":"reboot"}\n')
                                     cycle_idx += 1
                                     boot_shot_taken = False
+                                    wrong_sent_this_boot = False
+                                    correct_sent_this_boot = False
                                     start_t = time.time()
                                 else:
                                     if args.final_action == "poweroff":
@@ -277,6 +359,11 @@ def main():
             if not boot_cycles and not current_shots:
                 current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_98_timeout_screen"))
             qmp.quit()
+        if serial_s:
+            try:
+                serial_s.close()
+            except Exception:
+                pass
         if vs:
             try:
                 vs.close()
@@ -305,6 +392,8 @@ def main():
         "guest_report": first_report,
         "boot_cycles": boot_cycles,
     }
+    if args.serial_sock:
+        result["luks_unlock_diag"] = luks_diag
     print(json.dumps(result, indent=2))
     return 0 if len(boot_cycles) >= args.expected_boots and not failure_data else 1
 
