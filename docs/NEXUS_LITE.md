@@ -1,73 +1,58 @@
-# NEXUS Lite — Ultra-Low-RAM Edition (Phase 11–12.3 Validation Guide)
+# NEXUS Lite — Openbox vs. Lubuntu/LXQt Evaluation & RAM Matrix (Phase 12.4)
 
-## Why NEXUS Lite Exists
+## Overview & Dual-Profile Architecture
 
-Linux Mint Cinnamon is designed for `>= 2–4 GiB` RAM and uses `~1103 MiB` idle when installed (`4096 MiB` VM). **NEXUS Lite** keeps the exact same **Linux Mint 22.3 / Ubuntu 24.04 Noble (`x86_64`)** security, APT signature verification, UFW firewall, `NetworkManager`, and `unattended-upgrades` foundation while replacing Cinnamon/Xfce with **Openbox + `tint2` + `PCManFM` + `LXTerminal` (GNU Bash)**, disabling heavy tray autostart bloat (`warpinator`, `sticky`, `mintupdate`, `evolution-alarm-notify`, `blueman`, `mintwelcome`), and enabling `zstd` `zram-tools` (`50%` RAM).
+NEXUS OS evaluates two lightweight editions built on the **Linux Mint 22.3 / Ubuntu 24.04 Noble (`x86_64`)** security, APT signature, UFW, `NetworkManager`, `unattended-upgrades`, and `zstd` ZRAM (`50%`, `vm.swappiness=60`) foundation:
 
-## Measured Post-Install 7-Stage RAM & ZRAM Telemetry (Run `45722286627`, Commit `efc6c01`, `accel=tcg`)
+1. **NEXUS Lite Openbox (`--edition lite`, `linux/lite/`)** — Ultra-minimalist `Openbox + tint2 + PCManFM + LXTerminal (GNU Bash)` (`nexus-os-22.3-lite-amd64.iso`, `2.84 GB`, SHA-256 `ea38cdc9f3ab2dd2c9a14ac6b4123f46a64727d37cc637fb665db7474758dbce`).
+2. **NEXUS Lite LXQt Candidate (`--edition lite-lxqt`, `linux/lite/lxqt/`, `linux/lite/manifests/lite-lxqt-packages.list`)** — Curated Ubuntu/Lubuntu **LXQt + Openbox WM** (`lxqt-panel` with Dark Glass QSS styling, `pcmanfm-qt`, `qterminal` + GNU Bash, `featherpad`, `qps`, `lxqt-archiver`, `screengrab`, `lxqt-config`, `lxqt-policykit`, `lxqt-powermanagement`, `LightDM`, `Xorg`, `NetworkManager`, without `sddm`/`connman`/`snapd`/`libreoffice`) (`nexus-os-22.3-lite-lxqt-amd64.iso`, `2.87 GB`, `+30.8 MB`, SHA-256 `e1be78e6044243cb6daabbc27fd225656d7fabe446fd96e2274c5978ba3c9906`).
 
-All measurements below were captured **after full disk installation onto disposable `/dev/vda` and booting without the live ISO** across 3 reboots (`Boot 1`, warm `Boot 2`, cold `Boot 3`) via `guest-mem-probe.sh` and `test-zram-pressure.sh`:
+## Head-to-Head QEMU/OVMF Comparison (`512 MB` – `4 GB`, Run `45808626482`, `d537b2c`, `accel=tcg`)
 
-| Edition & Tier (Installed Boot 1 / Boot 3) | `1_post_login` Used / Avail | `2_post_session_init` Used | `3_idle` Used | `4_file_manager` Used | `5_terminal` Used | `6_multi_apps` Used | `7_post_close` Used | Swap Used (`3_idle` -> `7_post_close`) | ZRAM Ratio / Pressure (`oom_kill`) |
-|---|---|---|---|---|---|---|---|---|---|
-| **NEXUS Lite `512 MiB` (Boot 1)** | `233 / 217` | `260` | `282` | `290` | `300` | `270` | `257` | `101 -> 175 MiB` | `4.81–5.95x` / `64 MiB` **PASS** (`0` OOM) |
-| **NEXUS Lite `512 MiB` (Boot 3 Cold)** | `260 / 191` | `296` | `233` | `245` | `254` | `254` | `237` | `81 -> 100 MiB` | `5.39–6.05x` / `64 MiB` **PASS** (`0` OOM) |
-| **NEXUS Lite `768 MiB` (Boot 1)** | `334 / 368` | `394` | `416` | `418` | `412` | `431` | `417` | `23 -> 66 MiB` | `5.34–6.02x` / `96 MiB` **PASS** (`0` OOM) |
-| **NEXUS Lite `1024 MiB` (Boot 1)** | `386 / 568` | `466` | `446` | `448` | `465` | `483` | `465` | `0 -> 0 MiB` | `96 MiB` **PASS** (`0` OOM) |
-| **NEXUS Lite `1024 MiB` (Boot 3 Cold)** | `389 / 565` | `467` | `475` | `474` | `483` | `498` | `490` | `0 -> 0 MiB` | `96 MiB` **PASS** (`0` OOM) |
-| **NEXUS Lite `2048 MiB` (Boot 1)** | `389 / 1571` | `504` | `502` | `501` | `516` | `561` | `530` | `0 -> 0 MiB` | `96 MiB` **PASS** (`0` OOM) |
-| **NEXUS Cinnamon `4096 MiB` (Boot 1)** | `511 / 3398` | `727` | `1103` | `1110` | `1128` | `1190` | `1079` | `0 -> 0 MiB` | N/A (`0` OOM) |
-| **MADOO Xfce `4096 MiB` (Boot 1)** | `505 / 3404` | `538` | `907` | `905` | `928` | `958` | `889` | `0 -> 0 MiB` | N/A (`0` OOM) |
-| **MADOO Xfce `4096 MiB` (Boot 3 Cold)** | `470 / 3439` | `602` | `858` | `870` | `872` | `900` | `884` | `0 -> 0 MiB` | N/A (`0` OOM) |
+Both editions were tested under identical QEMU (`q35`, OVMF UEFI, `-vga std`, `300s` idle on primary tiers, `30s` idle on secondary tiers, identical `guest-mem-probe.sh` & `test-zram-pressure.sh` workloads) and aggregated by `linux/lite/scripts/nexus-lite-compare.py`:
 
-*(Live ISO 6-stage measurements from Phase 12.2 run `45656960059` also passed `0` OOM across all tiers; see `docs/RELEASE_DASHBOARD.md` for per-tier Phase 12.3 install durations and reboot metrics.)*
+| RAM Tier | Openbox Live (`3_idle` / `6_multi` / `7_close`, Swap) | LXQt Live (`3_idle` / `6_multi` / `7_close`, Swap) | Idle Delta (`LXQt - OB`) | Openbox Live/Inst/Boot | LXQt Live/Inst/Boot | LXQt Installed `idle -> close` (Boot 1–3) | ZRAM Pressure / `oom_kill` |
+|---|---|---|---|---|---|---|---|
+| **`512 MiB`** | `240 / 255 / 237 MiB` (`103->113` sw) | `251 / 255 / 233 MiB` (`160->189` sw) | **`+11 MiB` (`+57` sw)** | `2/3` live (`2/2` inst, `3/3` boot in `12.3`) | `3/3` live, `2/2` inst (`1210.8s`), `3/3` boot | `275–287 -> 266–280 MiB` (`0` err) | Both **PASS** (`4.32–4.48x`, `0` OOM) |
+| **`768 MiB`** | `366 / 384 / 377 MiB` (`39->50` sw) | `405 / 434 / 418 MiB` (`93->93` sw) | **`+39 MiB` (`+54` sw)** | `1/1` live (`1/1` inst, `3/3` boot in `12.3`) | `1/1` live, `1/1` inst (`1229.4s`), `3/3` boot | `466–476 -> 403–448 MiB` (`0` err) | Both **PASS** (`3.94–4.82x`, `0` OOM) |
+| **`1024 MiB`** | `459 / 486 / 495 MiB` (`1->1` sw) | `521 / 522 / 504 MiB` (`10->43` sw) | **`+62 MiB`** | `3/3` live, `1/1` inst (`1554.5s`), `3/3` boot | `3/3` live, `1/1` inst (`1154.0s`), `3/3` boot | `549–564 -> 559–572 MiB` vs OB `474–485` (`0` err) | Both **PASS** (`3.10–4.86x`, `0` OOM) |
+| **`2048 MiB`** | `457 / 484 / 500 MiB` (`2->2` sw) | `540 / 571 / 552 MiB` (`1->1` sw) | **`+83 MiB`** | `1/1` live (`1/1` inst, `3/3` boot in `12.3`) | `1/1` live, `1/1` inst (`1189.3s`), `3/3` boot | `558–578 -> 580–617 MiB` (`0` err) | Both **PASS** (`2.79x`, `0` OOM) |
+| **`4096 MiB`** | `568 / 575 / 583 MiB` (`0` sw) | `639 / 671 / 666 MiB` (`0` sw) | **`+71 MiB`** | `1/1` live (`ub_ui: true`) | `1/1` live (`ub_ui: true`) | N/A (live comparison) | Both **PASS** (`0` OOM) |
 
-## Evidence-Based Classification & Minimum RAM Recommendations
+### Startup Time, Panel RSS & Stability Notes
 
-| RAM Level | Target Configuration | Classification | Notes & Evidence Basis |
-|---|---|---|---|
-| **512 MB** | NEXUS Lite (`lite-512`) | **Experimental (Verified QEMU Install + 3-Reboot + ZRAM)** | Installed `2/2` via `nexus-disk-install` (`840.4s`), booted `3/3` without ISO (`233–300 MiB` used, `81–175 MiB` zram swap at `4.81–6.06x` ratio, `0` OOM, `persist=true`, `64 MiB` pressure PASS). Remains **Experimental** because heavy web browsing/Electron apps are unsupported in 512 MiB and `Boot 3` logged `28` `journalctl -p err` messages (`0` failed systemd units). |
-| **768 MB** | NEXUS Lite (`lite-512` / `lite-1g`) | **Verified Lightweight GUI (QEMU)** | Installed `1/1` (`832.5s`), booted `3/3` (`416–431 MiB` used, `0–66 MiB` swap, `0` err, `0` failed units, `96 MiB` ZRAM PASS). |
-| **1 GB (`1024 MiB`)** | NEXUS Lite (`lite-1g`) | **Verified Recommended Minimum for NEXUS Lite (QEMU)** | Live `3/3` (`ubiquity` GTK UI verified `99.98%`), installed `1/1` (`836.6s`), booted `3/3` (`446–516 MiB` used, `0` swap, `~460–500 MiB` free RAM, `96 MiB` ZRAM PASS). |
-| **2 GB (`2048 MiB`)** | NEXUS Lite / NEXUS Standard | **Verified for Lite; Entry Floor (Development) for Cinnamon** | Lite installed `1/1` & booted `3/3` (`502–561 MiB` used, `0` swap). Cinnamon installed `1/1` & booted `3/3`, but software LLVMpipe (`tcg`) causes >30s initial render delay at `-vga std` (`96.65%` once settled under `-vga virtio`). |
-| **4 GB (`4096 MiB`)** | NEXUS Standard (Cinnamon) & MADOO Xfce | **Verified Recommended Tier (QEMU)** | Both installed `2/2` and booted `3/3` (`0` err, `0` failed units, `0` OOM, `persist=true`). |
+- **Installed Startup (`1024 MiB`, Boots 1–3):** Openbox WM `15.6–17.8s` / `tint2` `28.4–30.6s`; LXQt Openbox WM `14.6–20.8s` / `lxqt-panel` `25.9–32.0s` — **effectively tied once installed**.
+- **Panel Memory (`1024–4096 MiB`):** `tint2` uses `24.95–25.69 MiB` RSS vs `lxqt-panel` `35.30–36.62 MiB` (`~+10 MiB`). Under `512 MiB` ZRAM paging, `tint2` compresses down to `3.84 MiB` RSS vs `lxqt-panel` `22.84 MiB`.
+- **Errors & Persistence:** All `12` installed LXQt boots across `512 / 768 / 1024 / 2048 MiB` logged **`0` `journalctl -p err` messages, `0` failed systemd units, `persist: true`, and `NetworkManager: connected`**.
 
-## Browser, Gaming & Low-Memory Installation Procedure
+## Option A / B / C Architectural Recommendation
 
-- **Web Browsers & Gaming:** Excluded by default from `512 MB` (`lite-packages.list` marks `falkon` and `firefox` optional). Steam/Proton remain exclusive to `>= 4 GB` NEXUS Standard systems.
-- **Swap & `zram`:** `configure-zram.sh` configures compressed `zstd` RAM swap (`PERCENT=50`, `vm.swappiness=60`). Swap/zram absorbs transient spikes safely and never replaces physical RAM.
-- **Exact Installation Procedure (Target Disk):**
-  1. **Verify target disk & preflight:** Boot live ISO, open `LXTerminal`, and run `nexus-install-preflight --json` plus `lsblk` to confirm the target disk (e.g. `/dev/vda` or `/dev/nvme0n1`).
-  2. **For `>= 1024 MiB` RAM systems (Ubiquity GUI or deterministic CLI):** Launch the graphical installer via `sudo ubiquity` (or the desktop installer launcher) for interactive guided/manual/LUKS partitioning, or run `sudo nexus-disk-install --disk /dev/sdX --user <username> --autologin --edition lite --yes-erase-disk` (prompts interactively for password if `--password-file` is not supplied).
-  3. **For `512 MiB` systems (`CLI` path):** Graphical `ubiquity` is skipped below `850 MiB`; run `sudo nexus-lite-install --disk /dev/sdX --dry-run` to inspect GPT ESP (`512 MiB` FAT32) + ext4 root + UEFI GRUB steps, then execute `sudo nexus-lite-install --disk /dev/sdX --hostname nexus-lite --user <username> --yes-erase-disk`.
+- **Selected Strategy: Option B — Dual-Tier Lite Architecture**
+  - **Promote `NEXUS Lite LXQt` (`lite-lxqt`) as the primary UX-forward Lite desktop for `>= 1 GiB` RAM systems (`1024 MiB` practical minimum, `2048 MiB` comfortable):** Adds only `~62–83 MiB` idle RAM and `+30.8 MB` ISO size while gaining a full Qt/LXQt settings center (`lxqt-config`), integrated power management, Polkit agent, cohesive Dark Glass panel/theming, `PCManFM-Qt`, `QTerminal`, `FeatherPad`, `Qps`, `lxqt-archiver`, and `ScreenGrab`.
+  - **Retain `NEXUS Lite Openbox` (`lite`) for ultra-low `512–768 MiB` systems:** Saves `~39–62 MiB` RAM and `~54–57 MiB` active ZRAM swap pressure under tight `512–768 MiB` limits (`512 MiB` remains **Experimental** on both editions; heavy web browsers and Electron apps remain unsupported at `512 MiB`).
 
-## Reproducible External Build, Install & 3-Reboot QEMU Test Commands
+## ZRAM & Tier Policy (`linux/lite/profiles/lite-*.conf`)
 
-On a Linux host (`Ubuntu 24.04` / `Debian 12+` / `Linux Mint 22.3`) or via `.github/workflows/iso-and-qemu-validation.yml`:
+| Profile | RAM Floor | ZRAM Policy (`configure-zram.sh`) | Browser & Apps Policy | Classification |
+|---|---|---|---|---|
+| `lite-512` | `512 MiB` | `zstd`, `PERCENT=50`, `swappiness=60`, `cache_pressure=100` | Excluded by default; CLI install (`nexus-lite-install`) | **Experimental** |
+| `lite-768` | `768 MiB` | `zstd`, `PERCENT=50`, `swappiness=60` | Light single-tab only; CLI install | **Experimental / Development** |
+| `lite-1g` | `1024 MiB` | `zstd`, `PERCENT=50`, `swappiness=60` | Optional lightweight browser (`falkon`), Ubiquity GUI OK | **Alpha (Minimum Practical Target)** |
+| `lite-2g` | `2048 MiB` | `zstd`, `PERCENT=50`, `swappiness=40` | Full desktop + standard browser | **Alpha (Comfortable Lite Tier)** |
+| `lite-4g` | `4096 MiB` | `zstd`, `PERCENT=25`, `swappiness=20` | Full Lite productivity or Standard Cinnamon/Xfce | **Alpha** |
+
+## Reproducible Build & Side-by-Side QEMU Commands
 
 ```sh
-sudo apt-get update
-sudo apt-get install -y --no-install-recommends \
-  bash coreutils curl gnupg xorriso squashfs-tools \
-  qemu-system-x86 qemu-utils ovmf shellcheck cpio gzip \
-  initramfs-tools-core zstd xz-utils
-
-# 1. Download & GPG/SHA-256 verify Mint 22.3 base ISOs
-bash scripts/download-linux-mint.sh --edition xfce
-bash scripts/download-linux-mint.sh --edition cinnamon
-
-# 2. Build & verify all three separated editions (including unmkinitramfs + unsquashfs test-leak checks)
+# Build isolated Openbox Lite and LXQt Lite ISOs
 sudo bash linux/lite/build-nexus-lite-iso.sh
 bash linux/build/verify-nexus-iso.sh --edition lite
 
-sudo bash linux/build/build-nexus-iso.sh --edition cinnamon
-bash linux/build/verify-nexus-iso.sh --edition cinnamon
+sudo bash linux/lite/scripts/build-nexus-lite-lxqt-iso.sh
+bash linux/build/verify-nexus-iso.sh --edition lite-lxqt
 
-sudo bash linux/build/build-nexus-iso.sh --edition xfce
-bash linux/build/verify-nexus-iso.sh --edition xfce
-
-# 3. Run full graphical QEMU + disposable-disk install + 3-reboot ISO-free validation
-bash linux/test/run-qemu-validation.sh --edition lite --ram-matrix "512 768 1024 2048" --install-test --reliability
-bash linux/test/run-qemu-validation.sh --edition cinnamon --ram-matrix "2048 4096" --install-test --reliability
-bash linux/test/run-qemu-validation.sh --edition xfce --ram-matrix "4096" --install-test --reliability
+# Run parallel QEMU verification & generate comparison report
+bash linux/test/run-qemu-validation.sh --edition lite --ram-matrix "512 768 1024 2048 4096" --install-ram-matrix "1024" --primary-idle 300 --install-test --reliability
+bash linux/test/run-qemu-validation.sh --edition lite-lxqt --ram-matrix "512 768 1024 2048 4096" --install-ram-matrix "512 768 1024 2048" --primary-idle 300 --install-test --reliability
+python3 linux/lite/scripts/nexus-lite-compare.py --openbox-json build/qemu-test/qemu-results-lite.json --lxqt-json build/qemu-test/qemu-results-lite-lxqt.json --out-json build/lite-comparison.json --out-md build/lite-comparison.md
 ```
