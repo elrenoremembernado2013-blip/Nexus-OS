@@ -434,8 +434,24 @@ mkdir -p -- "$TARGET/boot/efi/EFI/BOOT" "$TARGET/boot/efi/EFI/ubuntu"
 cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/BOOT/"
 # Signed Ubuntu/Mint grubx64.efi looks for /EFI/ubuntu/grub.cfg even when --bootloader-id=nexus
 cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/ubuntu/"
+# Ensure signed UEFI Secure Boot chain (shimx64.efi -> grubx64.efi -> signed kernel) when available
 if [[ -f "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" ]]; then
   mv -f -- "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+elif [[ -f "$TARGET/usr/lib/shim/shimx64.efi.signed" ]]; then
+  cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+  cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/nexus/shimx64.efi"
+  cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/ubuntu/shimx64.efi"
+  if [[ -f "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" ]]; then
+    cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/BOOT/grubx64.efi"
+    cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/nexus/grubx64.efi"
+    cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/ubuntu/grubx64.efi"
+  fi
+  for aux_efi in mmx64.efi fbx64.efi; do
+    if [[ -f "$TARGET/usr/lib/shim/$aux_efi" ]]; then
+      cp -f -- "$TARGET/usr/lib/shim/$aux_efi" "$TARGET/boot/efi/EFI/BOOT/$aux_efi"
+      cp -f -- "$TARGET/usr/lib/shim/$aux_efi" "$TARGET/boot/efi/EFI/ubuntu/$aux_efi"
+    fi
+  done
 elif [[ -f "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" ]]; then
   cp -f -- "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
 fi
@@ -444,6 +460,9 @@ fi
 if [[ -f "$TARGET/etc/default/grub" ]]; then
   sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=2/' "$TARGET/etc/default/grub" || true
   sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' "$TARGET/etc/default/grub" || true
+  if [[ "$KEEP_EFI" == true ]] && ! grep -q '^GRUB_DISABLE_OS_PROBER=' "$TARGET/etc/default/grub"; then
+    printf 'GRUB_DISABLE_OS_PROBER=false\n' >> "$TARGET/etc/default/grub"
+  fi
 fi
 chroot "$TARGET" /usr/sbin/update-grub
 

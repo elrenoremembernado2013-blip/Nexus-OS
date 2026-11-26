@@ -143,7 +143,7 @@ fi
 share_dir="$PREFIX_DIR/share/nexus-os"
 bin_dir="$PREFIX_DIR/bin"
 
-run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$bin_dir" /usr/local/share/applications
+run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$share_dir/hardware" "$bin_dir" /usr/local/share/applications
 run_cmd install -m 0644 "$REPO_ROOT/linux/xfce/nexus-dark.css" "$share_dir/xfce/nexus-dark.css"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/themes.json" "$share_dir/cinnamon/themes.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/wallpapers.json" "$share_dir/cinnamon/wallpapers.json"
@@ -165,6 +165,13 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" "$bin_dir/ne
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" "$bin_dir/nexus-install-preflight"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" "$bin_dir/nexus-installer-launcher"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" "$bin_dir/nexus-disk-install"
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-inventory.sh" "$bin_dir/nexus-hw-inventory"
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-diagnostics.sh" "$bin_dir/nexus-hw-diagnostics"
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-qualify.sh" "$bin_dir/nexus-hw-qualify"
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-browser-qualify.sh" "$bin_dir/nexus-browser-qualify"
+run_cmd install -m 0755 "$REPO_ROOT/linux/security/nexus-security-audit.sh" "$bin_dir/nexus-security-audit"
+run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" "$share_dir/hardware/hw-compatibility-db.json"
+run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" "$share_dir/hardware/nexus-browser-bench.py"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" "$bin_dir/nexus-system-bridge"
 
 for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do

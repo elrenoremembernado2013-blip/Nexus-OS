@@ -13,9 +13,14 @@ core:zram-tools
 core:policykit-1-gnome
 core:grub2-common
 core:grub-efi-amd64-bin
+core:grub-efi-amd64-signed
+core:shim-signed
+core:mokutil
 core:efibootmgr
 core:parted
 core:dosfstools
+core:ntfs-3g
+core:os-prober
 core:cryptsetup
 core:cryptsetup-initramfs
 

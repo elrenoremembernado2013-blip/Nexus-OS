@@ -280,6 +280,48 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
         subprocess.run(["mount", "/dev/vda2", str(dirty_mnt)], check=True)
         (dirty_mnt / "partial-failed.txt").write_text("interrupted-install-artifact\n", encoding="utf-8")
         extra_diag["dirty_mount_created"] = True
+    elif install_mode == "dualboot":
+        # Simulate an existing Windows/OS disk: vda1=512M ESP with Microsoft EFI stub, vda2=4G NTFS (or FAT32 fallback), vda3=15G+ target root
+        subprocess.run(["wipefs", "-af", "/dev/vda"], capture_output=True, check=False)
+        subprocess.run(["parted", "-s", "/dev/vda", "mklabel", "gpt"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "ESP", "fat32", "1MiB", "513MiB"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "set", "1", "esp", "on"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "Windows", "ntfs", "513MiB", "4609MiB"], check=True)
+        subprocess.run(["parted", "-s", "/dev/vda", "mkpart", "nexus_root", "ext4", "4609MiB", "100%"], check=True)
+        subprocess.run(["partprobe", "/dev/vda"], capture_output=True, check=False)
+        subprocess.run(["udevadm", "settle"], capture_output=True, check=False)
+        subprocess.run(["mkfs.vfat", "-F", "32", "-n", "ESP", "/dev/vda1"], capture_output=True, check=True)
+        emnt = Path("/mnt/nexus-esp-prep")
+        emnt.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["mount", "/dev/vda1", str(emnt)], check=True)
+        (emnt / "EFI/Microsoft/Boot").mkdir(parents=True, exist_ok=True)
+        (emnt / "EFI/Microsoft/Boot/bootmgfw.efi").write_text("SIMULATED_WINDOWS_BOOTMGR\n", encoding="utf-8")
+        subprocess.run(["umount", str(emnt)], check=True)
+        if shutil.which("mkfs.ntfs"):
+            subprocess.run(["mkfs.ntfs", "-Q", "-F", "-L", "Windows", "/dev/vda2"], capture_output=True, check=True)
+            extra_diag["simulated_os_fs"] = "ntfs"
+        else:
+            subprocess.run(["mkfs.vfat", "-F", "32", "-n", "WINOS", "/dev/vda2"], capture_output=True, check=True)
+            extra_diag["simulated_os_fs"] = "vfat_fallback"
+        wmnt = Path("/mnt/nexus-win-prep")
+        wmnt.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["mount", "/dev/vda2", str(wmnt)], check=True)
+        (wmnt / "Windows/System32").mkdir(parents=True, exist_ok=True)
+        (wmnt / "Windows/System32/winload.efi").write_text("SIMULATED_WINLOAD\n", encoding="utf-8")
+        (wmnt / "dualboot-ntfs-marker.txt").write_text("windows-os-preserved\n", encoding="utf-8")
+        subprocess.run(["umount", str(wmnt)], check=True)
+        # Verify nexus-install-preflight detects simulated dual-boot layout before installing
+        if shutil.which("nexus-install-preflight"):
+            pf_res = subprocess.run(["nexus-install-preflight", "--json"], capture_output=True, text=True, timeout=20)
+            if pf_res.returncode == 0 and pf_res.stdout.strip():
+                try:
+                    pf_data = json.loads(pf_res.stdout)
+                    extra_diag["dualboot_preflight_detected"] = (pf_data.get("dual_boot_detection") or {}).get("dual_boot_candidates_detected")
+                    extra_diag["dualboot_ntfs_count"] = len((pf_data.get("dual_boot_detection") or {}).get("ntfs_partitions", []))
+                    extra_diag["dualboot_esp_count"] = len((pf_data.get("dual_boot_detection") or {}).get("esp_partitions", []))
+                except Exception:
+                    pass
+        cmd.extend(["--efi-part", "/dev/vda1", "--root-part", "/dev/vda3", "--keep-efi"])
     elif install_mode == "luks":
         if not luks_pass:
             pw_file.unlink(missing_ok=True)
@@ -326,6 +368,8 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
         crypt_opened_here = True
         subprocess.run(["mount", "/dev/mapper/nexus_crypt", str(mnt)], check=True)
         subprocess.run(["mount", "/dev/vda2", str(mnt / "boot")], check=True)
+    elif install_mode == "dualboot":
+        subprocess.run(["mount", "/dev/vda3", str(mnt)], check=True)
     else:
         subprocess.run(["mount", "/dev/vda2", str(mnt)], check=True)
     subprocess.run(["mount", "/dev/vda1", str(mnt / "boot" / "efi")], check=True)
@@ -349,6 +393,13 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
             subprocess.run(["mount", "/dev/vda3", str(dmnt)], check=True)
             extra_diag["manual_extra_part_preserved"] = (dmnt / "preserve-check.txt").is_file()
             subprocess.run(["umount", str(dmnt)], check=True)
+        if install_mode == "dualboot":
+            extra_diag["dualboot_efi_preserved"] = (mnt / "boot/efi/EFI/Microsoft/Boot/bootmgfw.efi").is_file()
+            wmnt = Path("/mnt/nexus-win-verify")
+            wmnt.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["mount", "-o", "ro", "/dev/vda2", str(wmnt)], check=True)
+            extra_diag["dualboot_os_part_preserved"] = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
+            subprocess.run(["umount", str(wmnt)], check=True)
 
         # Enable ttyS0 serial console inside disposable test disk grub.cfg for CI diagnostics
         grub_def = mnt / "etc/default/grub"
@@ -699,6 +750,9 @@ def main():
                 hd = json.loads(hres.stdout)
                 hw_summary = {
                     "firmware": hd.get("firmware", {}).get("mode"),
+                    "secure_boot": hd.get("firmware", {}).get("secure_boot"),
+                    "secure_boot_chain": hd.get("secure_boot_chain", {}),
+                    "graphics_qualification": hd.get("graphics_qualification", {}),
                     "gpus": [(g.get("driver"), (g.get("classification") or {}).get("status")) for g in hd.get("gpus", [])],
                     "storage": [(s.get("device"), s.get("driver"), (s.get("classification") or {}).get("status")) for s in hd.get("storage", [])],
                     "missing_fw_count": len(hd.get("firmware", {}).get("missing_firmware_hints", [])),
@@ -787,12 +841,20 @@ def main():
         luks_guide = Path("/usr/local/share/nexus-os/luks-recovery-guide.txt").is_file()
         crypttab_ok = Path("/etc/crypttab").is_file()
         extra_part_preserved = False
-        if Path("/dev/vda3").exists() and not luks_active:
+        if Path("/dev/vda3").exists() and not luks_active and root_src != "/dev/vda3":
             dmnt = Path("/mnt/nexus-extra-check")
             dmnt.mkdir(parents=True, exist_ok=True)
             if subprocess.run(["mount", "-o", "ro", "/dev/vda3", str(dmnt)], capture_output=True).returncode == 0:
                 extra_part_preserved = (dmnt / "preserve-check.txt").is_file()
                 subprocess.run(["umount", str(dmnt)], capture_output=True)
+        dualboot_efi_preserved = Path("/boot/efi/EFI/Microsoft/Boot/bootmgfw.efi").is_file()
+        dualboot_os_part_preserved = False
+        if root_src == "/dev/vda3" and Path("/dev/vda2").exists():
+            wmnt = Path("/mnt/nexus-win-check")
+            wmnt.mkdir(parents=True, exist_ok=True)
+            if subprocess.run(["mount", "-o", "ro", "/dev/vda2", str(wmnt)], capture_output=True).returncode == 0:
+                dualboot_os_part_preserved = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
+                subprocess.run(["umount", str(wmnt)], capture_output=True)
         installed_checks = {
             "root_source": root_src,
             "booted_from_vda": root_src.startswith("/dev/vda") or luks_active,
@@ -800,11 +862,15 @@ def main():
             "crypttab_present": crypttab_ok,
             "luks_recovery_guide_present": luks_guide,
             "extra_partition_preserved": extra_part_preserved,
+            "dualboot_efi_preserved": dualboot_efi_preserved,
+            "dualboot_os_part_preserved": dualboot_os_part_preserved,
             "live_iso_absent": not Path("/rofs").exists() and not Path("/cdrom/casper/filesystem.squashfs").exists(),
             "efi_boot_ok": Path("/boot/efi/EFI/BOOT/BOOTX64.EFI").is_file(),
             "grub_cfg_ok": Path("/boot/grub/grub.cfg").is_file(),
             "installed_meta_ok": Path("/etc/nexus-installed.json").is_file(),
             "mint_user_absent": not Path("/home/mint").exists(),
+            "hw_summary": hw_summary,
+            "sec_summary": sec_summary,
             "failed_systemd_units": len(failed_units),
             "journal_err_count": len(err_lines),
             "journal_err_sample": err_lines[:8],

@@ -10,6 +10,7 @@ on:
           - all
           - lite-pair
           - phase125
+          - phase130
           - lite
           - lite-lxqt
           - cinnamon
@@ -130,6 +131,17 @@ jobs:
                   "upload_iso": False,
               },
               {
+                  "job_slug": "lite-lxqt-phase130",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "phase130",
+                  "ram_matrix": "",
+                  "install_ram_matrix": "",
+                  "phase125_flags": "",
+                  "phase130_flags": "--dualboot-test --secure-boot-test",
+                  "upload_iso": False,
+              },
+              {
                   "job_slug": "cinnamon",
                   "edition": "cinnamon",
                   "base_edition": "cinnamon",
@@ -154,6 +166,8 @@ jobs:
               entries = [e for e in entries if e["edition"] in ("lite", "lite-lxqt") and e["mode"] == "matrix"]
           elif selected == "phase125":
               entries = [e for e in entries if e["mode"] == "phase125"]
+          elif selected == "phase130":
+              entries = [e for e in entries if e["mode"] == "phase130"]
           elif selected != "all":
               entries = [e for e in entries if e["edition"] == selected]
           print("matrix=" + json.dumps(entries))
@@ -165,7 +179,7 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 9
+      max-parallel: 10
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
@@ -387,6 +401,39 @@ jobs:
                       bad.append(f"bench:{tier}:missing_results")
           if bad:
               print(f"::error title=NEXUS-125-FAIL-{slug}::Failures: {bad}")
+              sys.exit(1)
+          PY
+
+      - name: Run Phase 13.0 Qualification (${{ matrix.job_slug }})
+        if: matrix.mode == 'phase130'
+        run: |
+          set +e
+          eval "bash linux/test/run-phase130-tests.sh --edition '${{ matrix.edition }}' --test-dir 'build/qemu-test' ${{ matrix.phase130_flags }}" > /tmp/phase130-runner.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/phase130-runner.log
+          if [ "$rc" -ne 0 ]; then
+            err_tail="$(tail -n 15 /tmp/phase130-runner.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-130-ERR-${{ matrix.job_slug }}::rc=${rc} ${err_tail}"
+            exit "$rc"
+          fi
+          python3 - "build/qemu-test/phase130-results-${{ matrix.edition }}.json" "${{ matrix.job_slug }}" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          slug = sys.argv[2]
+          db = data.get("dualboot_test") or {}
+          sb = data.get("secure_boot_test") or {}
+          if db:
+              print(f"::notice title=NEXUS-130-DUALBOOT-{slug}::" + json.dumps(db, separators=(",", ":")))
+          if sb:
+              print(f"::notice title=NEXUS-130-SECBOOT-{slug}::" + json.dumps(sb, separators=(",", ":")))
+          bad = []
+          if db and not (db.get("install_success") and db.get("installed_boot_ok") and db.get("dualboot_preflight_detected") and db.get("dualboot_efi_preserved_after_boot") and db.get("dualboot_os_part_preserved_after_boot")):
+              bad.append("dualboot")
+          if sb.get("tested") and not (sb.get("install_success") and sb.get("installed_boot_ok") and sb.get("efi_boot_ok") and sb.get("secure_boot_state") == "enabled"):
+              bad.append(f"secure_boot:{sb.get('secure_boot_state')}")
+          if bad:
+              print(f"::error title=NEXUS-130-FAIL-{slug}::Failures: {bad}")
               sys.exit(1)
           PY
 

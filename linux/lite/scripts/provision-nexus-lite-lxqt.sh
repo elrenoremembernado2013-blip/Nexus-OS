@@ -123,8 +123,11 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" /usr/local/bin/nexus-disk-install
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-inventory.sh" /usr/local/bin/nexus-hw-inventory
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-diagnostics.sh" /usr/local/bin/nexus-hw-diagnostics
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-qualify.sh" /usr/local/bin/nexus-hw-qualify
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-browser-qualify.sh" /usr/local/bin/nexus-browser-qualify
 run_cmd install -m 0755 "$REPO_ROOT/linux/security/nexus-security-audit.sh" /usr/local/bin/nexus-security-audit
 run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" /usr/local/share/nexus-os/hardware/hw-compatibility-db.json
+run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" /usr/local/share/nexus-os/hardware/nexus-browser-bench.py
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
 run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.svg" /usr/local/share/nexus-os/lite/wallpaper-nexus-obsidian.svg
 run_cmd install -m 0644 "$LXQT_DIR/theme/nexus-dark/lxqt-panel.qss" /usr/local/share/lxqt/themes/nexus-dark/lxqt-panel.qss
