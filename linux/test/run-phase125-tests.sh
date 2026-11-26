@@ -87,6 +87,8 @@ QEMU_SMP="$(nproc 2>/dev/null || echo 2)"
 (( QEMU_SMP < 2 )) && QEMU_SMP=2
 
 mkdir -p -- "$TEST_DIR"
+TEST_DIR="$(cd -- "$TEST_DIR" && pwd)"
+ISO_PATH="$(cd -- "$(dirname -- "$ISO_PATH")" && pwd)/$(basename -- "$ISO_PATH")"
 
 # Build ephemeral QEMU test-initrd overlay (never persisted in ISO)
 overlay_dir="$TEST_DIR/initrd-${EDITION}"
