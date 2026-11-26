@@ -1,58 +1,41 @@
-# NEXUS Lite — Openbox vs. Lubuntu/LXQt Evaluation & RAM Matrix (Phase 12.4)
+# NEXUS Lite — Openbox vs. LXQt Evaluation, RAM Matrix & Browser Benchmarks (Phase 12.5)
 
 ## Overview & Dual-Profile Architecture
 
-NEXUS OS evaluates two lightweight editions built on the **Linux Mint 22.3 / Ubuntu 24.04 Noble (`x86_64`)** security, APT signature, UFW, `NetworkManager`, `unattended-upgrades`, and `zstd` ZRAM (`50%`, `vm.swappiness=60`) foundation:
+NEXUS OS maintains two lightweight editions built on **Linux Mint 22.3 / Ubuntu 24.04 Noble (`x86_64`)** with signed APT repos, UFW, `NetworkManager`, `unattended-upgrades`, `cryptsetup` + `cryptsetup-initramfs`, and `zstd` ZRAM (`50%`, `vm.swappiness=60`):
 
-1. **NEXUS Lite Openbox (`--edition lite`, `linux/lite/`)** — Ultra-minimalist `Openbox + tint2 + PCManFM + LXTerminal (GNU Bash)` (`nexus-os-22.3-lite-amd64.iso`, `2.84 GB`, SHA-256 `ea38cdc9f3ab2dd2c9a14ac6b4123f46a64727d37cc637fb665db7474758dbce`).
-2. **NEXUS Lite LXQt Candidate (`--edition lite-lxqt`, `linux/lite/lxqt/`, `linux/lite/manifests/lite-lxqt-packages.list`)** — Curated Ubuntu/Lubuntu **LXQt + Openbox WM** (`lxqt-panel` with Dark Glass QSS styling, `pcmanfm-qt`, `qterminal` + GNU Bash, `featherpad`, `qps`, `lxqt-archiver`, `screengrab`, `lxqt-config`, `lxqt-policykit`, `lxqt-powermanagement`, `LightDM`, `Xorg`, `NetworkManager`, without `sddm`/`connman`/`snapd`/`libreoffice`) (`nexus-os-22.3-lite-lxqt-amd64.iso`, `2.87 GB`, `+30.8 MB`, SHA-256 `e1be78e6044243cb6daabbc27fd225656d7fabe446fd96e2274c5978ba3c9906`).
+1. **NEXUS Lite Openbox (`--edition lite`, `linux/lite/`)** — Ultra-minimalist `Openbox + tint2 + PCManFM + LXTerminal (GNU Bash)` (`nexus-os-22.3-lite-amd64.iso`, `2.84 GB`, SHA-256 `49a948a1d159d60948d8e50831db48cb56d291e6e01852e7357c5fc8afa71eb4`).
+2. **NEXUS Lite LXQt (`--edition lite-lxqt`, `linux/lite/lxqt/`, `linux/lite/manifests/lite-lxqt-packages.list`)** — Curated **LXQt + Openbox WM** (`lxqt-panel` with Dark Glass QSS styling, `pcmanfm-qt`, `qterminal`, `featherpad`, `qps`, `lxqt-archiver`, `screengrab`, `lxqt-config`, `lxqt-policykit`, `lxqt-powermanagement`, `LightDM`, `Xorg`, `NetworkManager`, without `sddm`/`connman`/`snapd`/`libreoffice`) (`nexus-os-22.3-lite-lxqt-amd64.iso`, `2.87 GB`, `+30.7 MB`, SHA-256 `0543e98359481124948784ee98252c79a47c85f20d43d3c556c270abd1d04862`).
 
-## Head-to-Head QEMU/OVMF Comparison (`512 MB` – `4 GB`, Run `45808626482`, `d537b2c`, `accel=tcg`)
+## Head-to-Head QEMU/OVMF Comparison (`512 MB` – `4 GB`, Run `45876350800`, `b4879cb`, `accel=tcg`)
 
-Both editions were tested under identical QEMU (`q35`, OVMF UEFI, `-vga std`, `300s` idle on primary tiers, `30s` idle on secondary tiers, identical `guest-mem-probe.sh` & `test-zram-pressure.sh` workloads) and aggregated by `linux/lite/scripts/nexus-lite-compare.py`:
-
-| RAM Tier | Openbox Live (`3_idle` / `6_multi` / `7_close`, Swap) | LXQt Live (`3_idle` / `6_multi` / `7_close`, Swap) | Idle Delta (`LXQt - OB`) | Openbox Live/Inst/Boot | LXQt Live/Inst/Boot | LXQt Installed `idle -> close` (Boot 1–3) | ZRAM Pressure / `oom_kill` |
+| RAM Tier | Openbox Live (`3_idle` / `6_multi` / `7_close`, Swap) | LXQt Live (`3_idle` / `6_multi` / `7_close`, Swap) | Idle Delta (`LXQt - OB`) | Openbox Live/Inst/Boot | LXQt Live/Inst/Boot | LXQt Installed `idle -> close` (Boot 1) | ZRAM Pressure / `oom_kill` |
 |---|---|---|---|---|---|---|---|
-| **`512 MiB`** | `240 / 255 / 237 MiB` (`103->113` sw) | `251 / 255 / 233 MiB` (`160->189` sw) | **`+11 MiB` (`+57` sw)** | `2/3` live (`2/2` inst, `3/3` boot in `12.3`) | `3/3` live, `2/2` inst (`1210.8s`), `3/3` boot | `275–287 -> 266–280 MiB` (`0` err) | Both **PASS** (`4.32–4.48x`, `0` OOM) |
-| **`768 MiB`** | `366 / 384 / 377 MiB` (`39->50` sw) | `405 / 434 / 418 MiB` (`93->93` sw) | **`+39 MiB` (`+54` sw)** | `1/1` live (`1/1` inst, `3/3` boot in `12.3`) | `1/1` live, `1/1` inst (`1229.4s`), `3/3` boot | `466–476 -> 403–448 MiB` (`0` err) | Both **PASS** (`3.94–4.82x`, `0` OOM) |
-| **`1024 MiB`** | `459 / 486 / 495 MiB` (`1->1` sw) | `521 / 522 / 504 MiB` (`10->43` sw) | **`+62 MiB`** | `3/3` live, `1/1` inst (`1554.5s`), `3/3` boot | `3/3` live, `1/1` inst (`1154.0s`), `3/3` boot | `549–564 -> 559–572 MiB` vs OB `474–485` (`0` err) | Both **PASS** (`3.10–4.86x`, `0` OOM) |
-| **`2048 MiB`** | `457 / 484 / 500 MiB` (`2->2` sw) | `540 / 571 / 552 MiB` (`1->1` sw) | **`+83 MiB`** | `1/1` live (`1/1` inst, `3/3` boot in `12.3`) | `1/1` live, `1/1` inst (`1189.3s`), `3/3` boot | `558–578 -> 580–617 MiB` (`0` err) | Both **PASS** (`2.79x`, `0` OOM) |
-| **`4096 MiB`** | `568 / 575 / 583 MiB` (`0` sw) | `639 / 671 / 666 MiB` (`0` sw) | **`+71 MiB`** | `1/1` live (`ub_ui: true`) | `1/1` live (`ub_ui: true`) | N/A (live comparison) | Both **PASS** (`0` OOM) |
+| **`512 MiB`** | `226 / 238 / 214 MiB` (`117->135` sw) | `266 / 266 / 239 MiB` (`142->177` sw) | **`+40 MiB` (`+25` sw)** | `3/3` live (`2/2` inst, `3/3` boot in `12.3`) | `2/3` live, `2/2` inst (`1823.4s`), `3/3` boot | `294 -> 285 MiB` (`0` err) | Both **PASS** (`4.25–4.41x`, `0` OOM) |
+| **`768 MiB`** | `366 / 394 / 372 MiB` (`32->65` sw) | `407 / 433 / 407 MiB` (`103->106` sw) | **`+41 MiB` (`+71` sw)** | `1/1` live (`1/1` inst, `3/3` boot in `12.3`) | `1/1` live, `1/1` inst (`1642.3s`), `3/3` boot | `470 -> 434 MiB` (`0` err) | Both **PASS** (`3.93–4.62x`, `0` OOM) |
+| **`1024 MiB`** | `445 / 468 / 470 MiB` (`1->1` sw) | `509 / 512 / 504 MiB` (`11->50` sw) | **`+64 MiB`** | `3/3` live, `1/1` inst (`1111.1s`), `3/3` boot | `3/3` live, `1/1` inst (`1165.7s`), `3/3` boot | `564 -> 556 MiB` vs OB `481 -> 516` (`0` err) | Both **PASS** (`2.81–4.85x`, `0` OOM) |
+| **`2048 MiB`** | `465 / 488 / 503 MiB` (`2->2` sw) | `555 / 577 / 567 MiB` (`1->1` sw) | **`+90 MiB`** | `1/1` live (`1/1` inst, `3/3` boot in `12.3`) | `1/1` live, `1/1` inst (`1158.5s`), `3/3` boot | `583 -> 600 MiB` (`0` err) | Both **PASS** (`2.79x`, `0` OOM) |
+| **`4096 MiB`** | `557 / 577 / 577 MiB` (`0` sw) | `643 / 666 / 652 MiB` (`0` sw) | **`+86 MiB`** | `1/1` live (`ub_ui: true`) | `1/1` live (`ub_ui: true`) | N/A (live comparison) | Both **PASS** (`0` OOM) |
 
-### Startup Time, Panel RSS & Stability Notes
+## Phase 12.5 Browser Performance Benchmarks: Firefox vs. Falkon (Run `45876350800`, `b4879cb`)
 
-- **Installed Startup (`1024 MiB`, Boots 1–3):** Openbox WM `15.6–17.8s` / `tint2` `28.4–30.6s`; LXQt Openbox WM `14.6–20.8s` / `lxqt-panel` `25.9–32.0s` — **effectively tied once installed**.
-- **Panel Memory (`1024–4096 MiB`):** `tint2` uses `24.95–25.69 MiB` RSS vs `lxqt-panel` `35.30–36.62 MiB` (`~+10 MiB`). Under `512 MiB` ZRAM paging, `tint2` compresses down to `3.84 MiB` RSS vs `lxqt-panel` `22.84 MiB`.
-- **Errors & Persistence:** All `12` installed LXQt boots across `512 / 768 / 1024 / 2048 MiB` logged **`0` `journalctl -p err` messages, `0` failed systemd units, `persist: true`, and `NetworkManager: connected`**.
+Measured inside cold-booted **installed** disposable QEMU/OVMF VMs (`linux/test/nexus-browser-bench.py`) using a controlled local HTTP fixture server (DOM grid, article reflow, JS compute table, SVG+Canvas rendering, `/beacon` load timing) across `1, 2, 4, 6` tabs on both **`lite-lxqt`** and **`lite` Openbox**:
 
-## Option A / B / C Architectural Recommendation
+| Edition & RAM Tier | Falkon (`start_s` / `tabs_ok` / `1->6T RSS` / `Swap` / `OOM` / `Post-Close RSS`) | Firefox (`start_s` / `tabs_ok` / `1->6T RSS` / `Swap` / `OOM` / `Post-Close RSS`) | Measured Winner (QEMU TCG) |
+|---|---|---|---|
+| **Lite LXQt `1024 MiB`** (`954 MiB` avail) | `3.87s` / **`1/6`** / `482.4 -> 805.2 MiB` / `274.0 MiB` sw / `0` / `0.0 MiB` (`387.6` used) | `1.36s` / **`6/6`** (`2.29–7.76s` load) / `207.0 -> 775.2 MiB` / `278.1 MiB` sw / `0` / `0.0 MiB` (`400.9` used) | **Firefox** (completed `6/6` tabs, lower peak RSS) |
+| **Lite LXQt `2048 MiB`** (`1960.5 MiB`) | `1.35s` / **`1/6`** / `490.7 -> 1260.2 MiB` / `0` sw / `0` / `0.0 MiB` (`567.0` used) | `1.38s` / **`6/6`** (`2.56–6.48s` load) / `339.5 -> 897.9 MiB` / `0` sw / `0` / `0.0 MiB` (`576.3` used) | **Firefox** (`-362.3 MiB` RSS at 6 tabs, `6/6` tabs) |
+| **Lite LXQt `4096 MiB`** (`3908.8 MiB`) | `1.32s` / **`1/6`** / `494.6 -> 1242.0 MiB` / `0` sw / `0` / `0.0 MiB` (`651.1` used) | `1.35s` / **`6/6`** (`2.57–11.14s` load) / `343.4 -> 845.7 MiB` / `0` sw / `0` / `0.0 MiB` (`653.9` used) | **Firefox** (`-396.3 MiB` RSS at 6 tabs, `6/6` tabs) |
+| **Lite Openbox `1024 MiB`** (`954 MiB`) | `1.22s` / **`2/6`** (`19.2s` at 2T) / `489.5 -> 810.7 MiB` / `236.2 MiB` sw / `0` / `0.0 MiB` (`371.7` used) | `1.27s` / **`6/6`** (`2.42–7.36s` load) / `326.5 -> 760.0 MiB` / `232.1 MiB` sw / `0` / `0.0 MiB` (`365.8` used) | **Firefox** (`6/6` tabs vs `2/6`, lower RSS) |
+| **Lite Openbox `2048 MiB`** (`1960.5 MiB`) | `1.23s` / **`2/6`** (`17.2s` at 2T) / `512.2 -> 1287.1 MiB` / `0` sw / `0` / `0.0 MiB` (`490.8` used) | `1.26s` / **`6/6`** (`1.93–9.51s` load) / `456.0 -> 848.7 MiB` / `0` sw / `0` / `0.0 MiB` (`494.4` used) | **Firefox** (`-438.4 MiB` RSS at 6 tabs, `6/6` tabs) |
+| **Lite Openbox `4096 MiB`** (`3908.8 MiB`) | `1.23s` / **`2/6`** (`16.4s` at 2T) / `515.0 -> 1291.2 MiB` / `0` sw / `0` / `0.0 MiB` (`582.7` used) | `1.28s` / **`6/6`** (`1.75–9.58s` load) / `455.7 -> 850.7 MiB` / `0` sw / `0` / `0.0 MiB` (`592.6` used) | **Firefox** (`-440.5 MiB` RSS at 6 tabs, `6/6` tabs) |
 
-- **Selected Strategy: Option B — Dual-Tier Lite Architecture**
-  - **Promote `NEXUS Lite LXQt` (`lite-lxqt`) as the primary UX-forward Lite desktop for `>= 1 GiB` RAM systems (`1024 MiB` practical minimum, `2048 MiB` comfortable):** Adds only `~62–83 MiB` idle RAM and `+30.8 MB` ISO size while gaining a full Qt/LXQt settings center (`lxqt-config`), integrated power management, Polkit agent, cohesive Dark Glass panel/theming, `PCManFM-Qt`, `QTerminal`, `FeatherPad`, `Qps`, `lxqt-archiver`, and `ScreenGrab`.
-  - **Retain `NEXUS Lite Openbox` (`lite`) for ultra-low `512–768 MiB` systems:** Saves `~39–62 MiB` RAM and `~54–57 MiB` active ZRAM swap pressure under tight `512–768 MiB` limits (`512 MiB` remains **Experimental** on both editions; heavy web browsers and Electron apps remain unsupported at `512 MiB`).
+### Browser Findings & Honest Default-Browser Decision
 
-## ZRAM & Tier Policy (`linux/lite/profiles/lite-*.conf`)
+- **Why Falkon struggled in QEMU:** Under QEMU TCG without GPU acceleration (`bochs-drm` + `llvmpipe`), QtWebEngine/Chromium (`falkon`) sustained `83–92%` CPU and failed to deliver `/beacon` page-load completions within `30s` past 1–2 tabs (`load_ms: null` at 4 and 6 tabs), while allocating `~1.24–1.29 GiB` RSS at 6 tabs on `2G/4G`.
+- **Firefox behavior:** Completed `6/6` tabs cleanly at `1024 / 2048 / 4096 MiB` with `0` OOM kills and `0` crashes (`~232–278 MiB` ZRAM swap at `1024 MiB`, `0` swap at `2048/4096 MiB`).
+- **Decision (Conservative):** Keep browsers `optional` in Lite ISOs until bare-metal GPU-accelerated browser testing is completed; **do not** auto-select Falkon as the Lite default browser based on the assumption that QtWebEngine is lighter than Firefox — measured QEMU evidence shows **Firefox** is currently more reliable and uses less RAM at `4–6` tabs, while `512–768 MiB` remains unsuitable for heavy multi-tab web browsing.
 
-| Profile | RAM Floor | ZRAM Policy (`configure-zram.sh`) | Browser & Apps Policy | Classification |
-|---|---|---|---|---|
-| `lite-512` | `512 MiB` | `zstd`, `PERCENT=50`, `swappiness=60`, `cache_pressure=100` | Excluded by default; CLI install (`nexus-lite-install`) | **Experimental** |
-| `lite-768` | `768 MiB` | `zstd`, `PERCENT=50`, `swappiness=60` | Light single-tab only; CLI install | **Experimental / Development** |
-| `lite-1g` | `1024 MiB` | `zstd`, `PERCENT=50`, `swappiness=60` | Optional lightweight browser (`falkon`), Ubiquity GUI OK | **Alpha (Minimum Practical Target)** |
-| `lite-2g` | `2048 MiB` | `zstd`, `PERCENT=50`, `swappiness=40` | Full desktop + standard browser | **Alpha (Comfortable Lite Tier)** |
-| `lite-4g` | `4096 MiB` | `zstd`, `PERCENT=25`, `swappiness=20` | Full Lite productivity or Standard Cinnamon/Xfce | **Alpha** |
+## Option B Architectural Decision & ZRAM Tier Policy
 
-## Reproducible Build & Side-by-Side QEMU Commands
-
-```sh
-# Build isolated Openbox Lite and LXQt Lite ISOs
-sudo bash linux/lite/build-nexus-lite-iso.sh
-bash linux/build/verify-nexus-iso.sh --edition lite
-
-sudo bash linux/lite/scripts/build-nexus-lite-lxqt-iso.sh
-bash linux/build/verify-nexus-iso.sh --edition lite-lxqt
-
-# Run parallel QEMU verification & generate comparison report
-bash linux/test/run-qemu-validation.sh --edition lite --ram-matrix "512 768 1024 2048 4096" --install-ram-matrix "1024" --primary-idle 300 --install-test --reliability
-bash linux/test/run-qemu-validation.sh --edition lite-lxqt --ram-matrix "512 768 1024 2048 4096" --install-ram-matrix "512 768 1024 2048" --primary-idle 300 --install-test --reliability
-python3 linux/lite/scripts/nexus-lite-compare.py --openbox-json build/qemu-test/qemu-results-lite.json --lxqt-json build/qemu-test/qemu-results-lite-lxqt.json --out-json build/lite-comparison.json --out-md build/lite-comparison.md
-```
+- **Option B retained:** `lite-lxqt` is primary for `>= 1 GiB` RAM (`Alpha` at `1024 / 2048 / 4096 MiB`); `lite` Openbox is retained for `512–768 MiB` (`Experimental` at `512 MiB`, `Development` at `768 MiB`). Neither edition is promoted to `Beta` or `Stable` without physical bare-metal qualification.
