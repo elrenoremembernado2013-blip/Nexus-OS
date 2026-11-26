@@ -99,7 +99,11 @@ if meminfo:
 # UEFI & Secure Boot (no NVRAM/UUID reads)
 uefi_active = Path("/sys/firmware/efi").is_dir()
 secure_boot = "unavailable"
-for cand in sorted(Path("/sys/firmware/efi/efivars").glob("SecureBoot-*")) if Path("/sys/firmware/efi/efivars").is_dir() else []:
+try:
+    efivars = sorted(Path("/sys/firmware/efi/efivars").glob("SecureBoot-*")) if Path("/sys/firmware/efi/efivars").is_dir() else []
+except OSError:
+    efivars = []
+for cand in efivars:
     try:
         data = cand.read_bytes()
         if len(data) >= 5:
@@ -111,28 +115,35 @@ for cand in sorted(Path("/sys/firmware/efi/efivars").glob("SecureBoot-*")) if Pa
 # Storage (explicitly excludes serials/UUIDs/WWNs)
 storage = []
 if shutil.which("lsblk"):
-    res = subprocess.run(["lsblk", "-J", "-d", "-o", "NAME,SIZE,TYPE,TRAN,RO,RM,MODEL"], capture_output=True, text=True, timeout=4)
-    if res.returncode == 0 and res.stdout.strip():
-        for dev in json.loads(res.stdout).get("blockdevices", []):
-            if dev.get("type") != "disk":
-                continue
-            name = dev.get("name", "")
-            drv_link = Path(f"/sys/block/{name}/device/driver")
-            drv = drv_link.resolve().name if drv_link.is_symlink() else ("virtio_blk" if name.startswith("vd") else "unknown")
-            storage.append({
-                "device": f"/dev/{name}",
-                "size": dev.get("size"),
-                "transport": dev.get("tran") or ("virtio" if name.startswith("vd") else "unknown"),
-                "model": (dev.get("model") or "").strip() or "Generic Disk",
-                "driver": drv,
-                "classification": classify("storage", drv, "unknown"),
-            })
+    try:
+        res = subprocess.run(["lsblk", "-J", "-d", "-o", "NAME,SIZE,TYPE,TRAN,RO,RM,MODEL"], capture_output=True, text=True, timeout=4)
+        if res.returncode == 0 and res.stdout.strip():
+            for dev in json.loads(res.stdout).get("blockdevices", []):
+                if dev.get("type") != "disk":
+                    continue
+                name = dev.get("name", "")
+                drv_link = Path(f"/sys/block/{name}/device/driver")
+                drv = drv_link.resolve().name if drv_link.is_symlink() else ("virtio_blk" if name.startswith("vd") else "unknown")
+                storage.append({
+                    "device": f"/dev/{name}",
+                    "size": dev.get("size"),
+                    "transport": dev.get("tran") or ("virtio" if name.startswith("vd") else "unknown"),
+                    "model": (dev.get("model") or "").strip() or "Generic Disk",
+                    "driver": drv,
+                    "classification": classify("storage", drv, "unknown"),
+                })
+    except Exception:
+        pass
 
 # PCI GPUs & Audio & Wi-Fi/Ethernet
 gpus = []
 pci_network = []
 pci_audio = []
-for dev in sorted(Path("/sys/bus/pci/devices").glob("*")):
+try:
+    pci_devs = sorted(Path("/sys/bus/pci/devices").glob("*")) if Path("/sys/bus/pci/devices").is_dir() else []
+except OSError:
+    pci_devs = []
+for dev in pci_devs:
     cls = read_text(dev / "class") or ""
     drv_link = dev / "driver"
     drv = drv_link.resolve().name if drv_link.is_symlink() else "none"
@@ -148,7 +159,11 @@ for dev in sorted(Path("/sys/bus/pci/devices").glob("*")):
 # Network interfaces (explicitly omits MAC addresses & IP addresses)
 wifi_adapters = []
 ethernet_adapters = []
-for iface in sorted(Path("/sys/class/net").iterdir()) if Path("/sys/class/net").is_dir() else []:
+try:
+    net_ifaces = sorted(Path("/sys/class/net").iterdir()) if Path("/sys/class/net").is_dir() else []
+except OSError:
+    net_ifaces = []
+for iface in net_ifaces:
     if iface.name == "lo":
         continue
     drv_link = iface / "device" / "driver"
@@ -165,7 +180,11 @@ for iface in sorted(Path("/sys/class/net").iterdir()) if Path("/sys/class/net").
 bluetooth = []
 bt_dir = Path("/sys/class/bluetooth")
 if bt_dir.is_dir():
-    for hci in sorted(bt_dir.iterdir()):
+    try:
+        bt_devs = sorted(bt_dir.iterdir())
+    except OSError:
+        bt_devs = []
+    for hci in bt_devs:
         drv_link = hci / "device" / "driver"
         drv = drv_link.resolve().name if drv_link.is_symlink() else "btusb"
         bluetooth.append({"adapter": hci.name, "driver": drv, "classification": {"status": "detected", "notes": "Bluetooth controller detected; pairing/audio untested in CI."}})
@@ -182,7 +201,11 @@ if asound:
 displays = []
 drm_dir = Path("/sys/class/drm")
 if drm_dir.is_dir():
-    for conn in sorted(drm_dir.glob("card*-*")):
+    try:
+        drm_conns = sorted(drm_dir.glob("card*-*"))
+    except OSError:
+        drm_conns = []
+    for conn in drm_conns:
         st = read_text(conn / "status") or "unknown"
         modes = (read_text(conn / "modes") or "").splitlines()[:3]
         displays.append({"connector": conn.name, "status": st, "modes": modes})
@@ -200,7 +223,11 @@ for block in inp_text.split("\n\n"):
 usb_devices = []
 usb_dir = Path("/sys/bus/usb/devices")
 if usb_dir.is_dir():
-    for u in sorted(usb_dir.iterdir()):
+    try:
+        usb_nodes = sorted(usb_dir.iterdir())
+    except OSError:
+        usb_nodes = []
+    for u in usb_nodes:
         vid = read_text(u / "idVendor")
         pid = read_text(u / "idProduct")
         if not (vid and pid):
@@ -215,11 +242,14 @@ if usb_dir.is_dir():
 fw_dir_present = Path("/lib/firmware").is_dir() or Path("/usr/lib/firmware").is_dir()
 missing_fw_hints = []
 if shutil.which("dmesg"):
-    dres = subprocess.run(["dmesg"], capture_output=True, text=True, timeout=3)
-    if dres.returncode == 0:
-        for line in dres.stdout.splitlines():
-            if "direct firmware load" in line.lower() or "failed to load" in line.lower():
-                missing_fw_hints.append(line[:180])
+    try:
+        dres = subprocess.run(["dmesg"], capture_output=True, text=True, timeout=3)
+        if dres.returncode == 0:
+            for line in dres.stdout.splitlines():
+                if "direct firmware load" in line.lower() or "failed to load" in line.lower():
+                    missing_fw_hints.append(line[:180])
+    except Exception:
+        pass
 
 payload = {
     "schema_version": 1,

@@ -99,7 +99,8 @@ bash linux/lite/nexus-lite-install.sh --dry-run >/dev/null
 bash linux/hardware/nexus-hw-inventory.sh --json >/dev/null
 bash linux/hardware/nexus-hw-inventory.sh --markdown >/dev/null
 bash linux/hardware/nexus-hw-diagnostics.sh --json >/dev/null
-bash linux/security/nexus-security-audit.sh --repo . --strict >/dev/null
+bash linux/security/nexus-security-audit.sh --json >/dev/null
+bash linux/security/nexus-security-audit.sh --repo-only --repo . --strict >/dev/null
 bash linux/installer/nexus-disk-install.sh --disk /dev/vda --dry-run >/dev/null
 if bash linux/installer/nexus-disk-install.sh --disk /dev/vda >/dev/null 2>&1; then
   printf 'FAIL nexus-disk-install.sh must refuse execution without --yes-erase-disk\n' >&2
