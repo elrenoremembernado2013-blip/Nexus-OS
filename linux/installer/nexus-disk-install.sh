@@ -272,7 +272,7 @@ else
     mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_boot "$PART_BOOT" >/dev/null
     log_msg "Formatting $PART_LUKS as LUKS2 (argon2id 64 MiB memory bound for low-RAM reliability)"
-    cryptsetup luksFormat \
+    tr -d '\r\n' < "$LUKS_PASS_FILE" | cryptsetup luksFormat \
       --type luks2 \
       --cipher aes-xts-plain64 \
       --key-size 512 \
@@ -281,9 +281,9 @@ else
       --pbkdf-memory 65536 \
       --iter-time 400 \
       --batch-mode \
-      --key-file "$LUKS_PASS_FILE" \
+      --key-file - \
       "$PART_LUKS"
-    cryptsetup luksOpen --key-file "$LUKS_PASS_FILE" "$PART_LUKS" "$CRYPT_NAME"
+    tr -d '\r\n' < "$LUKS_PASS_FILE" | cryptsetup luksOpen --key-file - "$PART_LUKS" "$CRYPT_NAME"
     crypt_opened=true
     PART_ROOT="/dev/mapper/$CRYPT_NAME"
     LUKS_UUID="$(blkid -s UUID -o value "$PART_LUKS")"

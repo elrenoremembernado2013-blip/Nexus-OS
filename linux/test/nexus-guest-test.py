@@ -317,7 +317,11 @@ def perform_install_and_stage_test_agent(edition, port_fd, port_file, sess, inst
     mnt.mkdir(parents=True, exist_ok=True)
     crypt_opened_here = False
     if install_mode == "luks":
-        subprocess.run(["cryptsetup", "luksOpen", "--key-file", str(luks_pw_file), "/dev/vda3", "nexus_crypt"], check=True)
+        subprocess.run(
+            ["cryptsetup", "luksOpen", "--key-file", "-", "/dev/vda3", "nexus_crypt"],
+            input=luks_pass.rstrip("\r\n").encode("utf-8"),
+            check=True,
+        )
         luks_pw_file.unlink(missing_ok=True)
         crypt_opened_here = True
         subprocess.run(["mount", "/dev/mapper/nexus_crypt", str(mnt)], check=True)

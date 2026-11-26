@@ -188,6 +188,9 @@ jobs:
 
       - name: Validate scripts, package manifests, hardware inventory, and security audit
         run: |
+          shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh \
+            linux/mint/*.sh linux/installer/*.sh linux/build/*.sh linux/cinnamon/*.sh \
+            linux/lite/*.sh linux/lite/scripts/*.sh linux/hardware/*.sh linux/security/*.sh linux/test/*.sh
           bash linux/build/validate-packages.sh linux/config/mint-packages.list
           bash linux/build/validate-packages.sh linux/config/cinnamon-packages.list
           bash linux/build/validate-packages.sh linux/lite/lite-packages.list

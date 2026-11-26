@@ -52,7 +52,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$ISO_PATH" ]] || ISO_PATH="$REPO_ROOT/build/iso/nexus-os-22.3-${EDITION}-amd64.iso"
+[[ -n "$ISO_PATH" ]] || ISO_PATH="$REPO_ROOT/build/iso/out/nexus-os-22.3-${EDITION}-amd64.iso"
+[[ -r "$ISO_PATH" ]] || [[ ! -r "$REPO_ROOT/build/iso/nexus-os-22.3-${EDITION}-amd64.iso" ]] || ISO_PATH="$REPO_ROOT/build/iso/nexus-os-22.3-${EDITION}-amd64.iso"
 [[ -n "$TEST_DIR" ]] || TEST_DIR="$REPO_ROOT/build/phase125-test-${EDITION}"
 
 if [[ "$DRY_RUN" == true ]]; then
