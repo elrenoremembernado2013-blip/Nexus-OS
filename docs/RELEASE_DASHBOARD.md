@@ -1,35 +1,30 @@
-# NEXUS OS Release Readiness Dashboard (Phase 12.2)
+# NEXUS OS Release Readiness Dashboard (Phase 12.3)
 
-**Current Release Stage:** `Development` (All 3 ISOs built, GPG/SHA-256 verified, and graphically validated in QEMU/OVMF via GitHub Actions run [`45656960059`](https://github.com/elrenoremembernado2013-blip/Nexus-OS/actions/runs/45656960059); full end-to-end Ubiquity disk install + bare-metal hardware tests remain pending)
-**Stable Release Decision:** **HOLD — Not ready for `Stable` release** until interactive/end-to-end disk installation + post-install reboot and physical hardware checks are completed.
+**Current Release Stage:** `Development` / `Alpha` (ISO build + production/test separation + live ISO graphical boot + Ubiquity UI launch + automated GPT/UEFI disk installation onto disposable `qcow2` + 3-reboot ISO-free installed-system & persistence validation passed across all 3 editions in GitHub Actions run [`45722286627`](https://github.com/elrenoremembernado2013-blip/Nexus-OS/actions/runs/45722286627), commit `efc6c01`).
+**Stable Release Decision:** **HOLD — Not ready for `Stable` release.** Physical bare-metal hardware qualification, interactive manual Ubiquity partition/LUKS UI walkthroughs, and real-world heavy desktop/browser workloads remain untested.
 
-## Phase 12.2 Separated Validation Outcomes (Run `45656960059`, Commit `abee847`, `accel=tcg`)
+## Phase 12.3 Separated Validation Matrix (Run `45722286627`, Commit `efc6c01`, `accel=tcg`)
 
-| Edition | RAM Tier | ISO Build & SHA-256 | UEFI/OVMF Boot | LightDM Login | Graphical Session (WM + Panel) | App Windows (`xwininfo`) | 6-Stage RAM (`oom=0`) | ZRAM Pressure | Disposable `/dev/vda` Preflight | End-to-End Disk Install |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **NEXUS Lite** | `512 MiB` | PASS (`2.84 GB`) | PASS | PASS | PASS (`openbox` + `tint2`) | PASS | PASS (`300s` idle) | PASS (`64 MiB`) | PASS (`lsblk vda`) | Manual / Unverified |
-| **NEXUS Lite** | `768 MiB` | PASS | PASS | PASS | PASS (`openbox` + `tint2`) | PASS | PASS (`30s` idle) | PASS (`96 MiB`) | PASS (`lsblk vda`) | Manual / Unverified |
-| **NEXUS Lite** | `1024 MiB` | PASS | PASS | PASS | PASS (`openbox` + `tint2`) | PASS | PASS (`300s` idle) | PASS (`96 MiB`) | PASS (`lsblk vda`) | Manual / Unverified |
-| **NEXUS Lite** | `2048 MiB` | PASS | PASS | PASS | PASS (`openbox` + `tint2`) | PASS | PASS (`30s` idle) | PASS (`96 MiB`) | PASS (`lsblk vda`) | Manual / Unverified |
-| **NEXUS Lite** | `4096 MiB` | PASS | PASS | PASS | PASS (`openbox` + `tint2`) | PASS | PASS (`300s` idle) | PASS (`96 MiB`) | PASS (`lsblk vda`) | Manual / Unverified |
-| **NEXUS Standard (Cinnamon)** | `2048 MiB` | PASS (`3.09 GB`) | PASS | PASS | PASS (`cinnamon-session`) | PASS (X11; LLVMpipe render incomplete at `30s`) | PASS (`30s` idle) | N/A (not configured) | PASS (`lsblk vda`) | Manual / Unverified |
-| **NEXUS Standard (Cinnamon)** | `4096 MiB` | PASS (`3.09 GB`) | PASS | PASS | PASS (`cinnamon-session`, `96.06%` screen) | PASS | PASS (`300s` idle) | N/A (not configured) | PASS (`lsblk vda`) | Manual / Unverified |
-| **MADOO Xfce** | `4096 MiB` | PASS (`3.03 GB`) | PASS | PASS | PASS (`xfce4-session` + `xfce4-panel`, `97.87%` screen) | PASS | PASS (`300s` idle) | N/A (not configured) | PASS (`lsblk vda`) | Manual / Unverified |
+Live ISO tests, installer tests, and ISO-free installed-disk boots are tracked separately so a passing live boot can never imply installation or installed-system success.
 
-## Subsystem Status Matrix
+| Edition | RAM Tier | ISO Build & Test-Leak Check | Live ISO Boots | Ubiquity GTK UI | Disposable `/dev/vda` Install (`nexus-disk-install`) | Installed Boots (No ISO: 2x Warm + 1x Cold) | Persistence Across Reboots | Installed RAM / Swap / OOM (`7_post_close`) | Edition Stage Assessment |
+|---|---|---|---|---|---|---|---|---|---|
+| **NEXUS Lite** | `512 MiB` | PASS (`2.84 GB`, 0 test leaks) | `3/3` PASS (`99.96–100%`) | Skipped (`<850 MiB`; CLI path) | `2/2` PASS (`840.4s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`, `99.99–100%`) | PASS (`persist=true`) | `237–258 MiB` used, `100–175 MiB` ZRAM swap, `0` OOM | **Experimental** (verified in QEMU; heavy apps/browser unsupported at 512 MiB) |
+| **NEXUS Lite** | `768 MiB` | PASS | `1/1` PASS (`99.98–100%`) | Skipped (`<850 MiB`) | `1/1` PASS (`832.5s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`, `99.99–100%`) | PASS (`persist=true`) | `407–428 MiB` used, `48–66 MiB` ZRAM swap, `0` OOM | **Alpha** |
+| **NEXUS Lite** | `1024 MiB` | PASS | `3/3` PASS (`99.98–100%`) | PASS (`99.98%`) | `1/1` PASS (`836.6s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`, `99.99%`) | PASS (`persist=true`) | `465–516 MiB` used, `0` swap, `0` OOM | **Alpha** (Verified QEMU minimum recommended for Lite) |
+| **NEXUS Lite** | `2048 MiB` | PASS | `1/1` PASS (`99.98–100%`) | PASS (`99.98%`) | `1/1` PASS (`851.1s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`, `99.93–99.99%`) | PASS (`persist=true`) | `527–554 MiB` used, `0` swap, `0` OOM | **Alpha** |
+| **NEXUS Standard (Cinnamon)** | `2048 MiB` | PASS (`3.09 GB`, 0 test leaks) | `1/1` PASS (X11; see LLVMpipe note) | PASS (`96.63%`) | `1/1` PASS (`945.3s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`) | PASS (`persist=true`) | `0` OOM (LLVMpipe slow under `-vga std` `30s`) | **Development / Entry Floor** (requires >=90s settle or GPU accel; >=4 GiB recommended) |
+| **NEXUS Standard (Cinnamon)** | `4096 MiB` | PASS (`3.09 GB`, 0 test leaks) | `3/3` PASS (`96.63–97.83%`) | PASS (`96.63%`) | `2/2` PASS (`961.7s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`) | PASS (`persist=true`) | `1079 MiB` used (`Boot 1`), `0` swap, `0` OOM | **Alpha** (Recommended floor `4096 MiB`) |
+| **MADOO Xfce** | `4096 MiB` | PASS (`3.03 GB`, 0 test leaks) | `3/3` PASS (`98.01–100%`) | PASS (`98.11%`) | `2/2` PASS (`1188.8s`, EFI OK) | `3/3` PASS (`vda`, `no_iso`, `98.01–100%`) | PASS (`persist=true`) | `853–889 MiB` used, `0` swap, `0` OOM | **Alpha** (Hardware-dependent on real Chromebook) |
 
-| Subsystem | Status | Verified Evidence | Remaining Manual / Hardware Scope |
+## Evidence Classification & Known Issues
+
+| Area | Classification | Verified Evidence | Open Issues & Untested Scope |
 |---|---|---|---|
-| **Linux Mint 22.3 Foundation** | Verified in ISO & Live VM | GPG-verified Mint 22.3 base ISOs (`27DEB15644C6B3CF3BD7D291300F846BA25BAE09`), `systemd` + `NetworkManager` (`connected`) | Bare-metal firmware & long-run `unattended-upgrades` |
-| **Desktop & Shell (3 Editions)** | Verified in Live QEMU | Openbox + `tint2`, Cinnamon (`96.06%` at 4G), Xfce (`97.87%` at 4G) at `1280x800` | Physical GPU compositing (vs software `tcg`/LLVMpipe) |
-| **Core Applications & Bridge** | Verified Locally & in Live VM | `pcmanfm`/`nemo`/`thunar`, `lxterminal`/`gnome-terminal`/`xfce4-terminal`, `obconf`/`cinnamon-settings`/`xfce4-settings-manager`, `mousepad`/`xed`; `15` JS + bridge suites | Interactive browser media playback & Flatpak app installs |
-| **ZRAM & Low-Memory Support** | Verified in Live VM | `zram0` (`zstd`, `50%` RAM) verified `512M`–`4096M` on Lite with `0` OOM kills across 6 stages + pressure tests | Real web-browsing workload pressure at `512 MiB` |
-| **Security & Privacy** | Verified in CI & Scripts | `ufw`, `unattended-upgrades`, zero test services baked into released ISOs (`casper-bottom` test harness injected in ephemeral test initrd only) | UEFI Secure Boot on physical firmware + LUKS install test |
-| **Installer & Preflight** | Preflight Verified; Full Install Manual | `nexus-install-preflight` & `/dev/vda` block detection verified in all 8 live VM runs | Unattended or interactive `ubiquity` partitioning + post-install reboot |
+| **Production / Test Separation** | **Verified** | `verify-nexus-iso.sh` unpacks every ISO `initrd` (`unmkinitramfs`) and `filesystem.squashfs` (`unsquashfs -l`) and fails if `nexus-test-agent`, `casper-test-hook`, or `/usr/local/libexec/nexus-test` appear. | N/A |
+| **Automated Disk Installer (`nexus-disk-install.sh`)** | **Verified in QEMU** | `10/10` installs on disposable `/dev/vda` (`GPT` 512 MiB FAT32 ESP + ext4 root, UUID `fstab`, UEFI `grub-install --no-nvram` + `EFI/BOOT/BOOTX64.EFI` + `EFI/ubuntu/grub.cfg`, `casper` purge, zero hardcoded passwords). | Interactive Ubiquity "Something else" manual partitioning and LUKS passphrase entry remain untested in headless CI. |
+| **Installed First Boot, Multi-Reboot & Persistence** | **Verified in QEMU** | `21/21` ISO-free OVMF boots (`2x` warm reboot + `1x` cold boot per config); `findmnt /` on `/dev/vda2`, `/rofs` absent, `NetworkManager` `connected`, `0` failed systemd units, marker + `~/Documents` file persisted across reboots. | `lite-512M` cold boot & `lite-1024M` boot 1 logged `28` `journalctl -p err` entries with `0` failed units (`0` errors on all other boots). `xfce`/`cinnamon` `windows_closed_cleanup` returned `false` due to resident desktop/tray window IDs even though RAM returned to baseline. |
+| **Cinnamon `2048 MiB` Rendering** | **Root-Caused / Partially Verified** | `glxinfo` confirmed `llvmpipe (LLVM 20.1.2, 256 bits)`, `Accelerated: no`, `1966 MiB` unified memory. At `30s` idle under `-vga std` + `accel=tcg`, Muffin/Clutter shader warmup had not flushed (`0.03%` on both `2048M` live and `4096M` Boot 1), then jumped to `96.63%` ~25s later; `-vga virtio` at `90s` rendered `96.65–96.7%`. | Not an OOM bug (`0` OOM kills), but software OpenGL compositing imposes high CPU load (`100%`) and multi-second initial frame latency without 3D GPU acceleration. |
+| **Physical Hardware (`MADOO` & PCs)** | **Hardware-Dependent / Untested** | QEMU `q35` + VirtIO (`vda`, `virtio-net-pci`, `1280x800` OVMF) only. | Real Intel/AMD/NVIDIA GPUs, Wi-Fi/Bluetooth chipsets, Chromebook SOF audio (`MADOO`), Secure Boot hardware keys, and sleep/resume. |
 
-## Remaining Steps Before `Stable` Promotion
-
-1. **Interactive / End-to-End Disk Install Verification:** Boot an ISO in QEMU/KVM or bare metal with a `20+ GB` target disk, complete `ubiquity` (for `>= 1024 MiB`) or `sudo nexus-lite-install` (for `512 MiB` target), reboot without the ISO, and verify the installed system.
-2. **Physical Hardware Qualification:** Test real Wi-Fi/Bluetooth chipsets, HDA/SOF Chromebook audio (`MADOO`), Vulkan/Proton GPU drivers, and external displays.
-
-See `docs/STANDARD_VS_LITE_EDITIONS.md` and `docs/NEXUS_LITE.md` for full measured RAM profiles and installation instructions.
+See `docs/NEXUS_LITE.md`, `docs/HARDWARE_COMPATIBILITY.md`, `docs/INSTALLER_ARCHITECTURE.md`, and `docs/ISO_BUILD.md` for full RAM stage tables and reproduction commands.
