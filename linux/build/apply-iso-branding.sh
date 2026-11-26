@@ -40,8 +40,8 @@ done
 
 if [[ "$DRY_RUN" == true ]]; then
   echo "[dry-run] Update GRUB/ISOLINUX menu titles in ${ISO_ROOT:-<iso-root>} for edition=$EDITION"
-  if [[ "$EDITION" == "lite" ]]; then
-    echo "[dry-run] Install NEXUS Lite Openbox/tint2 assets, LICENSE, and docs into ${SQUASH_ROOT:-<squash-root>}/usr/local/share/nexus-os/ (omitting Cinnamon)"
+  if [[ "$EDITION" == "lite" || "$EDITION" == "lite-lxqt" ]]; then
+    echo "[dry-run] Install NEXUS Lite ($EDITION) assets, LICENSE, and docs into ${SQUASH_ROOT:-<squash-root>}/usr/local/share/nexus-os/ (omitting Cinnamon)"
   else
     echo "[dry-run] Install Cinnamon/Xfce theme assets, LICENSE, and docs into ${SQUASH_ROOT:-<squash-root>}/usr/local/share/nexus-os/"
   fi
@@ -54,6 +54,8 @@ fi
 boot_label="Start NEXUS OS (Linux Mint)"
 if [[ "$EDITION" == "lite" ]]; then
   boot_label="Start NEXUS OS Lite (Openbox)"
+elif [[ "$EDITION" == "lite-lxqt" ]]; then
+  boot_label="Start NEXUS OS Lite (LXQt Candidate)"
 elif [[ "$EDITION" == "cinnamon" || "$EDITION" == "standard" ]]; then
   boot_label="Start NEXUS OS Standard (Cinnamon)"
 fi
@@ -72,6 +74,10 @@ install -m 0644 "$REPO_ROOT/docs/RECOVERY_AND_BOOT.md" "$SQUASH_ROOT/usr/local/s
 if [[ "$EDITION" == "lite" ]]; then
   install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite"
   cp -a "$REPO_ROOT/linux/lite/openbox" "$SQUASH_ROOT/usr/local/share/nexus-os/lite/"
+  install -m 0644 "$REPO_ROOT/docs/NEXUS_LITE.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/NEXUS_LITE.md"
+elif [[ "$EDITION" == "lite-lxqt" ]]; then
+  install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite-lxqt"
+  cp -a "$REPO_ROOT/linux/lite/lxqt" "$SQUASH_ROOT/usr/local/share/nexus-os/lite-lxqt/"
   install -m 0644 "$REPO_ROOT/docs/NEXUS_LITE.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/NEXUS_LITE.md"
 else
   install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/cinnamon"

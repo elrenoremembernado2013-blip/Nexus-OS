@@ -67,8 +67,15 @@ case "$EDITION" in
     default_base_iso="linuxmint-22.3-xfce-64bit.iso"
     default_work="work-lite"
     ;;
+  lite-lxqt)
+    default_conf="$REPO_ROOT/linux/lite/nexus-lite-lxqt.conf"
+    default_manifest="$REPO_ROOT/linux/lite/manifests/lite-lxqt-packages.list"
+    default_provision="linux/lite/scripts/provision-nexus-lite-lxqt.sh"
+    default_base_iso="linuxmint-22.3-xfce-64bit.iso"
+    default_work="work-lite-lxqt"
+    ;;
   *)
-    printf 'Unsupported --edition: %s (expected cinnamon, standard, xfce, or lite)\n' "$EDITION" >&2
+    printf 'Unsupported --edition: %s (expected cinnamon, standard, xfce, lite, or lite-lxqt)\n' "$EDITION" >&2
     exit 2
     ;;
 esac
@@ -103,7 +110,7 @@ while IFS='=' read -r key val; do
   esac
 done < "$SYSTEM_CONF"
 
-if [[ -n "$conf_base_edition" && "$conf_edition" != "lite" ]]; then
+if [[ -n "$conf_base_edition" && "$conf_edition" != "lite" && "$conf_edition" != "lite-lxqt" ]]; then
   out_slug="$conf_base_edition"
 else
   out_slug="$conf_edition"
@@ -240,7 +247,7 @@ if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then
     "NEXUS_SYSTEM_CONF=/tmp/nexus-repo/linux/config/${SYSTEM_CONF##*/}"
     "NEXUS_PKG_MANIFEST=/tmp/nexus-repo/linux/config/${PKG_MANIFEST##*/}"
   )
-elif [[ "$PROVISION_SCRIPT" == *"provision-nexus-lite.sh" ]]; then
+elif [[ "$PROVISION_SCRIPT" == *"provision-nexus-lite.sh" || "$PROVISION_SCRIPT" == *"provision-nexus-lite-lxqt.sh" ]]; then
   chroot_args=(--skip-ufw --purge-bloat --force)
 fi
 

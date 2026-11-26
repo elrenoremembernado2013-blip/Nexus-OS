@@ -135,15 +135,24 @@ for bat in sorted(Path("/sys/class/power_supply").glob("BAT*")):
     break
 
 ubiquity_path = shutil.which("ubiquity")
+cryptsetup_path = shutil.which("cryptsetup")
+lvm_path = shutil.which("lvm")
+dm_crypt_loaded = Path("/sys/module/dm_crypt").is_dir() or Path("/proc/crypto").is_file()
 live_session = Path("/rofs").is_dir() or Path("/cdrom/casper/filesystem.squashfs").is_file()
 
 warnings = []
 if arch != "x86_64":
     warnings.append(f"Unsupported architecture ({arch}); NEXUS OS targets x86_64.")
-if ram_total_mib is not None and ram_total_mib < 2048:
-    warnings.append(f"Low RAM ({ram_total_mib} MiB); at least 2048 MiB (4096 MiB recommended) is required.")
+if ram_total_mib is not None and ram_total_mib < 850:
+    warnings.append(f"Ultra-low RAM ({ram_total_mib} MiB); graphical Ubiquity requires >= 1024 MiB — use nexus-lite-install CLI path.")
+elif ram_total_mib is not None and ram_total_mib < 2048:
+    warnings.append(f"Low RAM ({ram_total_mib} MiB); suitable for NEXUS Lite (>= 1024 MiB), while Cinnamon/Xfce require >= 2048 MiB (4096 MiB recommended).")
 if not ubiquity_path:
-    warnings.append("Linux Mint Ubiquity installer binary is not present on this host (live ISO required to install).")
+    warnings.append("Linux Mint Ubiquity installer binary is not present on this host (live ISO required for graphical install).")
+if not cryptsetup_path:
+    warnings.append("cryptsetup binary not detected; LUKS full-disk encryption requires cryptsetup in live environment.")
+
+eligible_disks = [d for d in disks if not d.get("removable")]
 
 payload = {
     "arch": arch,
@@ -151,11 +160,19 @@ payload = {
     "live_session": live_session,
     "ubiquity_available": ubiquity_path is not None,
     "ubiquity_path": ubiquity_path,
+    "encryption_ux": {
+        "cryptsetup_available": cryptsetup_path is not None,
+        "lvm2_available": lvm_path is not None,
+        "luks_supported_via_ubiquity": bool(ubiquity_path and cryptsetup_path),
+        "dm_crypt_module_ready": dm_crypt_loaded,
+        "note": "LUKS+LVM passphrase entry and recovery keys are handled interactively by Ubiquity partman-auto-crypto; automated CI does not test LUKS unlock prompts.",
+    },
     "hardware": {
         "cpu": cpu,
         "ram_total_mib": ram_total_mib,
         "root_free_gib": root_free_gib,
         "disks": disks,
+        "non_removable_disk_count": len(eligible_disks),
         "gpus": gpus,
         "network": network_ifaces,
         "audio_cards": audio_cards,
@@ -163,8 +180,11 @@ payload = {
         "battery": battery,
     },
     "requirements": {
-        "min_ram_mib": 2048,
-        "recommended_ram_mib": 4096,
+        "min_ram_mib": 1024,
+        "lite_min_experimental_ram_mib": 512,
+        "lite_recommended_ram_mib": 1024,
+        "standard_min_ram_mib": 2048,
+        "standard_recommended_ram_mib": 4096,
         "min_storage_gib": 20,
         "recommended_storage_gib": 32,
         "arch": "x86_64",
@@ -175,8 +195,8 @@ payload = {
 if fmt == "summary":
     print(f"NEXUS OS Install Preflight ({payload['arch']} / {payload['firmware']})")
     print(f"  CPU: {cpu}")
-    print(f"  RAM: {ram_total_mib} MiB (min {payload['requirements']['min_ram_mib']} MiB)")
-    print(f"  Disks detected: {len(disks)}")
+    print(f"  RAM: {ram_total_mib} MiB (Lite min {payload['requirements']['min_ram_mib']} MiB / Standard {payload['requirements']['standard_min_ram_mib']} MiB)")
+    print(f"  Disks detected: {len(disks)} (LUKS capable: {payload['encryption_ux']['luks_supported_via_ubiquity']})")
     print(f"  Ubiquity installer: {'available' if payload['ubiquity_available'] else 'unavailable'}")
     for w in warnings:
         print(f"  [WARN] {w}")

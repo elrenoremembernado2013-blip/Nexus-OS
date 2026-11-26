@@ -30,7 +30,7 @@ Options:
   --password-hash HASH    Pre-hashed password (e.g. from openssl passwd -6)
   --password-file PATH    File containing plaintext password (read & hashed at runtime, never logged)
   --autologin             Configure LightDM autologin for the created user
-  --edition NAME          Override edition metadata (lite | cinnamon | xfce)
+  --edition NAME          Override edition metadata (lite | lite-lxqt | cinnamon | xfce)
   --yes-erase-disk        Required confirmation to partition and format --disk
   --dry-run               Print plan and safety checks without touching any disk
   --help, -h              Show this help message

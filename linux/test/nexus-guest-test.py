@@ -48,12 +48,16 @@ def detect_edition():
     rel = Path("/etc/nexus-os-release")
     if rel.is_file():
         txt = rel.read_text(encoding="utf-8", errors="replace")
+        if 'NEXUS_EDITION="lite-lxqt"' in txt or 'NEXUS_DESKTOP="lxqt"' in txt:
+            return "lite-lxqt"
         if 'NEXUS_EDITION="lite"' in txt or "openbox" in txt.lower():
             return "lite"
         if "cinnamon" in txt.lower():
             return "cinnamon"
     if shutil.which("cinnamon-session"):
         return "cinnamon"
+    if shutil.which("lxqt-session"):
+        return "lite-lxqt"
     if shutil.which("openbox") and not shutil.which("xfce4-session"):
         return "lite"
     return "xfce"
@@ -365,6 +369,7 @@ def main():
 
     wm_targets = {
         "lite": {"openbox"},
+        "lite-lxqt": {"openbox"},
         "cinnamon": {"cinnamon", "cinnamon-sessio", "cinnamon-session"},
         "xfce": {"xfwm4", "xfce4-session"},
     }.get(edition, {"openbox", "cinnamon", "xfwm4"})
@@ -395,7 +400,7 @@ def main():
     send_event(port_fd, "stage_mem", stages["1_post_login"])
 
     # Wait up to panel_wait_sec for panel + desktop window to actually map in X11
-    panel_expected = {"lite": "tint2", "cinnamon": "cinnamon", "xfce": "xfce4-panel"}.get(edition)
+    panel_expected = {"lite": "tint2", "lite-lxqt": "lxqt-panel", "cinnamon": "cinnamon", "xfce": "xfce4-panel"}.get(edition)
     panel_seen = False
     panel_win_mapped = False
     max_iters = max(4, panel_wait_sec // 2)
@@ -405,6 +410,8 @@ def main():
         win_txt = "\n".join(wins).lower()
         if edition == "lite":
             panel_win_mapped = ("tint2" in win_txt) or (panel_expected in procs and len(wins) >= 1)
+        elif edition == "lite-lxqt":
+            panel_win_mapped = ("lxqt-panel" in win_txt or "pcmanfm-qt" in win_txt) or (panel_expected in procs and len(wins) >= 1)
         elif edition == "cinnamon":
             panel_win_mapped = ("desktop" in win_txt or "muffin" in win_txt or "cinnamon" in win_txt) and len(wins) >= 2
         else:
@@ -457,6 +464,12 @@ def main():
             "terminal": (["lxterminal"], ("lxterminal", "terminal")),
             "settings": (["obconf"], ("obconf", "openbox")),
             "extra": (["mousepad", "xed", "lxtask"], ("mousepad", "xed", "lxtask")),
+        },
+        "lite-lxqt": {
+            "file_manager": (["pcmanfm-qt"], ("pcmanfm-qt", "pcmanfm")),
+            "terminal": (["qterminal"], ("qterminal", "terminal")),
+            "settings": (["lxqt-config", "obconf-qt"], ("lxqt-config", "configuration", "obconf")),
+            "extra": (["featherpad", "qps", "lxqt-archiver"], ("featherpad", "qps", "lxqt-archiver")),
         },
         "cinnamon": {
             "file_manager": (["nemo"], ("nemo",)),
@@ -578,6 +591,31 @@ def main():
     lsblk_out = subprocess.run(["lsblk", "-J", "-o", "NAME,SIZE,TYPE,TRAN"], capture_output=True, text=True).stdout
     ubiquity_present = bool(shutil.which("ubiquity"))
 
+    # Hardware inventory & security audit summaries inside booted guest (if tools installed)
+    hw_summary = {}
+    if shutil.which("nexus-hw-inventory"):
+        hres = subprocess.run(["nexus-hw-inventory", "--json"], capture_output=True, text=True, timeout=20)
+        if hres.returncode == 0 and hres.stdout.strip():
+            try:
+                hd = json.loads(hres.stdout)
+                hw_summary = {
+                    "firmware": hd.get("firmware", {}).get("mode"),
+                    "gpus": [(g.get("driver"), (g.get("classification") or {}).get("status")) for g in hd.get("gpus", [])],
+                    "storage": [(s.get("device"), s.get("driver"), (s.get("classification") or {}).get("status")) for s in hd.get("storage", [])],
+                    "missing_fw_count": len(hd.get("firmware", {}).get("missing_firmware_hints", [])),
+                }
+            except Exception:
+                pass
+    sec_summary = {}
+    if shutil.which("nexus-security-audit"):
+        sres = subprocess.run(["nexus-security-audit", "--json"], capture_output=True, text=True, timeout=20)
+        if sres.returncode == 0 and sres.stdout.strip():
+            try:
+                sd = json.loads(sres.stdout)
+                sec_summary = sd.get("summary") or {}
+            except Exception:
+                pass
+
     # Live-mode Ubiquity UI check & actual disk installation
     ubiquity_ui = {"checked": False}
     install_report = {"executed": False}
@@ -627,6 +665,8 @@ def main():
                 "installer_preflight": preflight,
                 "ubiquity_present": ubiquity_present,
                 "ubiquity_ui": ubiquity_ui,
+                "hw_summary": hw_summary,
+                "sec_summary": sec_summary,
                 "lsblk_vda_present": '"vda"' in lsblk_out,
             })
             install_report = perform_install_and_stage_test_agent(edition, port_fd, port_file, sess)
@@ -669,6 +709,8 @@ def main():
         "install_report": install_report,
         "installed_checks": installed_checks,
         "persistence": persistence,
+        "hw_summary": hw_summary,
+        "sec_summary": sec_summary,
         "lsblk_vda_present": '"vda"' in lsblk_out,
     })
 

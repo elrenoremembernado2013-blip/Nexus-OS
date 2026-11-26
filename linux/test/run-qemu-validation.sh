@@ -12,6 +12,7 @@ TEST_DIR="${NEXUS_QEMU_TEST_DIR:-$REPO_ROOT/build/qemu-test}"
 EDITION="lite"
 ISO_PATH=""
 RAM_LIST="512 768 1024 2048 4096"
+INSTALL_RAM_LIST=""
 BOOT_SECONDS=35
 IDLE_SECONDS=30
 PRIMARY_IDLE_SECONDS=120
@@ -29,18 +30,19 @@ Runs UEFI/OVMF ISO boot checks, graphical live tests, disposable-disk installati
 and post-install multi-reboot validation without the live ISO.
 
 Options:
-  --edition NAME          lite | cinnamon | xfce (default: lite)
-  --iso PATH              Override ISO file path
-  --ram-matrix LIST       Space-separated MiB list (default: "512 768 1024 2048 4096")
-  --boot-seconds SEC      UEFI boot check window in seconds (default: 35)
-  --idle-seconds SEC      Secondary-tier guest idle probe window (default: 30)
-  --primary-idle SEC      Primary-tier guest idle probe window (default: 120)
-  --graphical             Enable virtio-serial + QMP live graphical & memory suite
-  --install-test          Install onto disposable qcow2 and run 3 installed-disk boots (no ISO)
-  --reliability           Add repeated live boots (3x) and repeated installs (2x) on primary tier
-  --vga TYPE              QEMU VGA device: std | virtio (default: std)
-  --dry-run               Print QEMU validation plan without launching VMs
-  --help, -h              Show this help message
+  --edition NAME            lite | lite-lxqt | cinnamon | xfce (default: lite)
+  --iso PATH                Override ISO file path
+  --ram-matrix LIST         Space-separated MiB list (default: "512 768 1024 2048 4096")
+  --install-ram-matrix LIST Optional subset of MiB tiers to install + 3-reboot test
+  --boot-seconds SEC        UEFI boot check window in seconds (default: 35)
+  --idle-seconds SEC        Secondary-tier guest idle probe window (default: 30)
+  --primary-idle SEC        Primary-tier guest idle probe window (default: 120)
+  --graphical               Enable virtio-serial + QMP live graphical & memory suite
+  --install-test            Install onto disposable qcow2 and run 3 installed-disk boots (no ISO)
+  --reliability             Add repeated live boots (3x) and repeated installs (2x) on primary tier
+  --vga TYPE                QEMU VGA device: std | virtio (default: std)
+  --dry-run                 Print QEMU validation plan without launching VMs
+  --help, -h                Show this help message
 USAGE
 }
 
@@ -49,6 +51,7 @@ while (($#)); do
     --edition) [[ $# -ge 2 ]] || { echo '--edition requires a value' >&2; exit 2; }; EDITION="$2"; shift 2 ;;
     --iso) [[ $# -ge 2 ]] || { echo '--iso requires a path' >&2; exit 2; }; ISO_PATH="$2"; shift 2 ;;
     --ram-matrix) [[ $# -ge 2 ]] || { echo '--ram-matrix requires a list' >&2; exit 2; }; RAM_LIST="$2"; shift 2 ;;
+    --install-ram-matrix) [[ $# -ge 2 ]] || { echo '--install-ram-matrix requires a list' >&2; exit 2; }; INSTALL_RAM_LIST="$2"; shift 2 ;;
     --boot-seconds) [[ $# -ge 2 ]] || { echo '--boot-seconds requires seconds' >&2; exit 2; }; BOOT_SECONDS="$2"; shift 2 ;;
     --idle-seconds) [[ $# -ge 2 ]] || { echo '--idle-seconds requires seconds' >&2; exit 2; }; IDLE_SECONDS="$2"; shift 2 ;;
     --primary-idle) [[ $# -ge 2 ]] || { echo '--primary-idle requires seconds' >&2; exit 2; }; PRIMARY_IDLE_SECONDS="$2"; shift 2 ;;
@@ -65,6 +68,7 @@ done
 if [[ -z "$ISO_PATH" ]]; then
   case "$EDITION" in
     lite) ISO_PATH="$OUT_DIR/nexus-os-22.3-lite-amd64.iso" ;;
+    lite-lxqt) ISO_PATH="$OUT_DIR/nexus-os-22.3-lite-lxqt-amd64.iso" ;;
     cinnamon|standard) ISO_PATH="$OUT_DIR/nexus-os-22.3-cinnamon-amd64.iso" ;;
     xfce) ISO_PATH="$OUT_DIR/nexus-os-22.3-xfce-amd64.iso" ;;
     *) printf 'Unsupported --edition: %s\n' "$EDITION" >&2; exit 2 ;;
@@ -168,9 +172,23 @@ fi
 
 is_primary_tier() {
   local ed="$1" rm="$2"
-  [[ "$ed" == "lite" && "$rm" == "1024" ]] && return 0
+  [[ ( "$ed" == "lite" || "$ed" == "lite-lxqt" ) && "$rm" == "1024" ]] && return 0
   [[ "$ed" == "cinnamon" && "$rm" == "4096" ]] && return 0
   [[ "$ed" == "xfce" && "$rm" == "4096" ]] && return 0
+  return 1
+}
+
+should_install_ram() {
+  local rm="$1"
+  [[ "$INSTALL_TEST" == true ]] || return 1
+  if [[ -z "$INSTALL_RAM_LIST" ]]; then
+    return 0
+  fi
+  local inst_rams item
+  read -r -a inst_rams <<< "$INSTALL_RAM_LIST"
+  for item in "${inst_rams[@]}"; do
+    [[ "$item" == "$rm" ]] && return 0
+  done
   return 1
 }
 
@@ -264,9 +282,9 @@ PY
 
   # Determine idle & repeat counts
   idle_sec="$IDLE_SECONDS"
-  if [[ "$EDITION" == "lite" && ( "$ram_mb" == "512" || "$ram_mb" == "1024" ) ]]; then
+  if [[ ( "$EDITION" == "lite" || "$EDITION" == "lite-lxqt" ) && ( "$ram_mb" == "512" || "$ram_mb" == "1024" ) ]]; then
     idle_sec="$PRIMARY_IDLE_SECONDS"
-  elif [[ "$EDITION" != "lite" && "$ram_mb" == "4096" ]]; then
+  elif [[ "$EDITION" != "lite" && "$EDITION" != "lite-lxqt" && "$ram_mb" == "4096" ]]; then
     idle_sec="$PRIMARY_IDLE_SECONDS"
   fi
   live_repeats=1
@@ -274,12 +292,16 @@ PY
   if [[ "$RELIABILITY" == true ]] && is_primary_tier "$EDITION" "$ram_mb"; then
     live_repeats=3
     install_repeats=2
-  elif [[ "$RELIABILITY" == true && "$EDITION" == "lite" && "$ram_mb" == "512" ]]; then
+  elif [[ "$RELIABILITY" == true && ( "$EDITION" == "lite" || "$EDITION" == "lite-lxqt" ) && "$ram_mb" == "512" ]]; then
     live_repeats=3
     install_repeats=2
   fi
-  if [[ "$EDITION" == "lite" && "$ram_mb" == "1024" ]]; then
+  if [[ ( "$EDITION" == "lite" || "$EDITION" == "lite-lxqt" ) && "$ram_mb" == "1024" ]]; then
     install_repeats=1
+  fi
+  do_install_tier=false
+  if should_install_ram "$ram_mb"; then
+    do_install_tier=true
   fi
 
   # Stage 2: Live graphical ISO runs + optional installation onto disposable qcow2
@@ -299,7 +321,7 @@ PY
     timeout_sec=$(( rep_idle + 600 ))
     rep_disk="$run_dir/rep-${rep}-disk.qcow2"
     qemu-img create -f qcow2 "$rep_disk" 20G >/dev/null
-    if [[ "$INSTALL_TEST" == true && "$rep" -le "$install_repeats" ]]; then
+    if [[ "$do_install_tier" == true && "$rep" -le "$install_repeats" ]]; then
       install_flag=(--do-install)
       timeout_sec=$(( rep_idle + 2700 ))
     fi
@@ -316,7 +338,7 @@ PY
       --panel-wait-sec 90 \
       --timeout-seconds "$timeout_sec" \
       "${install_flag[@]}" > "$rep_json" || true
-    if [[ "$INSTALL_TEST" == true && "$rep" -le "$install_repeats" ]]; then
+    if [[ "$do_install_tier" == true && "$rep" -le "$install_repeats" ]]; then
       rep_inst_ok="$(python3 -c 'import json,sys
 try:
  d=json.load(open(sys.argv[1]))
@@ -354,7 +376,7 @@ except Exception: print("0")' "$rep_json")"
   # Stage 3: Installed-system multi-reboot validation WITHOUT live ISO (Boot 1 -> warm reboot -> Boot 2 -> poweroff -> Cold Boot 3)
   inst_warm_json="$run_dir/installed-warm.json"
   inst_cold_json="$run_dir/installed-cold.json"
-  if [[ "$INSTALL_TEST" == true ]]; then
+  if [[ "$do_install_tier" == true ]]; then
     inst_dir="$run_dir/installed-boots"
     mkdir -p -- "$inst_dir/warm" "$inst_dir/cold"
     cp -f -- "$OVMF_VARS" "$inst_dir/warm/OVMF_VARS.fd"
@@ -445,6 +467,8 @@ for rep_file in sorted(live_runs_dir.glob("rep-*/live-result.json")):
         "stages": stages,
         "network": gr.get("network"),
         "zram_pressure": zp,
+        "hw_summary": gr.get("hw_summary"),
+        "sec_summary": gr.get("sec_summary"),
         "screenshots": ld.get("screenshots", []),
         "desktop_failed": ld.get("desktop_failed"),
     })
@@ -529,6 +553,8 @@ entry = {
         "login": first_live.get("login_success"),
         "desktop": first_live.get("graphical_session_success"),
         "apps_ok": first_live.get("application_test_success"),
+        "hw_summary": first_live.get("hw_summary"),
+        "sec_summary": first_live.get("sec_summary"),
     },
 }
 

@@ -1,0 +1,58 @@
+# Curated APT package manifest for NEXUS Lite LXQt Candidate (Ubuntu 24.04 Noble / Lubuntu LXQt ecosystem).
+# Preserves identical core security, networking, installer, and ZRAM stack to Openbox Lite for fair A/B comparison.
+# Excludes sddm, connman, snapd, discover, libreoffice, and heavy KDE/PIM daemons.
+# Format: <category>:<apt-package>
+
+# Core system, security, networking, and memory management (identical to Openbox Lite)
+core:ufw
+core:unattended-upgrades
+core:ca-certificates
+core:gnupg
+core:curl
+core:network-manager
+core:zram-tools
+core:grub2-common
+core:grub-efi-amd64-bin
+core:efibootmgr
+core:parted
+core:dosfstools
+
+# Curated Lubuntu/Ubuntu Noble LXQt + Openbox desktop (installed with --no-install-recommends)
+desktop:openbox
+desktop:obconf-qt
+desktop:lxqt-session
+desktop:lxqt-panel
+desktop:lxqt-runner
+desktop:lxqt-config
+desktop:lxqt-globalkeys
+desktop:lxqt-notificationd
+desktop:lxqt-policykit
+desktop:lxqt-powermanagement
+desktop:lxqt-qtplugin
+desktop:lxqt-themes
+desktop:lxqt-system-theme
+desktop:breeze-icon-theme
+desktop:lightdm
+desktop:lightdm-gtk-greeter
+desktop:pcmanfm-qt
+desktop:qterminal
+desktop:featherpad
+desktop:qps
+desktop:lximage-qt
+desktop:lxqt-archiver
+desktop:screengrab
+desktop:pavucontrol-qt
+desktop:network-manager-gnome
+desktop:xorg
+desktop:x11-utils
+desktop:x11-xserver-utils
+
+# NEXUS lightweight integration & CLI tools
+nexus:python3
+nexus:gvfs
+
+# Optional extras & browsers (never installed automatically into 512 MB / 768 MB profiles)
+optional:gvfs-backends
+optional:falkon
+optional:firefox
+optional:flatpak

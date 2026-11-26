@@ -95,7 +95,7 @@ if [[ "$PURGE_BLOAT" == true ]]; then
   fi
 fi
 
-run_cmd install -d -m 0755 /usr/local/share/nexus-os/lite /usr/local/share/nexus-os/branding /usr/local/share/applications /usr/local/bin /etc/lightdm/lightdm.conf.d
+run_cmd install -d -m 0755 /usr/local/share/nexus-os/lite /usr/local/share/nexus-os/branding /usr/local/share/nexus-os/hardware /usr/local/share/applications /usr/local/bin /etc/lightdm/lightdm.conf.d
 run_cmd install -m 0755 "$SCRIPT_DIR/apply-nexus-lite.sh" /usr/local/bin/nexus-apply-lite
 run_cmd install -m 0755 "$SCRIPT_DIR/configure-zram.sh" /usr/local/bin/nexus-configure-zram
 run_cmd install -m 0755 "$SCRIPT_DIR/memory-audit.sh" /usr/local/bin/nexus-memory-audit
@@ -103,10 +103,14 @@ run_cmd install -m 0755 "$SCRIPT_DIR/nexus-lite-install.sh" /usr/local/bin/nexus
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" /usr/local/bin/nexus-install-preflight
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" /usr/local/bin/nexus-installer-launcher
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" /usr/local/bin/nexus-disk-install
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-inventory.sh" /usr/local/bin/nexus-hw-inventory
+run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-diagnostics.sh" /usr/local/bin/nexus-hw-diagnostics
+run_cmd install -m 0755 "$REPO_ROOT/linux/security/nexus-security-audit.sh" /usr/local/bin/nexus-security-audit
+run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" /usr/local/share/nexus-os/hardware/hw-compatibility-db.json
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
 run_cmd cp -a "$SCRIPT_DIR/openbox" /usr/local/share/nexus-os/lite/
 
-for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-installer.desktop; do
+for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-installer.desktop nexus-hw-diagnostics.desktop nexus-security-audit.desktop; do
   if [[ -f "$REPO_ROOT/linux/branding/applications/$desktop_file" ]]; then
     run_cmd install -m 0644 "$REPO_ROOT/linux/branding/applications/$desktop_file" "/usr/local/share/applications/$desktop_file"
   fi

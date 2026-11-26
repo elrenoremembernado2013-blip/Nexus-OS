@@ -40,6 +40,7 @@ else
   case "$EDITION" in
     cinnamon|standard) ISO_PATH="$OUT_DIR/nexus-os-22.3-cinnamon-amd64.iso" ;;
     lite) ISO_PATH="$OUT_DIR/nexus-os-22.3-lite-amd64.iso" ;;
+    lite-lxqt) ISO_PATH="$OUT_DIR/nexus-os-22.3-lite-lxqt-amd64.iso" ;;
     ""|xfce) ISO_PATH="$OUT_DIR/nexus-os-22.3-xfce-amd64.iso" ;;
     *) printf 'Unsupported --edition: %s\n' "$EDITION" >&2; exit 2 ;;
   esac

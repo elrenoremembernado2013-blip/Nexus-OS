@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NEXUS Hardware Diagnostics
+Comment=Run read-only, privacy-preserving hardware compatibility & diagnostics preview
+Exec=/usr/local/bin/nexus-hw-diagnostics --preview
+Icon=computer
+Terminal=true
+Categories=System;Utility;
+Keywords=hardware;diagnostics;drivers;wifi;audio;gpu;

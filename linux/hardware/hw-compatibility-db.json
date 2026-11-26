@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "foundation": "Ubuntu 24.04 Noble / Linux Mint 22.3 (x86_64)",
+  "status_taxonomy": [
+    "detected",
+    "supported",
+    "tested",
+    "partially_tested",
+    "unknown",
+    "unsupported"
+  ],
+  "policy": "Detection alone never implies Tested or Supported on bare metal. QEMU/OVMF runs classify only virtualized VirtIO/QEMU devices as tested (QEMU); real physical hardware remains detected/supported/partially_tested/unknown until physical qualification runs.",
+  "drivers": {
+    "gpu": {
+      "bochs-drm": {"status": "tested", "scope": "qemu_ovmf_vga_std", "notes": "QEMU std VGA verified in CI (1280x800)."},
+      "virtio-pci": {"status": "tested", "scope": "qemu_virtio_gpu", "notes": "QEMU virtio-gpu verified in CI."},
+      "virtio_gpu": {"status": "tested", "scope": "qemu_virtio_gpu", "notes": "QEMU virtio-gpu verified in CI."},
+      "i915": {"status": "supported", "scope": "bare_metal_untested", "notes": "Ubuntu Noble Intel graphics driver; hardware-dependent until physical test."},
+      "xe": {"status": "supported", "scope": "bare_metal_untested", "notes": "Ubuntu Noble modern Intel graphics driver; hardware-dependent."},
+      "amdgpu": {"status": "supported", "scope": "bare_metal_untested", "notes": "Ubuntu Noble open-source AMD Radeon + RADV Vulkan driver."},
+      "radeon": {"status": "partially_tested", "scope": "bare_metal_untested", "notes": "Legacy AMD GPUs; Vulkan support limited."},
+      "nouveau": {"status": "partially_tested", "scope": "bare_metal_untested", "notes": "Basic open-source NVIDIA display; proprietary mintdrivers recommended for 3D/Proton."},
+      "nvidia": {"status": "supported", "scope": "proprietary_driver_required", "notes": "Supported via Ubuntu/Mint Driver Manager."}
+    },
+    "storage": {
+      "virtio_blk": {"status": "tested", "scope": "qemu_vda", "notes": "QEMU VirtIO block storage verified across install + 3 reboots."},
+      "virtio-pci": {"status": "tested", "scope": "qemu_vda", "notes": "QEMU VirtIO PCI storage verified."},
+      "nvme": {"status": "supported", "scope": "bare_metal_untested", "notes": "Linux kernel NVMe driver; physical NVMe install untested."},
+      "ahci": {"status": "supported", "scope": "bare_metal_untested", "notes": "Standard SATA AHCI driver."},
+      "mmc_block": {"status": "partially_tested", "scope": "chromebook_emmc_untested", "notes": "Required for MADOO eMMC; physical eMMC install untested."}
+    },
+    "network": {
+      "virtio_net": {"status": "tested", "scope": "qemu_virtio_net", "notes": "QEMU VirtIO NIC verified via NetworkManager."},
+      "e1000e": {"status": "supported", "scope": "bare_metal_untested", "notes": "Intel Gigabit Ethernet."},
+      "r8169": {"status": "supported", "scope": "bare_metal_untested", "notes": "Realtek Gigabit Ethernet."},
+      "iwlwifi": {"status": "supported", "scope": "bare_metal_untested", "notes": "Intel Wi-Fi (requires linux-firmware iwlwifi blobs)."},
+      "ath10k_pci": {"status": "supported", "scope": "bare_metal_untested", "notes": "Qualcomm Atheros Wi-Fi."},
+      "ath11k_pci": {"status": "supported", "scope": "bare_metal_untested", "notes": "Qualcomm Atheros Wi-Fi 6."},
+      "mt7921e": {"status": "supported", "scope": "bare_metal_untested", "notes": "MediaTek Wi-Fi 6."},
+      "brcmfmac": {"status": "partially_tested", "scope": "firmware_dependent", "notes": "Broadcom Wi-Fi may require external NVRAM/firmware blobs."}
+    },
+    "audio": {
+      "snd_hda_intel": {"status": "supported", "scope": "bare_metal_untested", "notes": "Standard Intel/AMD HDA audio via PipeWire/PulseAudio."},
+      "snd_sof_pci_intel_tgl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "notes": "Intel SOF audio requires UCM topology verification on MADOO."},
+      "snd_sof_pci_intel_icl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "notes": "Intel SOF audio requires UCM topology verification."},
+      "snd_sof_pci_intel_apl": {"status": "partially_tested", "scope": "chromebook_sof_untested", "notes": "Intel Gemini/Apollo Lake SOF audio requires Chromebook topology check."}
+    }
+  }
+}

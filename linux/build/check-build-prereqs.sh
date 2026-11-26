@@ -38,7 +38,7 @@ done
 if [[ -z "$BASE_ISO" ]]; then
   case "$EDITION" in
     cinnamon|standard) BASE_ISO="$DOWNLOAD_DIR/linuxmint-22.3-cinnamon-64bit.iso" ;;
-    xfce|lite) BASE_ISO="$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso" ;;
+    xfce|lite|lite-lxqt) BASE_ISO="$DOWNLOAD_DIR/linuxmint-22.3-xfce-64bit.iso" ;;
     *) printf 'Unsupported --edition: %s\n' "$EDITION" >&2; exit 2 ;;
   esac
 fi
