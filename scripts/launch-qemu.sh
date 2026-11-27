@@ -295,6 +295,12 @@ NETDEV_OPT="user,id=n0"
 NET_DEVICE_OPT="virtio-net-pci,netdev=n0"
 DEBUG_FLAGS="guest_errors,unimp"
 
+TABLET_DEV_OPT="usb-tablet,bus=xhci.0"
+KBD_DEV_OPT="usb-kbd,bus=xhci.0"
+XHCI_DEV_OPT="qemu-xhci,id=xhci"
+MONITOR_OPT="unix:$MONITOR_SOCK,server,nowait"
+QMP_OPT="unix:$QMP_SOCK,server,nowait"
+
 ARGS=(
   -machine "$MACHINE_OPT"
   -cpu max
@@ -305,12 +311,12 @@ ARGS=(
   -drive "$DISK_DRIVE_OPT"
   -netdev "$NETDEV_OPT"
   -device "$NET_DEVICE_OPT"
-  -device qemu-xhci,id=xhci
-  -device usb-tablet,bus=xhci.0
-  -device usb-kbd,bus=xhci.0
+  -device "$XHCI_DEV_OPT"
+  -device "$TABLET_DEV_OPT"
+  -device "$KBD_DEV_OPT"
   -serial "file:$SERIAL_LOG"
-  -monitor "unix:$MONITOR_SOCK,server,nowait"
-  -qmp "unix:$QMP_SOCK,server,nowait"
+  -monitor "$MONITOR_OPT"
+  -qmp "$QMP_OPT"
   -display "$DISPLAY_BACKEND"
 )
 if [[ "$VIDEO" == std ]]; then ARGS+=(-vga std); else ARGS+=(-device virtio-vga); fi
