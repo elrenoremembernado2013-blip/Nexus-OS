@@ -269,6 +269,15 @@ fi
 [[ -r "$OVMF_VARS" ]] || { printf 'Cannot read OVMF_VARS template: %s\n' "$OVMF_VARS" >&2; exit 1; }
 
 mkdir -p -- "$(dirname -- "$DISK_PATH")" "$VM_STATE_DIR" "$(dirname -- "$SERIAL_LOG")" "$(dirname -- "$MONITOR_SOCK")" "$(dirname -- "$QMP_SOCK")"
+if [[ -e "$DISK_PATH" ]]; then
+  # Never reset or attach an arbitrary file merely because it has a .qcow2 suffix.
+  qemu-img info --output=json "$DISK_PATH" | python3 -c '
+import json, sys
+info = json.load(sys.stdin)
+if info.get("format") != "qcow2":
+    raise SystemExit("QEMU disk safety abort: existing disk is not a qcow2 image")
+'
+fi
 if [[ "$RESET_DISK" == true && -e "$DISK_PATH" ]]; then
   echo "Resetting disposable qcow2 guest disk (--yes-reset-disk confirmed): $DISK_PATH"
   rm -f -- "$DISK_PATH"
