@@ -2,7 +2,6 @@
 """Validate that a QEMU guest disk stays inside NEXUS's disposable build tree."""
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
