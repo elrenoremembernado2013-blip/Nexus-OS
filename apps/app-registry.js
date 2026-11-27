@@ -3,6 +3,12 @@
   const mountedRoots = new Map();
   const settingsEnhancements = [];
 
+  function reportAppError(message, id, error) {
+    if (typeof console !== "undefined" && typeof console.error === "function") {
+      console.error(message, id, error);
+    }
+  }
+
   function cleanupRoot(root) {
     const instance = mountedRoots.get(root);
     if (!instance) return false;
@@ -12,9 +18,7 @@
         instance.cleanup();
       } catch (error) {
         // A broken app cleanup must not prevent other windows from closing.
-        if (typeof console !== "undefined" && typeof console.error === "function") {
-          console.error("NEXUS app cleanup failed:", instance.id, error);
-        }
+        reportAppError("NEXUS app cleanup failed:", instance.id, error);
       }
     }
     return true;
@@ -22,7 +26,9 @@
 
   window.NexusAppRegistry = {
     register(app) {
-      if (!app || !/^[a-z][a-z0-9-]*$/.test(app.id) || !app.name || !app.render || !app.mount) {
+      if (!app || typeof app.id !== "string" || !/^[a-z][a-z0-9-]*$/.test(app.id) ||
+          typeof app.name !== "string" || !app.name.trim() ||
+          typeof app.render !== "function" || typeof app.mount !== "function") {
         throw new TypeError("A NEXUS app requires an id, name, render and mount function.");
       }
       if (apps.has(app.id)) throw new Error("NEXUS app already registered: " + app.id);
@@ -55,7 +61,14 @@
       settingsEnhancements.push(enhancement);
     },
     enhanceSettings(root) {
-      settingsEnhancements.forEach(enhancement => enhancement(root));
+      settingsEnhancements.forEach((enhancement, index) => {
+        try {
+          enhancement(root);
+        } catch (error) {
+          // A broken settings extension must not block the remaining settings UI.
+          reportAppError("NEXUS settings enhancement failed:", index, error);
+        }
+      });
     }
   };
 })();
