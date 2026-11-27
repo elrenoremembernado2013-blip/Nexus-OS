@@ -7,7 +7,16 @@
     const instance = mountedRoots.get(root);
     if (!instance) return false;
     mountedRoots.delete(root);
-    if (typeof instance.cleanup === "function") instance.cleanup();
+    if (typeof instance.cleanup === "function") {
+      try {
+        instance.cleanup();
+      } catch (error) {
+        // A broken app cleanup must not prevent other windows from closing.
+        if (typeof console !== "undefined" && typeof console.error === "function") {
+          console.error("NEXUS app cleanup failed:", instance.id, error);
+        }
+      }
+    }
     return true;
   }
 
