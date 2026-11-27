@@ -165,6 +165,8 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" "$bin_dir/ne
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" "$bin_dir/nexus-install-preflight"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" "$bin_dir/nexus-installer-launcher"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" "$bin_dir/nexus-disk-install"
+run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-recovery.sh" "$bin_dir/nexus-recovery"
+run_cmd install -m 0644 "$REPO_ROOT/docs/RECOVERY_AND_BOOT.md" "$share_dir/docs/RECOVERY_AND_BOOT.md"
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-inventory.sh" "$bin_dir/nexus-hw-inventory"
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-diagnostics.sh" "$bin_dir/nexus-hw-diagnostics"
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-qualify.sh" "$bin_dir/nexus-hw-qualify"

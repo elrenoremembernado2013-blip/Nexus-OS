@@ -74,9 +74,22 @@ done
 [[ "$HOSTNAME_NEW" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]] || { echo 'Invalid --hostname.' >&2; exit 2; }
 [[ "$USERNAME_NEW" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { echo 'Invalid --user.' >&2; exit 2; }
 
+if [[ -n "$EDITION_OVERRIDE" ]]; then
+  case "$EDITION_OVERRIDE" in
+    standard) EDITION_OVERRIDE="cinnamon" ;;
+    cinnamon|xfce|lite|lite-lxqt) ;;
+    *) printf 'Unsupported --edition: %s (expected cinnamon | xfce | lite | lite-lxqt)\n' "$EDITION_OVERRIDE" >&2; exit 2 ;;
+  esac
+fi
+
 if [[ -n "$EFI_PART" || -n "$ROOT_PART" ]]; then
   [[ -n "$EFI_PART" && -n "$ROOT_PART" ]] || { echo 'Manual partitioning requires both --efi-part and --root-part.' >&2; exit 2; }
   [[ "$EFI_PART" != "$ROOT_PART" ]] || { echo '--efi-part and --root-part must be distinct partitions.' >&2; exit 2; }
+fi
+
+if [[ "$KEEP_EFI" == true && -z "$EFI_PART" ]]; then
+  echo '--keep-efi requires explicit --efi-part and --root-part.' >&2
+  exit 2
 fi
 
 if [[ "$LUKS_ENABLED" == true && -n "$EFI_PART" ]]; then
@@ -136,6 +149,10 @@ if [[ "$LUKS_ENABLED" == true ]]; then
   command -v cryptsetup >/dev/null 2>&1 || { echo 'Missing required cryptsetup tool for --luks.' >&2; exit 1; }
   [[ -n "$LUKS_PASS_FILE" && -r "$LUKS_PASS_FILE" ]] || { echo '--luks requires a readable --luks-passphrase-file PATH.' >&2; exit 2; }
   [[ -s "$LUKS_PASS_FILE" ]] || { echo '--luks-passphrase-file cannot be empty.' >&2; exit 2; }
+  if [[ -z "$(tr -d '\r\n[:space:]' < "$LUKS_PASS_FILE")" ]]; then
+    echo '--luks-passphrase-file cannot contain only whitespace or newlines.' >&2
+    exit 2
+  fi
 fi
 
 if [[ -n "$PASSWORD_FILE" ]]; then
@@ -157,6 +174,17 @@ EDITION="${EDITION:-lite}"
 TARGET="/mnt/nexus-install-target"
 mounted=false
 crypt_opened=false
+CURRENT_STAGE="preflight"
+DISK_MODIFIED=false
+
+log_msg() {
+  local line
+  line="[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
+  printf '%s\n' "$line"
+  mkdir -p -- "$(dirname "$LOG_FILE")"
+  printf '%s\n' "$line" >> "$LOG_FILE"
+}
+
 cleanup() {
   if [[ "$mounted" == true ]]; then
     umount -lf "$TARGET/dev/pts" 2>/dev/null || true
@@ -167,20 +195,27 @@ cleanup() {
     umount -lf "$TARGET/boot/efi" 2>/dev/null || true
     umount -lf "$TARGET/boot" 2>/dev/null || true
     umount -lf "$TARGET" 2>/dev/null || true
+    mounted=false
   fi
   if [[ "$crypt_opened" == true ]] && command -v cryptsetup >/dev/null 2>&1; then
     cryptsetup luksClose "$CRYPT_NAME" 2>/dev/null || true
+    crypt_opened=false
   fi
 }
-trap cleanup EXIT
 
-log_msg() {
-  local line
-  line="[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
-  printf '%s\n' "$line"
-  mkdir -p -- "$(dirname "$LOG_FILE")"
-  printf '%s\n' "$line" >> "$LOG_FILE"
+on_err() {
+  local rc=$?
+  printf 'ERROR: NEXUS OS installation failed during stage [%s] (exit=%s).\n' "$CURRENT_STAGE" "$rc" >&2
+  printf '  Disk modified: %s | Target: %s\n' "$DISK_MODIFIED" "$DISK" >&2
+  printf '  Temporary mounts and any LUKS mapper are being safely detached.\n' >&2
+  printf '  Recovery guidance:\n' >&2
+  printf '    1. Inspect logs: %s\n' "$LOG_FILE" >&2
+  printf '    2. Inspect partitions safely (read-only): lsblk -f\n' >&2
+  printf '    3. Run recovery diagnostics: nexus-recovery --diagnose\n' >&2
+  exit "$rc"
 }
+trap cleanup EXIT
+trap on_err ERR
 
 # Interrupted-install recovery: detach any stale mounts or LUKS mapper left by a previous aborted run
 if mountpoint -q "$TARGET" 2>/dev/null || [[ -d "$TARGET/boot" ]]; then
@@ -211,21 +246,61 @@ LUKS_UUID=""
 
 if [[ -n "$EFI_PART" ]]; then
   # Manual partitioning path: validate existing partitions and preserve partition table
+  CURRENT_STAGE="manual_partition_validation"
   [[ -b "$EFI_PART" && -b "$ROOT_PART" ]] || { echo "Specified manual partitions do not exist ($EFI_PART, $ROOT_PART)." >&2; exit 1; }
   [[ "$(lsblk -n -d -o TYPE "$EFI_PART" 2>/dev/null || true)" == "part" ]] || { echo "$EFI_PART is not a partition." >&2; exit 1; }
   [[ "$(lsblk -n -d -o TYPE "$ROOT_PART" 2>/dev/null || true)" == "part" ]] || { echo "$ROOT_PART is not a partition." >&2; exit 1; }
+
+  disk_real="$(readlink -f "$DISK")"
+  efi_pk="$(lsblk -n -d -o PKNAME "$EFI_PART" 2>/dev/null || true)"
+  root_pk="$(lsblk -n -d -o PKNAME "$ROOT_PART" 2>/dev/null || true)"
+  [[ -n "$efi_pk" && "$(readlink -f "/dev/$efi_pk")" == "$disk_real" ]] || {
+    printf 'SAFETY ABORT: --efi-part (%s) does not belong to target --disk (%s).\n' "$EFI_PART" "$DISK" >&2
+    exit 1
+  }
+  [[ -n "$root_pk" && "$(readlink -f "/dev/$root_pk")" == "$disk_real" ]] || {
+    printf 'SAFETY ABORT: --root-part (%s) does not belong to target --disk (%s).\n' "$ROOT_PART" "$DISK" >&2
+    exit 1
+  }
+
+  if lsblk -n -o MOUNTPOINT "$EFI_PART" 2>/dev/null | grep -qE '^/'; then
+    printf 'SAFETY ABORT: --efi-part (%s) is currently mounted.\n' "$EFI_PART" >&2
+    exit 1
+  fi
+  if lsblk -n -o MOUNTPOINT "$ROOT_PART" 2>/dev/null | grep -qE '^/'; then
+    printf 'SAFETY ABORT: --root-part (%s) is currently mounted.\n' "$ROOT_PART" >&2
+    exit 1
+  fi
+
+  root_bytes="$(lsblk -n -d -b -o SIZE "$ROOT_PART" 2>/dev/null || echo 0)"
+  (( root_bytes >= 8589934592 )) || {
+    printf 'SAFETY ABORT: --root-part (%s) is < 8 GiB (%s bytes).\n' "$ROOT_PART" "$root_bytes" >&2
+    exit 1
+  }
+
   PART_EFI="$EFI_PART"
   PART_ROOT="$ROOT_PART"
   if [[ "$KEEP_EFI" == false ]]; then
+    CURRENT_STAGE="filesystem_format"
+    DISK_MODIFIED=true
     log_msg "Formatting manual EFI partition $PART_EFI (FAT32)"
     mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
   else
-    log_msg "Preserving existing manual EFI partition $PART_EFI (--keep-efi)"
+    efi_fstype="$(blkid -s TYPE -o value "$PART_EFI" 2>/dev/null || true)"
+    [[ "$efi_fstype" == "vfat" ]] || {
+      printf 'SAFETY ABORT: --keep-efi expects a FAT32/vfat EFI System Partition, found fstype=%s on %s.\n' "${efi_fstype:-unknown}" "$PART_EFI" >&2
+      exit 1
+    }
+    log_msg "Preserving existing manual EFI partition $PART_EFI (--keep-efi, fstype=$efi_fstype)"
   fi
+  CURRENT_STAGE="filesystem_format"
+  DISK_MODIFIED=true
   log_msg "Formatting manual root partition $PART_ROOT (ext4)"
   mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
 else
   # Guided partitioning (standard or LUKS2)
+  CURRENT_STAGE="partitioning"
+  DISK_MODIFIED=true
   wipefs -af "$DISK" >/dev/null 2>&1 || true
   parted -s "$DISK" mklabel gpt
   parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
@@ -268,9 +343,11 @@ else
 
   if [[ "$LUKS_ENABLED" == true ]]; then
     [[ -b "$PART_EFI" && -b "$PART_BOOT" && -b "$PART_LUKS" ]] || { echo "LUKS partitions did not appear on $DISK." >&2; exit 1; }
+    CURRENT_STAGE="filesystem_format"
     log_msg "Formatting $PART_EFI (FAT32) and $PART_BOOT (ext4 /boot)"
     mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_boot "$PART_BOOT" >/dev/null
+    CURRENT_STAGE="luks_format"
     log_msg "Formatting $PART_LUKS as LUKS2 (argon2id 64 MiB memory bound for low-RAM reliability)"
     tr -d '\r\n' < "$LUKS_PASS_FILE" | cryptsetup luksFormat \
       --type luks2 \
@@ -291,12 +368,14 @@ else
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
   else
     [[ -b "$PART_EFI" && -b "$PART_ROOT" ]] || { echo "Partitions did not appear on $DISK ($PART_EFI, $PART_ROOT)." >&2; exit 1; }
+    CURRENT_STAGE="filesystem_format"
     log_msg "Formatting $PART_EFI (FAT32) and $PART_ROOT (ext4)"
     mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
   fi
 fi
 
+CURRENT_STAGE="mounting"
 mkdir -p -- "$TARGET"
 mount "$PART_ROOT" "$TARGET"
 mounted=true
@@ -307,6 +386,7 @@ fi
 mkdir -p -- "$TARGET/boot/efi"
 mount "$PART_EFI" "$TARGET/boot/efi"
 
+CURRENT_STAGE="filesystem_copy"
 log_msg "Copying live filesystem ($SOURCE_MODE) to $TARGET"
 if [[ "$SOURCE_MODE" == "rofs" ]]; then
   cp -a /rofs/. "$TARGET/"
@@ -322,6 +402,7 @@ mount -t proc proc "$TARGET/proc"
 mount -t sysfs sysfs "$TARGET/sys"
 mount --bind /run "$TARGET/run"
 
+CURRENT_STAGE="system_config"
 uuid_root="$(blkid -s UUID -o value "$PART_ROOT")"
 uuid_efi="$(blkid -s UUID -o value "$PART_EFI")"
 
@@ -401,6 +482,7 @@ autologin-user-timeout=0
 DM
 fi
 
+CURRENT_STAGE="initramfs"
 # Remove casper/ubiquity live-only packages before regenerating initramfs
 chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive dpkg --purge --no-triggers casper lupin-casper >/dev/null 2>&1 || true
 
@@ -421,6 +503,7 @@ else
 fi
 rm -f -- "$initrd_speed_conf"
 
+CURRENT_STAGE="bootloader_install"
 # Install UEFI GRUB bootloader + fallback EFI/BOOT/BOOTX64.EFI
 log_msg "Installing UEFI GRUB bootloader onto $DISK ($PART_EFI)"
 chroot "$TARGET" /usr/sbin/grub-install \
@@ -467,6 +550,7 @@ if [[ -f "$TARGET/etc/default/grub" ]]; then
 fi
 chroot "$TARGET" /usr/sbin/update-grub
 
+CURRENT_STAGE="finalizing"
 # Mark installed system metadata (zero secrets or passphrases stored)
 cat > "$TARGET/etc/nexus-installed.json" <<META
 {
@@ -482,3 +566,11 @@ cat > "$TARGET/etc/nexus-installed.json" <<META
   "installed_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 META
+
+sync
+cleanup
+log_msg "NEXUS OS installation completed successfully (edition=${EDITION}, layout=${layout_name}, disk=${DISK})."
+echo "Next steps: Remove the live USB/ISO media and reboot into the installed system."
+if [[ "$LUKS_ENABLED" == true ]]; then
+  echo "LUKS2 note: You will be prompted for your encryption passphrase at boot. See /usr/local/share/nexus-os/luks-recovery-guide.txt."
+fi

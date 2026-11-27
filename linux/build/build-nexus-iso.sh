@@ -24,7 +24,7 @@ Prepares and builds a Linux Mint 22.3 based NEXUS OS live ISO under
 build/iso/out/ from a verified Mint ISO (scripts/download-linux-mint.sh).
 
 Options:
-  --edition NAME  cinnamon | standard | xfce | lite (default: xfce unless NEXUS_EDITION set)
+  --edition NAME  cinnamon | standard | xfce | lite | lite-lxqt (default: xfce unless NEXUS_EDITION set)
   --check         Check host build prerequisites and exit
   --dry-run       Validate configuration and print exact build steps without root or tools
   --with-gaming   Include gaming packages (Standard/Xfce only)

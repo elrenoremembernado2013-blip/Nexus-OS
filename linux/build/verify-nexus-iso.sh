@@ -18,7 +18,7 @@ Verifies an output NEXUS OS ISO file, SHA-256 manifest, build-info.json, and
 boot/casper filesystem entries via xorriso.
 
 Options:
-  --edition NAME  cinnamon | standard | xfce | lite (selects default ISO path)
+  --edition NAME  cinnamon | standard | xfce | lite | lite-lxqt (selects default ISO path)
   --dry-run       Validate script paths and print planned verification steps
   --help, -h      Show this help message
 USAGE

@@ -161,8 +161,13 @@ function mountWelcome(app) {
   const { app } = loadWelcome({
     preflight: () => ({
       arch: "x86_64",
+      edition: "lite-lxqt",
       firmware: "UEFI",
       ubiquity_available: true,
+      requirements: { edition_min_ram_mib: 1024 },
+      secure_boot_status: { secure_boot_state: "enabled" },
+      dual_boot_detection: { dual_boot_candidates_detected: true },
+      structured_warnings: [{ severity: "info", problem: "Existing OS detected", recommended_action: "Use --keep-efi" }],
       hardware: { cpu: "AMD Ryzen 5", ram_total_mib: 8192, disks: [{ device: "/dev/vda", size: "40G", model: "QEMU" }] }
     }),
     launch() {
@@ -172,7 +177,11 @@ function mountWelcome(app) {
   });
   const { root, panel, statusEl, tabs, cleanup } = mountWelcome(app);
   root.dispatch("click", { target: tabs[1] });
-  assert.ok(collectText(panel).includes("/dev/vda (40G, QEMU)"));
+  const text = collectText(panel);
+  assert.ok(text.includes("/dev/vda (40G, QEMU)"));
+  assert.ok(text.includes("lite-lxqt (min 1024 MiB RAM)"));
+  assert.ok(text.includes("Secure Boot: enabled"));
+  assert.ok(text.includes("nexus-recovery --diagnose"));
 
   const launchBtn = panel.children[1].children.find(c => c.dataset?.welcomeAction === "launch-ubiquity");
   assert.equal(launchBtn.disabled, false);

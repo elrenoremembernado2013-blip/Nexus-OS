@@ -1,4 +1,4 @@
-# NEXUS OS Hardware Compatibility & Diagnostics Matrix (Phase 13.0)
+# NEXUS OS Hardware Compatibility & Diagnostics Matrix (Phase 13.1)
 
 **Foundation:** Linux Mint 22.3 (`noble` Ubuntu 24.04 LTS kernel & drivers, `x86_64`).
 **Classification Policy:** NEXUS OS strictly separates QEMU/OVMF virtual verification from physical bare-metal qualification:
@@ -33,5 +33,5 @@ All 4 NEXUS OS editions (`cinnamon`, `xfce`, `lite`, `lite-lxqt`) package `/usr/
 | Wi-Fi (`iwlwifi`, `ath10k_pci`, `ath11k_pci`, `rtw88`, `mt7921e`) & Bluetooth (`btusb`) | **Supported / Unknown by USB chipset** | `NOT TESTED` | Common PCIe chipsets supported via `linux-firmware`; Broadcom/Realtek USB dongles remain `unknown` until bare-metal tested. |
 | Audio (`snd_hda_intel`, `snd_sof_pci` / Chromebook MADOO), Speakers & Mics | **Supported / Hardware-dependent** | `NOT TESTED` | HDA + PipeWire/ALSA shipped; Chromebook SOF UCM/topology requires physical validation (`docs/MADOO_CHROMEBOOK_QUALIFICATION.md`). |
 | Touchpads / Multi-touch (`libinput`), USB Peripherals, Battery (`BAT*`), S3 / `s2idle` Suspend & Resume | **Detected / Supported** | `NOT TESTED` | Stage A/B probes implemented in `nexus-hw-qualify`; physical wake, palm rejection, and drain curves untested. |
-| Internal NVMe / SATA AHCI / eMMC & Physical UEFI + Signed `shimx64.efi` Secure Boot | **Supported** | `NOT TESTED` | All 4 manifests include `shim-signed`, `grub-efi-amd64-signed`, `mokutil`; physical NVMe/eMMC & OEM Secure Boot untested on bare metal. |
+| Internal NVMe / SATA AHCI / eMMC & Physical UEFI + Signed `shimx64.efi` Secure Boot | **Supported** | `NOT TESTED` | All 4 manifests include `shim-signed`, `grub-efi-amd64-signed`, `mokutil`; `nexus-install-preflight` & `nexus-recovery` verify EFI/Secure Boot readiness read-only; physical NVMe/eMMC & OEM Secure Boot untested on bare metal. |
 | ARM64 / `i386` / Apple Silicon native | **Unsupported** | `Unsupported` | NEXUS OS targets `x86_64` (`amd64`) only. |

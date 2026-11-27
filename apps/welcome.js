@@ -195,23 +195,38 @@
 
       const dl = node("dl", "store-detail-metadata");
       const hw = pre.data?.hardware;
+      const editionName = pre.data?.edition && pre.data.edition !== "unknown" ? pre.data.edition : "Standard/Xfce";
+      const minRam = pre.data?.requirements?.edition_min_ram_mib || 2048;
+      const sbState = pre.data?.secure_boot_status?.secure_boot_state || "unavailable";
+      const dualBootDetected = pre.data?.dual_boot_detection?.dual_boot_candidates_detected;
       const diskSummary = hw?.disks?.length
         ? hw.disks.map(d => `${d.device} (${d.size}, ${d.model})`).join(", ")
         : (pre.available ? "None detected" : "Unavailable in browser preview");
       [
-        ["Architecture / Firmware", pre.available ? `${pre.data.arch} · ${pre.data.firmware}` : "Unavailable (requires x86_64 UEFI or BIOS host)"],
+        ["Edition", pre.available ? `${editionName} (min ${minRam} MiB RAM)` : "Unavailable in browser preview"],
+        ["Architecture / Firmware", pre.available ? `${pre.data.arch} · ${pre.data.firmware} (Secure Boot: ${sbState})` : "Unavailable (requires x86_64 UEFI or BIOS host)"],
         ["CPU", hw?.cpu || "Unavailable"],
-        ["Memory", hw?.ram_total_mib ? `${hw.ram_total_mib} MiB (min 2048 MiB)` : "Unavailable"],
+        ["Memory", hw?.ram_total_mib ? `${hw.ram_total_mib} MiB (min ${minRam} MiB)` : "Unavailable"],
         ["Target disks", diskSummary],
+        ["Dual-boot / Existing OS", pre.available ? (dualBootDetected ? "Existing OS partitions detected — use 'Something else' or --keep-efi" : "No conflicting OS partitions detected") : "Unavailable in browser preview"],
         ["Ubiquity installer", pre.available ? (pre.data.ubiquity_available ? "Ready (live session)" : "Not installed on this non-live host") : "Unavailable in browser preview"]
       ].forEach(([k, v]) => dl.append(node("dt", "", k), node("dd", "", v)));
       hwCard.append(dl);
 
+      if (pre.available && Array.isArray(pre.data?.structured_warnings) && pre.data.structured_warnings.length > 0) {
+        const warnList = node("ul", "");
+        warnList.style.cssText = "margin:8px 0 0 18px;font-size:12px";
+        pre.data.structured_warnings.slice(0, 4).forEach(w => {
+          warnList.append(node("li", "", `[${String(w.severity || "info").toUpperCase()}] ${w.problem} (${w.recommended_action})`));
+        });
+        hwCard.append(warnList);
+      }
+
       const optCard = node("article", "content-card");
       optCard.style.marginTop = "12px";
       optCard.append(
-        node("h3", "", "Partitioning, Encryption & Safety Confirmation"),
-        node("p", "", "Supported Ubiquity modes: (1) Install alongside existing OS, (2) Erase disk and install NEXUS OS, (3) Manual partitioning (Something else), and optional LUKS Full-Disk Encryption. Save any LUKS passphrase securely offline.")
+        node("h3", "", "Partitioning, Encryption & Recovery Guidance"),
+        node("p", "", "Supported Ubiquity modes: (1) Install alongside existing OS, (2) Erase disk and install NEXUS OS, (3) Manual partitioning (Something else), and optional LUKS Full-Disk Encryption. Save any LUKS passphrase securely offline. For boot diagnostics or recovery, run `nexus-recovery --diagnose` or see docs/RECOVERY_AND_BOOT.md.")
       );
 
       const confirmLabel = node("label", "");

@@ -1,4 +1,4 @@
-# NEXUS OS Security & Privacy Architecture (Phase 5–13.0)
+# NEXUS OS Security & Privacy Architecture (Phase 5–13.1)
 
 ## Core Principles
 
@@ -15,8 +15,10 @@
 2. **Privacy-Safe Hardware Qualification & Community Template (`linux/hardware/`)**:
    - `nexus-hw-inventory`, `nexus-hw-diagnostics`, and `nexus-hw-qualify` are strictly read-only by default, never record microphone audio, never log Wi-Fi SSIDs or credentials, strip serial numbers, MAC addresses, UUIDs, IPv4/IPv6 addresses, hostnames, and `/home/<USER>` paths, run a `privacy_audit` self-check, and set `auto_upload: false` (`human_review_required: true`) on `--contribute-template`.
    - Stage B hardware checks require explicit confirmation (`--confirm-test <name>`) and pre-run safety explanations; destructive disk/firmware/Secure-Boot actions are refused, and users are warned never to treat their primary computer or personal Chromebook as a disposable test target (`docs/HARDWARE_TESTING_GUIDE.md`).
-3. **LUKS2 Installer Secret Hygiene (`linux/installer/nexus-disk-install.sh`)**:
-   - Includes `core:cryptsetup` and `core:cryptsetup-initramfs` across all Lite manifests, strips trailing `\r\n` before piping passphrases to `cryptsetup --key-file -`, never stores passphrases on disk or in `/etc/nexus-installed.json`/logs, and writes `/usr/local/share/nexus-os/luks-recovery-guide.txt`.
+3. **LUKS2 & Installer Safety / Secret Hygiene (`linux/installer/`)**:
+   - Includes `core:cryptsetup` and `core:cryptsetup-initramfs` across all Lite manifests, strips trailing `\r\n` and rejects blank/whitespace passphrases before piping to `cryptsetup --key-file -`, never stores passphrases on disk or in `/etc/nexus-installed.json`/logs, and writes `/usr/local/share/nexus-os/luks-recovery-guide.txt`.
+   - `nexus-disk-install.sh` requires explicit `--yes-erase-disk`, verifies manual/dual-boot partitions belong to `--disk`, are unmounted, `--root-part >= 8 GiB`, and `--efi-part` is `vfat` when `--keep-efi` is set, and runs safe `EXIT`/`ERR` mount & LUKS cleanup traps.
+   - `nexus-recovery.sh` is strictly read-only by default (`--diagnose`, `--guide`), supports `--redacted` UUID stripping, explains intended read-only `fsck -n` checks before execution, and refuses `--fsck-dry-run` without `--confirm`.
    - Also packages `core:shim-signed`, `core:grub-efi-amd64-signed`, and `core:mokutil` across all 5 edition manifests and copies signed `shimx64.efi` (`BOOTX64.EFI`) + `grubx64.efi` during UEFI installation.
 4. **`linux/mint/nexus-security-cli.sh` & `linux/mint/nexus-system-bridge.py`**:
    - Polkit-authenticated UFW toggling (`pkexec`), UEFI Secure Boot / LUKS status inspection, Flatpak sandbox permission inspection/overrides, and loopback-only token-authenticated bridge (`X-Nexus-Token` + Origin check).

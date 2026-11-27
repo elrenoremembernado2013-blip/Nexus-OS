@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NEXUS Recovery & Boot Diagnostics
+Comment=Run read-only boot/partition diagnosis and view safe recovery steps
+Exec=/usr/local/bin/nexus-recovery --diagnose
+Icon=drive-harddisk
+Terminal=true
+Categories=System;Utility;
+Keywords=recovery;boot;grub;luks;fsck;diagnostics;

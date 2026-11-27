@@ -216,6 +216,8 @@ jobs:
           bash linux/hardware/nexus-hw-diagnostics.sh --contribute-template >/dev/null
           bash linux/hardware/nexus-hw-qualify.sh --stage a >/dev/null
           bash linux/hardware/nexus-browser-qualify.sh --dry-run >/dev/null
+          bash linux/installer/nexus-recovery.sh --diagnose --json --redacted >/dev/null
+          bash linux/test/test-installer-safety.sh
           bash linux/security/nexus-security-audit.sh --repo-only --repo . --strict
 
       - name: Download and GPG-verify Linux Mint 22.3 base ISO (${{ matrix.base_edition }})
@@ -308,6 +310,8 @@ jobs:
                   "iboot": f"{r.get('installed_boot_successes')}/{r.get('installed_boot_attempts')}",
                   "persist": r.get("persistence_verified"),
                   "ub_ui": (l0.get("ubiquity_ui") or {}).get("window_verified"),
+                  "ub_tier": (l0.get("ubiquity_ui") or {}).get("qualification_tier"),
+                  "ub_screens": (l0.get("ubiquity_ui") or {}).get("screens_observed"),
                   "wm_s": d0.get("wm_ready_sec"),
                   "pnl_s": d0.get("panel_ready_sec"),
                   "pnl_rss": d0.get("panel_rss_mib"),

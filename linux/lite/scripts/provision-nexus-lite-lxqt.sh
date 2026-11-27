@@ -109,6 +109,7 @@ run_cmd install -d -m 0755 \
   /usr/local/share/nexus-os/lite-lxqt \
   /usr/local/share/nexus-os/branding \
   /usr/local/share/nexus-os/hardware \
+  /usr/local/share/nexus-os/docs \
   /usr/local/share/lxqt/themes/nexus-dark \
   /usr/local/share/applications \
   /usr/local/bin \
@@ -121,6 +122,8 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/lite/nexus-lite-install.sh" /usr/local
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" /usr/local/bin/nexus-install-preflight
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" /usr/local/bin/nexus-installer-launcher
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" /usr/local/bin/nexus-disk-install
+run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-recovery.sh" /usr/local/bin/nexus-recovery
+run_cmd install -m 0644 "$REPO_ROOT/docs/RECOVERY_AND_BOOT.md" /usr/local/share/nexus-os/docs/RECOVERY_AND_BOOT.md
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-inventory.sh" /usr/local/bin/nexus-hw-inventory
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-diagnostics.sh" /usr/local/bin/nexus-hw-diagnostics
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-qualify.sh" /usr/local/bin/nexus-hw-qualify
@@ -133,7 +136,7 @@ run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.svg" /usr/local/shar
 run_cmd install -m 0644 "$LXQT_DIR/theme/nexus-dark/lxqt-panel.qss" /usr/local/share/lxqt/themes/nexus-dark/lxqt-panel.qss
 run_cmd cp -a "$LXQT_DIR" /usr/local/share/nexus-os/lite-lxqt/
 
-for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-installer.desktop nexus-hw-diagnostics.desktop nexus-security-audit.desktop; do
+for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-installer.desktop nexus-recovery.desktop nexus-hw-diagnostics.desktop nexus-security-audit.desktop; do
   if [[ -f "$REPO_ROOT/linux/branding/applications/$desktop_file" ]]; then
     run_cmd install -m 0644 "$REPO_ROOT/linux/branding/applications/$desktop_file" "/usr/local/share/applications/$desktop_file"
   fi

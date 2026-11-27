@@ -783,8 +783,16 @@ def main():
             except Exception:
                 pass
 
-    # Live-mode Ubiquity UI check & actual disk installation
-    ubiquity_ui = {"checked": False}
+    # Live-mode Ubiquity UI check (launch + multi-screen navigation) & actual disk installation
+    ubiquity_ui = {
+        "checked": False,
+        "installer_launch_verified": False,
+        "individual_screens_verified": False,
+        "complete_gui_install_verified": False,
+        "installed_boot_verified": False,
+        "qualification_tier": "not_checked",
+        "screens_observed": [],
+    }
     install_report = {"executed": False}
     if mode == "live":
         if check_ubiquity_ui and ubiquity_present and stages["1_post_login"].get("ram_total_mib", 0) >= 850:
@@ -792,7 +800,15 @@ def main():
                 subprocess.run(["xhost", "+si:localuser:root"], env=x_env(sess), capture_output=True, text=True)
             before_ub = set(x11_windows(sess))
             ub_env = x_env(sess)
-            ub_proc = subprocess.Popen(["ubiquity", "gtk_ui"], env=ub_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            dbg_path = Path("/var/log/installer/debug")
+            prev_dbg_len = dbg_path.stat().st_size if dbg_path.is_file() else 0
+            ub_proc = subprocess.Popen(
+                ["ubiquity", "--debug", "gtk_ui"],
+                env=ub_env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
             ub_wins = []
             for _ in range(50):
                 time.sleep(0.5)
@@ -801,10 +817,58 @@ def main():
                 ub_wins = [w for w in new_ub if any(k in w.lower() for k in ("ubiquity", "install"))]
                 if ub_wins:
                     break
+
+            def read_ub_steps():
+                if not dbg_path.is_file():
+                    return []
+                try:
+                    raw = dbg_path.read_text(encoding="utf-8", errors="replace")[prev_dbg_len:]
+                except OSError:
+                    return []
+                found = []
+                for line in raw.splitlines():
+                    if "Step_before" in line or "Step_after" in line or "step " in line.lower() or "ubi-" in line:
+                        for token in line.replace("(", " ").replace(")", " ").replace(",", " ").split():
+                            if token.startswith("ubi-") or token in ("stepLanguage", "stepKeyboardConf", "stepPrepare", "stepPartAuto", "stepPartAdvanced", "stepLocation", "stepUserInfo"):
+                                if token not in found:
+                                    found.append(token)
+                return found
+
+            screens_observed = []
+            launch_ok = ub_proc.poll() is None and len(ub_wins) > 0
+            if launch_ok:
+                time.sleep(1.5)
+                screens_observed = read_ub_steps() or ["initial_screen"]
+                send_event(port_fd, "ubiquity_step", {"step": "01_language", "steps": screens_observed})
+                wait_for_cmd(port_file, "ack", timeout=15)
+
+                # Attempt keyboard navigation across up to 3 subsequent screens (Language -> Keyboard -> Prepare -> Install Type)
+                for idx, step_label in enumerate(("02_keyboard", "03_prepare", "04_partman"), start=2):
+                    if ub_proc.poll() is not None:
+                        break
+                    prev_count = len(screens_observed)
+                    send_event(port_fd, "qmp_send_key", {"keys": ["ret"]})
+                    wait_for_cmd(port_file, "ack", timeout=15)
+                    for _ in range(12):
+                        time.sleep(0.5)
+                        cur_steps = read_ub_steps()
+                        if len(cur_steps) > prev_count:
+                            screens_observed = cur_steps
+                            break
+                    send_event(port_fd, "ubiquity_step", {"step": step_label, "steps": screens_observed})
+                    wait_for_cmd(port_file, "ack", timeout=15)
+
+            screens_verified = launch_ok and len(screens_observed) >= 2
             ubiquity_ui = {
                 "checked": True,
                 "launched": ub_proc.poll() is None,
                 "window_verified": len(ub_wins) > 0,
+                "installer_launch_verified": launch_ok,
+                "individual_screens_verified": screens_verified,
+                "complete_gui_install_verified": False,
+                "installed_boot_verified": False,
+                "qualification_tier": "screens_navigated" if screens_verified else ("launch_only" if launch_ok else "failed"),
+                "screens_observed": screens_observed[:10],
                 "windows": ub_wins[:3],
             }
             send_event(port_fd, "ubiquity_ui", ubiquity_ui)

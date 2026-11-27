@@ -123,6 +123,12 @@ class QmpClient:
             "arguments": {"keys": [{"type": "qcode", "data": "alt"}, {"type": "qcode", "data": "f4"}]},
         })
 
+    def send_keys(self, keys):
+        return self.cmd({
+            "execute": "send-key",
+            "arguments": {"keys": [{"type": "qcode", "data": str(k)} for k in keys]},
+        })
+
     def nudge_mouse(self):
         return self.cmd({
             "execute": "input-send-event",
@@ -309,6 +315,16 @@ def main():
                             elif et in ("app_file_manager", "app_terminal", "app_settings", "app_multi_apps", "ubiquity_ui", "browser_falkon_max", "browser_firefox_max"):
                                 if qmp_ok:
                                     current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_02_{et}"))
+                                vs.sendall(b'{"cmd":"ack"}\n')
+                            elif et == "ubiquity_step":
+                                step_tag = str((ev.get("data") or {}).get("step") or "step").replace("/", "_")
+                                if qmp_ok:
+                                    current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_ub_{step_tag}"))
+                                vs.sendall(b'{"cmd":"ack"}\n')
+                            elif et == "qmp_send_key":
+                                keys = (ev.get("data") or {}).get("keys") or []
+                                if qmp_ok and keys:
+                                    qmp.send_keys(keys)
                                 vs.sendall(b'{"cmd":"ack"}\n')
                             elif et == "test_alt_f4":
                                 if qmp_ok:

@@ -1,9 +1,9 @@
-# NEXUS OS Bare-Metal Hardware Qualification & Contribution Guide (Phase 13.0)
+# NEXUS OS Bare-Metal Hardware Qualification & Contribution Guide (Phase 13.1)
 
 > **Critical Safety Warning:**
 > - **NEVER** use your primary personal computer or your personal Chromebook (including HP Chromebook x360 14b) as a disposable disk-install, wipe, partitioning, LUKS, or firmware-modification target.
 > - Destructive installer, dual-boot, LUKS, and bootloader tests must run **only** on disposable QEMU/OVMF virtual disks or dedicated, backed-up spare test hardware.
-> - NEXUS hardware qualification scripts (`nexus-hw-inventory`, `nexus-hw-diagnostics`, `nexus-hw-qualify`, `nexus-browser-qualify`) **never** format drives, repartition disks, install an OS, flash BIOS/UEFI, alter or disable Secure Boot, modify bootloader configuration, run destructive storage tests, record microphone audio, log Wi-Fi SSIDs/passwords, or auto-upload reports.
+> - NEXUS hardware qualification scripts (`nexus-hw-inventory`, `nexus-hw-diagnostics`, `nexus-hw-qualify`, `nexus-browser-qualify`) and recovery tools (`nexus-recovery`) **never** format drives, repartition disks, install an OS, flash BIOS/UEFI, alter or disable Secure Boot, modify bootloader configuration, run destructive storage tests, record microphone audio, log Wi-Fi SSIDs/passwords, or auto-upload reports.
 
 ---
 
@@ -65,12 +65,13 @@ Measured fields per browser:
 
 ---
 
-## 3. Manual Installer & Ubiquity GUI Checklist (Spare Disks Only)
+## 3. Manual Installer, Ubiquity GUI & Recovery Checklist (Spare Disks Only)
 
-While automated QEMU tests cover `nexus-disk-install` guided, manual partitioning, interrupted recovery, simulated dual-boot (`--keep-efi` + NTFS/ESP preservation), and LUKS2 cold-boot unlock, the interactive GTK **Ubiquity** wizard screens still require manual verification on spare test hardware:
-1. Launch `nexus-installer-launcher` in a live session (`>= 1024 MiB` RAM) on spare test hardware.
-2. Verify Ubiquity "Something else" manual partition table display, EFI selection, dual-boot `os-prober` entry detection, and interactive LUKS+LVM passphrase entry (`partman-auto-crypto`).
-3. Verify Legacy BIOS / MBR boot behavior separately if testing non-UEFI hardware (`nexus-disk-install.sh` requires UEFI `x86_64-efi`; Legacy BIOS/MBR remains `NOT TESTED`).
+While automated QEMU tests cover `nexus-disk-install` guided, manual partitioning, interrupted recovery, simulated dual-boot (`--keep-efi` + NTFS/ESP preservation), and LUKS2 cold-boot unlock (plus automated safety/refusal tests in `linux/test/test-installer-safety.sh` and QMP Ubiquity screen navigation), a complete interactive GTK **Ubiquity** wizard installation still requires manual verification on spare test hardware:
+1. Run `nexus-install-preflight --summary` in a live session (`>= 1024 MiB` RAM for GUI; use `nexus-lite-install` CLI for `512–768 MiB` Openbox Lite) and verify all structured warnings before launching `nexus-installer-launcher --launch`.
+2. Verify Ubiquity "Something else" manual partition table display, EFI selection, dual-boot `os-prober` entry detection, and interactive LUKS+LVM passphrase entry (`partman-auto-crypto`), completion, reboot, and live media removal.
+3. Verify `nexus-recovery --diagnose` and `docs/RECOVERY_AND_BOOT.md` from a live session before any repair, backing up personal files read-only first (`mount -o ro`) and never running write-mode `fsck` on mounted partitions.
+4. Verify Legacy BIOS / MBR boot behavior separately if testing non-UEFI hardware (`nexus-disk-install.sh` requires UEFI `x86_64-efi`; Legacy BIOS/MBR remains `Unsupported` in CLI path / `NOT TESTED`).
 
 ---
 

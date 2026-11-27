@@ -21,7 +21,7 @@ theme assets, and legal/recovery documentation into an unpacked ISO staging tree
 Options:
   --iso-root PATH      Extracted ISO root directory
   --squash-root PATH   Unpacked squashfs root directory
-  --edition NAME       cinnamon | standard | xfce | lite (default: xfce)
+  --edition NAME       cinnamon | standard | xfce | lite | lite-lxqt (default: xfce)
   --dry-run            Print branding actions without modifying files
   --help, -h           Show this help message
 USAGE
