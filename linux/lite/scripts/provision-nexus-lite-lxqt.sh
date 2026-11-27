@@ -129,6 +129,8 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-diagnostics.sh" /usr
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-qualify.sh" /usr/local/bin/nexus-hw-qualify
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-browser-qualify.sh" /usr/local/bin/nexus-browser-qualify
 run_cmd install -m 0755 "$REPO_ROOT/linux/security/nexus-security-audit.sh" /usr/local/bin/nexus-security-audit
+run_cmd install -m 0755 "$REPO_ROOT/linux/branding/nexus-launch-app.sh" /usr/local/bin/nexus-launch-app
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" /usr/local/bin/nexus-store-cli
 run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" /usr/local/share/nexus-os/hardware/hw-compatibility-db.json
 run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" /usr/local/share/nexus-os/hardware/nexus-browser-bench.py
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
@@ -136,7 +138,7 @@ run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.svg" /usr/local/shar
 run_cmd install -m 0644 "$LXQT_DIR/theme/nexus-dark/lxqt-panel.qss" /usr/local/share/lxqt/themes/nexus-dark/lxqt-panel.qss
 run_cmd cp -a "$LXQT_DIR" /usr/local/share/nexus-os/lite-lxqt/
 
-for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-installer.desktop nexus-recovery.desktop nexus-hw-diagnostics.desktop nexus-security-audit.desktop; do
+for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-store.desktop nexus-installer.desktop nexus-recovery.desktop nexus-hw-diagnostics.desktop nexus-security-audit.desktop; do
   if [[ -f "$REPO_ROOT/linux/branding/applications/$desktop_file" ]]; then
     run_cmd install -m 0644 "$REPO_ROOT/linux/branding/applications/$desktop_file" "/usr/local/share/applications/$desktop_file"
   fi
