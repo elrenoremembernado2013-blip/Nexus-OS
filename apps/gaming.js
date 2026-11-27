@@ -94,18 +94,23 @@
         libCard.append(list);
       }
       const launchersCard = node("article", "content-card");
-      launchersCard.append(node("h3", "", "GameMode, Lutris & Heroic"));
+      launchersCard.append(node("h3", "", "Launchers, Tools & Package Managers"));
       if (!state.available) {
-        launchersCard.append(node("p", "", "Capability detection requires Linux Mint host. On Linux Mint / Ubuntu, install via APT/Flatpak: gamemode, net.lutris.Lutris, com.heroicgameslauncher.hgl."));
+        launchersCard.append(node("p", "", "Capability detection requires Linux host. On Linux Mint / Ubuntu, install optionally via APT/Flatpak: gamemode, mangohud, net.lutris.Lutris, com.heroicgameslauncher.hgl."));
       } else {
         const gmOk = Boolean(state.data?.performance?.gamemode_installed);
+        const mhOk = Boolean(state.data?.performance?.mangohud_installed);
         const lutrisOk = Boolean(state.data?.launchers?.lutris?.installed);
         const heroicOk = Boolean(state.data?.launchers?.heroic?.installed);
+        const aptOk = Boolean(state.data?.capabilities?.apt_available);
+        const flatpakOk = Boolean(state.data?.capabilities?.flatpak_available);
         const list = node("ul", "store-requirements");
         list.append(
           node("li", "", gmOk ? "GameMode: installed (use gamemoderun %command%)" : "GameMode: not installed — run: sudo apt install gamemode"),
+          node("li", "", mhOk ? "MangoHud: installed (use mangohud %command%)" : "MangoHud: not installed — run: sudo apt install mangohud"),
           node("li", "", lutrisOk ? "Lutris: installed" : "Lutris: not installed — run: flatpak install flathub net.lutris.Lutris"),
-          node("li", "", heroicOk ? "Heroic Games Launcher: installed" : "Heroic: not installed — run: flatpak install flathub com.heroicgameslauncher.hgl")
+          node("li", "", heroicOk ? "Heroic Games Launcher: installed" : "Heroic: not installed — run: flatpak install flathub com.heroicgameslauncher.hgl"),
+          node("li", "", `Package managers: APT ${aptOk ? "available" : "unavailable"} · Flatpak ${flatpakOk ? "available" : "unavailable"}`)
         );
         launchersCard.append(list);
       }

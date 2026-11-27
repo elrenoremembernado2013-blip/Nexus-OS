@@ -95,7 +95,7 @@ if [[ "$PURGE_BLOAT" == true ]]; then
   fi
 fi
 
-run_cmd install -d -m 0755 /usr/local/share/nexus-os/lite /usr/local/share/nexus-os/branding /usr/local/share/nexus-os/hardware /usr/local/share/nexus-os/docs /usr/local/share/applications /usr/local/bin /etc/lightdm/lightdm.conf.d
+run_cmd install -d -m 0755 /usr/local/share/nexus-os/lite /usr/local/share/nexus-os/branding /usr/local/share/nexus-os/hardware /usr/local/share/nexus-os/docs /usr/local/share/applications /usr/local/bin /etc/lightdm/lightdm.conf.d /etc/systemd/user /etc/systemd/user/default.target.wants
 run_cmd install -m 0755 "$SCRIPT_DIR/apply-nexus-lite.sh" /usr/local/bin/nexus-apply-lite
 run_cmd install -m 0755 "$SCRIPT_DIR/configure-zram.sh" /usr/local/bin/nexus-configure-zram
 run_cmd install -m 0755 "$SCRIPT_DIR/memory-audit.sh" /usr/local/bin/nexus-memory-audit
@@ -111,16 +111,21 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-hw-qualify.sh" /usr/loc
 run_cmd install -m 0755 "$REPO_ROOT/linux/hardware/nexus-browser-qualify.sh" /usr/local/bin/nexus-browser-qualify
 run_cmd install -m 0755 "$REPO_ROOT/linux/security/nexus-security-audit.sh" /usr/local/bin/nexus-security-audit
 run_cmd install -m 0755 "$REPO_ROOT/linux/branding/nexus-launch-app.sh" /usr/local/bin/nexus-launch-app
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" /usr/local/bin/nexus-firstboot
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" /usr/local/bin/nexus-store-cli
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" /usr/local/bin/nexus-security-cli
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" /usr/local/bin/nexus-gaming-cli
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" /usr/local/bin/nexus-system-bridge
+run_cmd install -m 0644 "$REPO_ROOT/linux/mint/nexus-system-bridge.service" /etc/systemd/user/nexus-system-bridge.service
+run_cmd ln -sf ../nexus-system-bridge.service /etc/systemd/user/default.target.wants/nexus-system-bridge.service
 run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" /usr/local/share/nexus-os/hardware/hw-compatibility-db.json
 run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" /usr/local/share/nexus-os/hardware/nexus-browser-bench.py
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
 run_cmd cp -a "$SCRIPT_DIR/openbox" /usr/local/share/nexus-os/lite/
 
-for desktop_file in nexus-files.desktop nexus-terminal.desktop nexus-system-monitor.desktop nexus-settings.desktop nexus-store.desktop nexus-installer.desktop nexus-recovery.desktop nexus-hw-diagnostics.desktop nexus-security-audit.desktop; do
-  if [[ -f "$REPO_ROOT/linux/branding/applications/$desktop_file" ]]; then
-    run_cmd install -m 0644 "$REPO_ROOT/linux/branding/applications/$desktop_file" "/usr/local/share/applications/$desktop_file"
-  fi
+for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do
+  [[ -f "$desktop_file" ]] || continue
+  run_cmd install -m 0644 "$desktop_file" "/usr/local/share/applications/${desktop_file##*/}"
 done
 
 run_cmd install -d -m 0755 /etc/skel/.config/openbox /etc/skel/.config/tint2 /etc/skel/.config/autostart /etc/skel/.config/nexus-os /etc/xdg/openbox /etc/xdg/tint2

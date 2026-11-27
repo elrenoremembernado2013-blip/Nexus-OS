@@ -30,6 +30,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install shellcheck and desktop-file-utils
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck desktop-file-utils
       - name: Run foundation and prototype checks
         run: bash scripts/check-foundation.sh
 

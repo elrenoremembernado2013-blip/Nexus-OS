@@ -2,7 +2,6 @@
 Type=Application
 Name=NEXUS OS First-Boot Setup
 Comment=Configure NEXUS theme, performance profile, and update readiness
-Exec=sh -c 'command -v gnome-terminal >/dev/null 2>&1 && exec gnome-terminal -- /usr/local/bin/nexus-firstboot || command -v xfce4-terminal >/dev/null 2>&1 && exec xfce4-terminal -T "NEXUS OS Setup" -e "/usr/local/bin/nexus-firstboot" || exec x-terminal-emulator -e /usr/local/bin/nexus-firstboot'
+Exec=sh -c 'command -v qterminal >/dev/null 2>&1 && exec qterminal -e /usr/local/bin/nexus-firstboot || command -v lxterminal >/dev/null 2>&1 && exec lxterminal -e /usr/local/bin/nexus-firstboot || command -v gnome-terminal >/dev/null 2>&1 && exec gnome-terminal -- /usr/local/bin/nexus-firstboot || command -v xfce4-terminal >/dev/null 2>&1 && exec xfce4-terminal -T "NEXUS OS Setup" -x /usr/local/bin/nexus-firstboot || exec x-terminal-emulator -e /usr/local/bin/nexus-firstboot'
 Icon=/usr/local/share/nexus-os/branding/nexus-logo.svg
-OnlyShowIn=XFCE;X-Cinnamon;
 X-GNOME-Autostart-enabled=true

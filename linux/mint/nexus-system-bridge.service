@@ -1,0 +1,15 @@
+[Unit]
+Description=NEXUS OS Local System Bridge (Loopback-Only)
+After=graphical-session.target
+ConditionUser=!root
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nexus-system-bridge --serve
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

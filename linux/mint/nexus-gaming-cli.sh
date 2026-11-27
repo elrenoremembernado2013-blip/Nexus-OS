@@ -199,6 +199,13 @@ lutris_bin = shutil.which("lutris")
 lutris_flatpak = flatpak_app_installed("net.lutris.Lutris")
 heroic_bin = shutil.which("heroic")
 heroic_flatpak = flatpak_app_installed("com.heroicgameslauncher.hgl")
+steam_flatpak = flatpak_app_installed("com.valvesoftware.Steam")
+steam_installed = bool(steam_bin or steam_dir or steam_flatpak)
+gamemode_ok = shutil.which("gamemoded") is not None
+mangohud_ok = shutil.which("mangohud") is not None
+apt_ok = shutil.which("apt-get") is not None
+flatpak_ok = shutil.which("flatpak") is not None
+pkexec_ok = shutil.which("pkexec") is not None
 
 power_profile = "unavailable"
 if shutil.which("powerprofilesctl"):
@@ -209,10 +216,25 @@ if shutil.which("powerprofilesctl"):
     except Exception:
         pass
 
+guidance = []
+if not steam_installed:
+    guidance.append("Steam missing: install optional steam-installer via NEXUS Store (sudo apt install steam-installer) or Flatpak com.valvesoftware.Steam.")
+if vulkan_summary != "available":
+    guidance.append("Vulkan tools/drivers unavailable: install vulkan-tools and mesa-vulkan-drivers (or proprietary NVIDIA drivers via Driver Manager).")
+if not gamemode_ok:
+    guidance.append("GameMode missing: optional install via sudo apt install gamemode.")
+if not mangohud_ok:
+    guidance.append("MangoHud missing: optional HUD overlay via sudo apt install mangohud.")
+if not (lutris_bin or lutris_flatpak):
+    guidance.append("Lutris missing: optional install via flatpak install flathub net.lutris.Lutris.")
+if not (heroic_bin or heroic_flatpak):
+    guidance.append("Heroic missing: optional install via flatpak install flathub com.heroicgameslauncher.hgl.")
+
 payload = {
     "steam": {
-        "installed": bool(steam_bin or steam_dir),
+        "installed": steam_installed,
         "binary": steam_bin,
+        "flatpak": steam_flatpak,
         "steamapps_found": steam_dir is not None,
         "installed_games": installed_games,
         "proton_versions": sorted(proton_versions),
@@ -245,14 +267,16 @@ payload = {
     "controllers": controllers,
     "performance": {
         "gaming_mode": gm_state,
-        "gamemode_installed": shutil.which("gamemoded") is not None,
-        "mangohud_installed": shutil.which("mangohud") is not None,
+        "gamemode_installed": gamemode_ok,
+        "mangohud_installed": mangohud_ok,
         "power_profile": power_profile,
     },
     "capabilities": {
-        "apt_available": shutil.which("apt-get") is not None,
-        "flatpak_available": shutil.which("flatpak") is not None,
+        "apt_available": apt_ok,
+        "flatpak_available": flatpak_ok,
+        "pkexec_available": pkexec_ok,
     },
+    "guidance": guidance,
 }
 print(json.dumps(payload, indent=2))
 PY

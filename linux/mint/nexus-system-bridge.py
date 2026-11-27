@@ -46,11 +46,28 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "network": [["cinnamon-settings", "network"], ["nm-connection-editor"]],
     "bluetooth": [["cinnamon-settings", "bluetooth"], ["blueman-manager"]],
     "power": [["cinnamon-settings", "power"], ["xfce4-power-manager-settings"], ["lxqt-config-power"]],
-    "accounts": [["cinnamon-settings", "users"], ["users-admin"], ["lxqt-config"]],
+    "accounts": [["cinnamon-settings", "users"], ["users-admin"], ["lxqt-admin-user"]],
     "privacy-security": [["cinnamon-settings", "privacy"], ["gufw"]],
     "packages": [["mintinstall"], ["mintupdate"]],
     "gaming": [["steam"]],
     "installer": [["nexus-installer-launcher"], ["ubiquity"]],
+}
+
+TOOL_INSTALL_HINTS: dict[str, str] = {
+    "files": "install nemo, thunar, pcmanfm, or pcmanfm-qt",
+    "browser": "install firefox or falkon via NEXUS Store",
+    "terminal": "install qterminal, lxterminal, gnome-terminal, or xfce4-terminal",
+    "monitor": "install gnome-system-monitor, xfce4-taskmanager, lxtask, or qps",
+    "display": "install arandr, lxrandr, or lxqt-config",
+    "sound": "install pavucontrol or pavucontrol-qt",
+    "network": "install network-manager-gnome (nm-connection-editor)",
+    "bluetooth": "install blueman (blueman-manager)",
+    "power": "install xfce4-power-manager or lxqt-powermanagement",
+    "accounts": "install gnome-system-tools (users-admin) or lxqt-admin",
+    "privacy-security": "install gufw for graphical firewall management",
+    "packages": "use nexus-store-cli in a terminal or install mintinstall",
+    "gaming": "install steam-installer via NEXUS Store",
+    "installer": "install ubiquity or run nexus-installer-launcher",
 }
 
 
@@ -303,6 +320,97 @@ def list_available_tools() -> dict[str, dict[str, object]]:
     return result
 
 
+def detect_desktop_edition() -> str:
+    xdg = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+    if "cinnamon" in xdg:
+        return "cinnamon"
+    if "xfce" in xdg:
+        return "xfce"
+    if "lxqt" in xdg:
+        return "lite-lxqt"
+    if "openbox" in xdg:
+        return "lite"
+    rel = read_text(Path("/etc/nexus-os-release")) or ""
+    if 'NEXUS_EDITION="lite-lxqt"' in rel or 'NEXUS_DESKTOP="lxqt"' in rel:
+        return "lite-lxqt"
+    if 'NEXUS_EDITION="lite"' in rel or 'NEXUS_DESKTOP="openbox"' in rel:
+        return "lite"
+    if 'NEXUS_DESKTOP="cinnamon"' in rel:
+        return "cinnamon"
+    if 'NEXUS_DESKTOP="xfce"' in rel:
+        return "xfce"
+    if shutil.which("cinnamon-session"):
+        return "cinnamon"
+    if shutil.which("lxqt-session"):
+        return "lite-lxqt"
+    if shutil.which("xfce4-session"):
+        return "xfce"
+    if shutil.which("openbox"):
+        return "lite"
+    return "cinnamon"
+
+
+def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
+    edition = str(body.get("edition") or "").strip().lower() or detect_desktop_edition()
+    if edition == "xfce":
+        cmd = resolve_helper("linux/mint/apply-nexus-xfce.sh", "nexus-apply-xfce")
+        if body.get("dryRun"):
+            cmd.append("--dry-run")
+        if body.get("revert"):
+            cmd.append("--revert")
+        elif body.get("effectLevel") == "off" or body.get("presetProfile") in ("minimal", "lightweight", "gaming"):
+            cmd.append("--lightweight")
+        return cmd
+    if edition == "lite-lxqt":
+        cmd = resolve_helper("linux/lite/scripts/apply-nexus-lite-lxqt.sh", "nexus-apply-lite-lxqt")
+        if body.get("dryRun"):
+            cmd.append("--dry-run")
+        if body.get("revert"):
+            cmd.append("--revert")
+        else:
+            profile = str(body.get("liteProfile") or "lite-1g")
+            if profile in ("lite-512", "lite-768", "lite-1g", "lite-2g", "lite-4g"):
+                cmd.extend(["--profile", profile])
+        return cmd
+    if edition == "lite":
+        cmd = resolve_helper("linux/lite/apply-nexus-lite.sh", "nexus-apply-lite")
+        if body.get("dryRun"):
+            cmd.append("--dry-run")
+        if body.get("revert"):
+            cmd.append("--revert")
+        else:
+            profile = str(body.get("liteProfile") or "lite-1g")
+            if profile in ("lite-512", "lite-1g", "standard-2g"):
+                cmd.extend(["--profile", profile])
+        return cmd
+
+    cmd = resolve_helper("linux/cinnamon/apply-nexus-cinnamon.sh", "nexus-apply-cinnamon")
+    if body.get("dryRun"):
+        cmd.append("--dry-run")
+    if body.get("revert"):
+        cmd.append("--revert")
+    else:
+        if body.get("theme") in ("midnight", "nebula", "arctic", "emerald", "solar"):
+            cmd.extend(["--theme", str(body["theme"])])
+        if isinstance(body.get("accent"), str) and re.fullmatch(r"#[0-9a-fA-F]{6}", body["accent"]):
+            cmd.extend(["--accent", body["accent"]])
+        if body.get("effectLevel") in ("off", "subtle", "balanced", "enhanced"):
+            cmd.extend(["--effect-level", str(body["effectLevel"])])
+        if body.get("dockPosition") in ("bottom", "left", "right"):
+            cmd.extend(["--dock-position", str(body["dockPosition"])])
+        if body.get("panelSize") in ("small", "medium", "large"):
+            cmd.extend(["--panel-size", str(body["panelSize"])])
+        if body.get("panelAutohide") in ("false", "true", "intel"):
+            cmd.extend(["--panel-autohide", str(body["panelAutohide"])])
+        if body.get("wallpaperFit") in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
+            cmd.extend(["--wallpaper-fit", str(body["wallpaperFit"])])
+        if isinstance(body.get("workspaces"), int) and 1 <= body["workspaces"] <= 8:
+            cmd.extend(["--workspaces", str(body["workspaces"])])
+        if body.get("presetProfile") in ("default", "minimal", "gaming", "productivity", "cinematic", "lightweight"):
+            cmd.extend(["--preset-profile", str(body["presetProfile"])])
+    return cmd
+
+
 def launch_allowlisted_tool(category: str) -> dict[str, object]:
     candidates = ALLOWLISTED_TOOLS.get(category)
     if not candidates:
@@ -320,7 +428,9 @@ def launch_allowlisted_tool(category: str) -> dict[str, object]:
                 return {"ok": True, "command": cmd[0], "message": f"Launched {cmd[0]}"}
             except OSError as err:
                 return {"ok": False, "command": cmd[0], "message": f"Failed to launch {cmd[0]}: {err}"}
-    return {"ok": False, "message": f"No supported Linux tool installed for {category}."}
+    hint = TOOL_INSTALL_HINTS.get(category, "")
+    suffix = f" ({hint})" if hint else ""
+    return {"ok": False, "message": f"No supported Linux tool installed for {category}{suffix}."}
 
 
 class TerminalSessionManager:
@@ -519,7 +629,39 @@ def run_bash_pty_self_test() -> dict[str, object]:
         mgr.close_session(sid)
 
 
-def serve_loopback(port: int) -> None:
+def default_runtime_file() -> Path | None:
+    xdg_runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not xdg_runtime:
+        return None
+    base = Path(xdg_runtime)
+    try:
+        st = base.stat()
+    except OSError:
+        return None
+    if not base.is_dir() or st.st_uid != os.geteuid():
+        return None
+    return base / "nexus-os" / "system-bridge.json"
+
+
+def write_runtime_file(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload))
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+
+def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
     if os.geteuid() == 0:
         raise SystemExit("Refusing to run NEXUS desktop bridge as root.")
     token = secrets.token_urlsafe(32)
@@ -533,7 +675,8 @@ def serve_loopback(port: int) -> None:
             if self.headers.get("X-Nexus-Token") != token:
                 return False
             origin = self.headers.get("Origin")
-            if origin and origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
+            bound_port = self.server.server_address[1]
+            if origin and origin not in (f"http://127.0.0.1:{bound_port}", f"http://localhost:{bound_port}"):
                 return False
             return True
 
@@ -695,33 +838,10 @@ def serve_loopback(port: int) -> None:
                 )
             elif self.path == "/api/personalisation/apply":
                 try:
-                    cmd = resolve_helper("linux/cinnamon/apply-nexus-cinnamon.sh", "nexus-apply-cinnamon")
+                    cmd = resolve_personalisation_cmd(body)
                 except FileNotFoundError as err:
                     self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
                     return
-                if body.get("dryRun"):
-                    cmd.append("--dry-run")
-                if body.get("revert"):
-                    cmd.append("--revert")
-                else:
-                    if body.get("theme") in ("midnight", "nebula", "arctic", "emerald", "solar"):
-                        cmd.extend(["--theme", str(body["theme"])])
-                    if isinstance(body.get("accent"), str) and re.fullmatch(r"#[0-9a-fA-F]{6}", body["accent"]):
-                        cmd.extend(["--accent", body["accent"]])
-                    if body.get("effectLevel") in ("off", "subtle", "balanced", "enhanced"):
-                        cmd.extend(["--effect-level", str(body["effectLevel"])])
-                    if body.get("dockPosition") in ("bottom", "left", "right"):
-                        cmd.extend(["--dock-position", str(body["dockPosition"])])
-                    if body.get("panelSize") in ("small", "medium", "large"):
-                        cmd.extend(["--panel-size", str(body["panelSize"])])
-                    if body.get("panelAutohide") in ("false", "true", "intel"):
-                        cmd.extend(["--panel-autohide", str(body["panelAutohide"])])
-                    if body.get("wallpaperFit") in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
-                        cmd.extend(["--wallpaper-fit", str(body["wallpaperFit"])])
-                    if isinstance(body.get("workspaces"), int) and 1 <= body["workspaces"] <= 8:
-                        cmd.extend(["--workspaces", str(body["workspaces"])])
-                    if body.get("presetProfile") in ("default", "minimal", "gaming", "productivity", "cinematic", "lightweight"):
-                        cmd.extend(["--preset-profile", str(body["presetProfile"])])
                 try:
                     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15.0)
                 except subprocess.TimeoutExpired:
@@ -736,12 +856,28 @@ def serve_loopback(port: int) -> None:
 
     server = ThreadingHTTPServer(("127.0.0.1", port), BridgeHandler)
     actual_port = server.server_address[1]
+    ready_payload = {"url": f"http://127.0.0.1:{actual_port}", "token": token, "pid": os.getpid()}
+    active_runtime_file = runtime_file if runtime_file is not None else default_runtime_file()
+    if active_runtime_file is not None:
+        write_runtime_file(active_runtime_file, ready_payload)
+
+    def handle_stop(signum: int, frame: object) -> None:
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    prev_sigterm = signal.getsignal(signal.SIGTERM)
+    signal.signal(signal.SIGTERM, handle_stop)
     print(json.dumps({"url": f"http://127.0.0.1:{actual_port}", "token": token}), flush=True)
     try:
         server.serve_forever()
     finally:
+        signal.signal(signal.SIGTERM, prev_sigterm)
         pty_mgr.close_all()
         server.server_close()
+        if active_runtime_file is not None:
+            try:
+                active_runtime_file.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def main() -> int:
@@ -751,6 +887,7 @@ def main() -> int:
     parser.add_argument("--bash-check", action="store_true", help="Verify real GNU Bash PTY open/write/read/close")
     parser.add_argument("--serve", action="store_true", help="Run loopback-only authenticated local bridge API")
     parser.add_argument("--port", type=int, default=0, help="Loopback port for --serve (default: ephemeral)")
+    parser.add_argument("--runtime-file", type=Path, default=None, help="Optional 0600 JSON runtime file path for --serve")
     args = parser.parse_args()
 
     if args.telemetry:
@@ -763,7 +900,7 @@ def main() -> int:
         print(json.dumps(run_bash_pty_self_test(), indent=2))
         return 0
     if args.serve:
-        serve_loopback(args.port)
+        serve_loopback(args.port, runtime_file=args.runtime_file)
         return 0
 
     parser.print_help()

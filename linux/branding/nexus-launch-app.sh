@@ -23,6 +23,13 @@ case "${1:-}" in
     done
     fail "no supported file manager is installed"
     ;;
+  browser)
+    shift
+    for app in firefox chromium chromium-browser falkon x-www-browser; do
+      if has "$app"; then exec "$app" "$@"; fi
+    done
+    fail "no supported web browser is installed (install firefox or falkon via NEXUS Store)"
+    ;;
   terminal)
     shift
     for app in qterminal lxterminal gnome-terminal xfce4-terminal x-terminal-emulator; do

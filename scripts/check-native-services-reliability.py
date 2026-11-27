@@ -327,6 +327,179 @@ def test_gaming_and_security_cli_boundaries() -> None:
     print("PASS Gaming Hub (Steam/Proton/Lutris/Heroic) & Security CLI boundary tests")
 
 
+def test_phase15_four_edition_service_parity(bridge) -> None:
+    # 1. Systemd user service unit enforces non-root and uses shared bridge binary
+    unit_path = REPO_ROOT / "linux" / "mint" / "nexus-system-bridge.service"
+    unit_text = unit_path.read_text(encoding="utf-8")
+    assert "ConditionUser=!root" in unit_text
+    assert "ExecStart=/usr/local/bin/nexus-system-bridge --serve" in unit_text
+    assert "0.0.0.0" not in unit_text
+
+    # 2. All three provisioners (Cinnamon/Xfce, Lite Openbox, Lite LXQt) stage the complete native service stack
+    provisioners = [
+        REPO_ROOT / "linux" / "mint" / "provision-nexus-guest.sh",
+        REPO_ROOT / "linux" / "lite" / "provision-nexus-lite.sh",
+        REPO_ROOT / "linux" / "lite" / "scripts" / "provision-nexus-lite-lxqt.sh",
+    ]
+    required_binaries = (
+        "/usr/local/bin/nexus-system-bridge",
+        "/usr/local/bin/nexus-store-cli",
+        "/usr/local/bin/nexus-security-cli",
+        "/usr/local/bin/nexus-gaming-cli",
+        "/usr/local/bin/nexus-firstboot",
+        "/usr/local/bin/nexus-launch-app",
+        "/etc/systemd/user/nexus-system-bridge.service",
+        "/etc/systemd/user/default.target.wants/nexus-system-bridge.service",
+    )
+    for prov in provisioners:
+        out = subprocess.run(["bash", str(prov), "--dry-run"], capture_output=True, text=True, check=True).stdout
+        for target in required_binaries:
+            assert target in out, f"{prov.name} dry-run missing {target}"
+        for desktop in sorted((REPO_ROOT / "linux" / "branding" / "applications").glob("*.desktop")):
+            assert desktop.name in out, f"{prov.name} dry-run missing desktop entry {desktop.name}"
+
+    # Verify Lite manifests keep gaming & heavy browsers strictly optional (never auto-installed)
+    for manifest in (
+        REPO_ROOT / "linux" / "lite" / "lite-packages.list",
+        REPO_ROOT / "linux" / "lite" / "manifests" / "lite-openbox-packages.list",
+        REPO_ROOT / "linux" / "lite" / "manifests" / "lite-lxqt-packages.list",
+    ):
+        text = manifest.read_text(encoding="utf-8")
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("optional:"):
+                continue
+            pkg = line.split(":", 1)[1].strip()
+            assert pkg not in ("steam", "steam-installer", "gamemode", "mangohud", "lutris", "firefox", "cinnamon"), (
+                f"Lite manifest {manifest.name} must not auto-install {pkg}"
+            )
+
+    # 3. Runtime file mode (0600), loopback-only binding, Origin validation, & SIGTERM cleanup
+    with tempfile.TemporaryDirectory() as td:
+        rt_file = Path(td) / "nexus-os" / "bridge.json"
+        proc = subprocess.Popen(
+            [sys.executable, str(BRIDGE_PATH), "--serve", "--port", "0", "--runtime-file", str(rt_file)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            ready = json.loads(proc.stdout.readline())
+            assert ready["url"].startswith("http://127.0.0.1:")
+            assert rt_file.is_file()
+            assert stat.S_IMODE(rt_file.stat().st_mode) == 0o600
+            assert stat.S_IMODE(rt_file.parent.stat().st_mode) == 0o700
+            rt_data = json.loads(rt_file.read_text(encoding="utf-8"))
+            assert rt_data["url"] == ready["url"] and rt_data["token"] == ready["token"]
+
+            # Same-origin loopback request with valid token succeeds
+            req_ok = urllib.request.Request(
+                f"{ready['url']}/api/tools",
+                headers={"X-Nexus-Token": ready["token"], "Origin": ready["url"]},
+            )
+            with urllib.request.urlopen(req_ok, timeout=3) as resp:
+                assert resp.status == 200
+
+            # Cross-origin request is rejected even with valid token
+            req_evil = urllib.request.Request(
+                f"{ready['url']}/api/tools",
+                headers={"X-Nexus-Token": ready["token"], "Origin": "http://evil.example"},
+            )
+            try:
+                urllib.request.urlopen(req_evil, timeout=3)
+                raise AssertionError("Expected cross-origin request to be rejected")
+            except urllib.error.HTTPError as err:
+                assert err.code == 401
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+        assert not rt_file.exists(), "Bridge must remove runtime token file on SIGTERM shutdown"
+
+    # 4. Edition-aware personalisation helper selection
+    assert "apply-nexus-cinnamon.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "cinnamon", "dryRun": True}))
+    assert "apply-nexus-xfce.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "xfce", "dryRun": True}))
+    assert "apply-nexus-lite.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "lite", "dryRun": True}))
+    assert "apply-nexus-lite-lxqt.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "lite-lxqt", "dryRun": True}))
+
+    # 5. Mocked 4-edition desktop utility detection & Gaming Hub full tool detection
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        home_dir = tmp / "home"
+        (home_dir / ".local" / "share" / "flatpak" / "app" / "com.valvesoftware.Steam").mkdir(parents=True)
+        (home_dir / ".local" / "share" / "flatpak" / "app" / "net.lutris.Lutris").mkdir(parents=True)
+        (home_dir / ".local" / "share" / "flatpak" / "app" / "com.heroicgameslauncher.hgl").mkdir(parents=True)
+
+        # Full gaming mock: vulkaninfo, gamemoded, mangohud, apt-get, flatpak, pkexec
+        gbin = tmp / "gaming-bin"
+        gbin.mkdir()
+        for tool in ("bash", "python3", "grep", "id"):
+            found = shutil.which(tool)
+            if found:
+                os.symlink(found, gbin / tool)
+        make_stub(gbin, "vulkaninfo", "echo 'Vulkan Instance Version: 1.3.275'")
+        make_stub(gbin, "gamemoded", "exit 0")
+        make_stub(gbin, "mangohud", "exit 0")
+        make_stub(gbin, "apt-get", "exit 0")
+        make_stub(gbin, "flatpak", "exit 0")
+        make_stub(gbin, "pkexec", "exit 0")
+        genv = {"PATH": str(gbin), "HOME": str(home_dir), "XDG_CONFIG_HOME": str(home_dir / ".config")}
+        gres = subprocess.run(["bash", str(GAMING_CLI), "status"], env=genv, capture_output=True, text=True, check=True)
+        gst = json.loads(gres.stdout)
+        assert gst["steam"]["installed"] is True and gst["steam"]["flatpak"] is True
+        assert gst["graphics"]["vulkan"] == "available"
+        assert gst["performance"]["gamemode_installed"] is True
+        assert gst["performance"]["mangohud_installed"] is True
+        assert gst["launchers"]["lutris"]["installed"] is True
+        assert gst["launchers"]["heroic"]["installed"] is True
+        assert gst["capabilities"]["apt_available"] is True
+        assert gst["capabilities"]["flatpak_available"] is True
+        assert gst["capabilities"]["pkexec_available"] is True
+        assert gst["guidance"] == []
+
+        # Edition tool matrix across mocked Cinnamon / Xfce / Lite Openbox / Lite LXQt bins
+        edition_bins = {
+            "cinnamon": ["nemo", "gnome-terminal", "gnome-system-monitor", "cinnamon-settings", "mintinstall", "firefox"],
+            "xfce": ["thunar", "xfce4-terminal", "xfce4-taskmanager", "xfce4-display-settings", "pavucontrol", "nm-connection-editor", "blueman-manager", "xfce4-power-manager-settings", "gufw"],
+            "lite": ["pcmanfm", "lxterminal", "lxtask", "nm-connection-editor", "arandr"],
+            "lite-lxqt": ["pcmanfm-qt", "qterminal", "qps", "lxqt-config-monitor", "pavucontrol-qt", "nm-connection-editor", "lxqt-config-power"],
+        }
+        orig_path = os.environ.get("PATH", "")
+        try:
+            for ed, tools_list in edition_bins.items():
+                ed_dir = tmp / f"bin-{ed}"
+                ed_dir.mkdir()
+                for t in tools_list:
+                    make_stub(ed_dir, t, "exit 0")
+                os.environ["PATH"] = str(ed_dir)
+                detected = bridge.list_available_tools()
+                assert detected["files"]["available"] is True, f"{ed} missing files"
+                assert detected["terminal"]["available"] is True, f"{ed} missing terminal"
+                assert detected["monitor"]["available"] is True, f"{ed} missing monitor"
+                assert detected["display"]["available"] is True, f"{ed} missing display"
+                if ed != "lite":
+                    assert detected["sound"]["available"] is True, f"{ed} missing sound"
+                else:
+                    assert detected["sound"]["available"] is False
+                    miss = bridge.launch_allowlisted_tool("sound")
+                    assert miss["ok"] is False and "pavucontrol" in miss["message"]
+        finally:
+            os.environ["PATH"] = orig_path
+
+    # 6. First-boot dry-run works across Lite LXQt & Lite Openbox desktops
+    for desktop_val in ("LXQt", "Openbox", "XFCE", "X-Cinnamon"):
+        fb_env = dict(os.environ, XDG_CURRENT_DESKTOP=desktop_val)
+        fb = subprocess.run(
+            ["bash", str(REPO_ROOT / "linux" / "mint" / "nexus-firstboot.sh"), "--dry-run", "--non-interactive"],
+            env=fb_env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert "NEXUS First-Boot:" in fb.stdout
+
+    print("PASS Phase 15 4-edition bridge packaging, systemd unit, runtime token, Gaming Hub, and tool parity tests")
+
+
 def main() -> None:
     bridge = load_bridge_module()
     test_telemetry_missing_and_restricted_permissions(bridge)
@@ -334,6 +507,7 @@ def main() -> None:
     test_pty_disconnect_exit_and_http_error_handling(bridge)
     test_store_cli_boundaries()
     test_gaming_and_security_cli_boundaries()
+    test_phase15_four_edition_service_parity(bridge)
 
 
 if __name__ == "__main__":

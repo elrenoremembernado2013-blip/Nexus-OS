@@ -151,7 +151,9 @@ function mountGaming(app) {
       },
       hardware: { cpu: "Intel N4500", ram_total_mib: 3900, ram_available_mib: 2200, storage_available_gib: 18.2 },
       controllers: [{ device: "js0", name: "Xbox Wireless Controller" }],
-      performance: { gaming_mode: modeEnabled ? "enabled" : "disabled", gamemode_installed: true }
+      performance: { gaming_mode: modeEnabled ? "enabled" : "disabled", gamemode_installed: true, mangohud_installed: true },
+      launchers: { lutris: { installed: true }, heroic: { installed: false } },
+      capabilities: { apt_available: true, flatpak_available: true }
     }),
     setGamingMode(enable) {
       modeEnabled = enable;
@@ -160,6 +162,8 @@ function mountGaming(app) {
   });
   const { root, panel, statusEl, tabs, cleanup } = mountGaming(app);
   assert.ok(collectText(panel).includes("<script>TF2</script> (AppID 440)"));
+  assert.ok(collectText(panel).includes("MangoHud: installed"));
+  assert.ok(collectText(panel).includes("Package managers: APT available · Flatpak available"));
   root.dispatch("click", { target: tabs[1] });
   assert.ok(collectText(panel).includes("Proton Experimental"));
   root.dispatch("click", { target: tabs[2] });

@@ -93,10 +93,18 @@ make_stub cinnamon-settings
 run_case "cinnamon-settings " settings
 make_stub mintinstall
 run_case "mintinstall " store
+make_stub firefox
+run_case "firefox https://example.org" browser https://example.org
+clear_stubs
+
+# 4b. Lightweight browser fallback (falkon)
+make_stub falkon
+run_case "falkon https://example.org" browser https://example.org
 clear_stubs
 
 # 5. Missing utility & missing Store CLI failure paths
 expect_fail files
+expect_fail browser
 expect_fail terminal
 expect_fail monitor
 expect_fail settings
@@ -106,6 +114,7 @@ clear_stubs
 expect_fail unknown-target
 
 for pair in \
+  "nexus-browser.desktop:browser %u" \
   "nexus-files.desktop:files" \
   "nexus-terminal.desktop:terminal" \
   "nexus-system-monitor.desktop:monitor" \
@@ -120,7 +129,8 @@ for pair in \
 done
 
 if command -v desktop-file-validate >/dev/null 2>&1; then
-  desktop-file-validate "$APP_DIR"/nexus-*.desktop
+  desktop-file-validate "$APP_DIR"/nexus-*.desktop "$ROOT_DIR/linux/branding/nexus-firstboot.desktop"
+  echo "PASS desktop-file-validate on all desktop launchers"
 fi
 
 echo "PASS native launcher selection across Cinnamon/Xfce/Lite Openbox/Lite LXQt, Store fallback, and missing-tool failure paths"

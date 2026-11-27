@@ -982,6 +982,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
   const launcherPath = path.join(rootDir, "linux", "branding", "nexus-launch-app.sh");
   const launcher = fs.readFileSync(launcherPath, "utf8");
   const expectedCommands = {
+    browser: ["firefox", "chromium", "chromium-browser", "falkon", "x-www-browser"],
     files: ["nemo", "pcmanfm-qt", "pcmanfm", "thunar"],
     terminal: ["qterminal", "lxterminal", "gnome-terminal", "xfce4-terminal", "x-terminal-emulator"],
     monitor: ["gnome-system-monitor", "qps", "lxtask", "xfce4-taskmanager"],
@@ -989,6 +990,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
     store: ["mintinstall", "qterminal", "lxterminal", "gnome-terminal", "xfce4-terminal", "x-terminal-emulator"]
   };
   const expectedTargets = {
+    "nexus-browser.desktop": "browser",
     "nexus-files.desktop": "files",
     "nexus-terminal.desktop": "terminal",
     "nexus-system-monitor.desktop": "monitor",
@@ -996,7 +998,8 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
     "nexus-store.desktop": "store"
   };
   for (const [file, target] of Object.entries(expectedTargets)) {
-    assert.match(contents.get(file), new RegExp("^Exec=/usr/local/bin/nexus-launch-app " + target + "$", "m"), `${file} must call the shared launcher dispatcher`);
+    const suffix = target === "browser" ? " %u" : "";
+    assert.match(contents.get(file), new RegExp("^Exec=/usr/local/bin/nexus-launch-app " + target + suffix + "$", "m"), `${file} must call the shared launcher dispatcher`);
     for (const command of expectedCommands[target]) {
       assert.ok(launcher.includes(command), `Native launcher dispatcher missing ${command} for ${target}`);
     }

@@ -176,6 +176,9 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/security/nexus-security-audit.sh" "$bi
 run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" "$share_dir/hardware/hw-compatibility-db.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" "$share_dir/hardware/nexus-browser-bench.py"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" "$bin_dir/nexus-system-bridge"
+run_cmd install -d -m 0755 /etc/systemd/user /etc/systemd/user/default.target.wants
+run_cmd install -m 0644 "$REPO_ROOT/linux/mint/nexus-system-bridge.service" /etc/systemd/user/nexus-system-bridge.service
+run_cmd ln -sf ../nexus-system-bridge.service /etc/systemd/user/default.target.wants/nexus-system-bridge.service
 
 for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do
   [[ -f "$desktop_file" ]] || continue

@@ -2,7 +2,7 @@
 Type=Application
 Name=NEXUS Browser
 Comment=Browse the web with the Linux Mint system web browser
-Exec=x-www-browser %u
+Exec=/usr/local/bin/nexus-launch-app browser %u
 Icon=web-browser
 Terminal=false
 Categories=Network;WebBrowser;
