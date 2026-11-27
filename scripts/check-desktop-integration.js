@@ -979,12 +979,29 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
     assert.match(text, /^Icon=.+$/m, `${file} missing Icon=`);
     contents.set(file, text);
   }
-  assert.ok(contents.get("nexus-files.desktop").includes("nemo") && contents.get("nexus-files.desktop").includes("pcmanfm-qt") && contents.get("nexus-files.desktop").includes("pcmanfm") && contents.get("nexus-files.desktop").includes("thunar"));
-  assert.ok(contents.get("nexus-terminal.desktop").includes("qterminal") && contents.get("nexus-terminal.desktop").includes("lxterminal") && contents.get("nexus-terminal.desktop").includes("gnome-terminal") && contents.get("nexus-terminal.desktop").includes("xfce4-terminal"));
-  assert.ok(contents.get("nexus-system-monitor.desktop").includes("gnome-system-monitor") && contents.get("nexus-system-monitor.desktop").includes("qps") && contents.get("nexus-system-monitor.desktop").includes("lxtask") && contents.get("nexus-system-monitor.desktop").includes("xfce4-taskmanager"));
-  assert.ok(contents.get("nexus-settings.desktop").includes("cinnamon-settings") && contents.get("nexus-settings.desktop").includes("xfce4-settings-manager") && contents.get("nexus-settings.desktop").includes("lxqt-config") && contents.get("nexus-settings.desktop").includes("obconf-qt") && contents.get("nexus-settings.desktop").includes("obconf"));
-  assert.ok(contents.get("nexus-store.desktop").includes("mintinstall") && contents.get("nexus-store.desktop").includes("qterminal") && contents.get("nexus-store.desktop").includes("lxterminal") && contents.get("nexus-store.desktop").includes("xfce4-terminal"));
-  console.log("PASS Linux .desktop launcher parity across Cinnamon, Xfce, Lite Openbox, and Lite LXQt");
+  const launcherPath = path.join(rootDir, "linux", "branding", "nexus-launch-app.sh");
+  const launcher = fs.readFileSync(launcherPath, "utf8");
+  const expectedCommands = {
+    files: ["nemo", "pcmanfm-qt", "pcmanfm", "thunar"],
+    terminal: ["qterminal", "lxterminal", "gnome-terminal", "xfce4-terminal", "x-terminal-emulator"],
+    monitor: ["gnome-system-monitor", "qps", "lxtask", "xfce4-taskmanager"],
+    settings: ["cinnamon-settings", "xfce4-settings-manager", "lxqt-config", "obconf-qt", "obconf"],
+    store: ["mintinstall", "qterminal", "lxterminal", "gnome-terminal", "xfce4-terminal", "x-terminal-emulator"]
+  };
+  const expectedTargets = {
+    "nexus-files.desktop": "files",
+    "nexus-terminal.desktop": "terminal",
+    "nexus-system-monitor.desktop": "monitor",
+    "nexus-settings.desktop": "settings",
+    "nexus-store.desktop": "store"
+  };
+  for (const [file, target] of Object.entries(expectedTargets)) {
+    assert.match(contents.get(file), new RegExp("^Exec=/usr/local/bin/nexus-launch-app " + target + "$", "m"), `${file} must call the shared launcher dispatcher`);
+    for (const command of expectedCommands[target]) {
+      assert.ok(launcher.includes(command), `Native launcher dispatcher missing ${command} for ${target}`);
+    }
+  }
+  console.log("PASS Linux .desktop launcher dispatcher parity across Cinnamon, Xfce, Lite Openbox, and Lite LXQt");
 }
 })().catch(error => {
   console.error(error);
