@@ -1,0 +1,12 @@
+{
+  "name": "nexus-os",
+  "version": "0.3.0",
+  "private": true,
+  "description": "NEXUS OS desktop prototype and Linux Mint 22.3 Xfce foundation scripts",
+  "scripts": {
+    "dev": "python3 -m http.server 4173",
+    "test": "bash scripts/check-foundation.sh",
+    "check": "bash scripts/check-foundation.sh",
+    "check:prototype": "bash scripts/check-prototype.sh"
+  }
+}

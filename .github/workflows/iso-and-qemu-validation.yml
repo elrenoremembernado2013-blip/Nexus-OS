@@ -1,0 +1,504 @@
+name: Build NEXUS ISOs and QEMU RAM Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: "ISO edition scope to build & test"
+        type: choice
+        options:
+          - all
+          - lite-pair
+          - phase125
+          - phase130
+          - lite
+          - lite-lxqt
+          - cinnamon
+          - xfce
+        required: true
+        default: "all"
+      boot_seconds:
+        description: "UEFI boot check window per RAM tier (seconds)"
+        required: true
+        default: "45"
+      primary_idle:
+        description: "Primary-tier guest idle probe duration (seconds)"
+        required: true
+        default: "300"
+  push:
+    branches:
+      - arena/33e911d5-nexus-os
+    paths:
+      - "linux/**"
+      - "scripts/download-linux-mint.sh"
+      - "scripts/launch-qemu.sh"
+      - ".github/workflows/iso-and-qemu-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iso-qemu-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Compute edition matrix
+        id: set-matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_EDITION: ${{ github.event.inputs.edition || 'lite-pair' }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+
+          event_name = os.environ["EVENT_NAME"]
+          selected = "all" if event_name == "push" else os.environ.get("INPUT_EDITION", "all")
+          entries = [
+              {
+                  "job_slug": "lite-openbox-compare",
+                  "edition": "lite",
+                  "base_edition": "xfce",
+                  "mode": "matrix",
+                  "ram_matrix": "512 768 1024 2048 4096",
+                  "install_ram_matrix": "1024",
+                  "phase125_flags": "",
+                  "upload_iso": True,
+              },
+              {
+                  "job_slug": "lite-openbox-browser-bench",
+                  "edition": "lite",
+                  "base_edition": "xfce",
+                  "mode": "phase125",
+                  "ram_matrix": "",
+                  "install_ram_matrix": "",
+                  "phase125_flags": "--browser-bench --bench-ram-tiers '1024 2048 4096'",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "lite-lxqt-512",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "matrix",
+                  "ram_matrix": "512",
+                  "install_ram_matrix": "512",
+                  "phase125_flags": "",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "lite-lxqt-768",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "matrix",
+                  "ram_matrix": "768",
+                  "install_ram_matrix": "768",
+                  "phase125_flags": "",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "lite-lxqt-main",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "matrix",
+                  "ram_matrix": "1024 2048 4096",
+                  "install_ram_matrix": "1024 2048",
+                  "phase125_flags": "",
+                  "upload_iso": True,
+              },
+              {
+                  "job_slug": "lite-lxqt-installer-luks",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "phase125",
+                  "ram_matrix": "",
+                  "install_ram_matrix": "",
+                  "phase125_flags": "--manual-test --recovery-test --luks-test",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "lite-lxqt-browser-bench",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "phase125",
+                  "ram_matrix": "",
+                  "install_ram_matrix": "",
+                  "phase125_flags": "--browser-bench --bench-ram-tiers '1024 2048 4096'",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "lite-lxqt-phase130",
+                  "edition": "lite-lxqt",
+                  "base_edition": "xfce",
+                  "mode": "phase130",
+                  "ram_matrix": "",
+                  "install_ram_matrix": "",
+                  "phase125_flags": "",
+                  "phase130_flags": "--dualboot-test --secure-boot-test",
+                  "upload_iso": False,
+              },
+              {
+                  "job_slug": "cinnamon",
+                  "edition": "cinnamon",
+                  "base_edition": "cinnamon",
+                  "mode": "matrix",
+                  "ram_matrix": "2048 4096",
+                  "install_ram_matrix": "2048 4096",
+                  "phase125_flags": "",
+                  "upload_iso": True,
+              },
+              {
+                  "job_slug": "xfce",
+                  "edition": "xfce",
+                  "base_edition": "xfce",
+                  "mode": "matrix",
+                  "ram_matrix": "4096",
+                  "install_ram_matrix": "4096",
+                  "phase125_flags": "",
+                  "upload_iso": True,
+              },
+          ]
+          if selected == "lite-pair":
+              entries = [e for e in entries if e["edition"] in ("lite", "lite-lxqt") and e["mode"] == "matrix"]
+          elif selected == "phase125":
+              entries = [e for e in entries if e["mode"] == "phase125"]
+          elif selected == "phase130":
+              entries = [e for e in entries if e["mode"] == "phase130"]
+          elif selected != "all":
+              entries = [e for e in entries if e["edition"] == selected]
+          print("matrix=" + json.dumps(entries))
+          PY
+
+  iso-and-qemu:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Reclaim runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h
+
+      - name: Install ISO remastering, cpio, and QEMU/OVMF dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bash coreutils curl gnupg xorriso squashfs-tools \
+            qemu-system-x86 qemu-utils ovmf shellcheck cpio gzip \
+            initramfs-tools-core zstd xz-utils
+
+      - name: Validate scripts, package manifests, hardware inventory, and security audit
+        run: |
+          shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh \
+            linux/mint/*.sh linux/installer/*.sh linux/build/*.sh linux/cinnamon/*.sh \
+            linux/lite/*.sh linux/lite/scripts/*.sh linux/hardware/*.sh linux/security/*.sh linux/test/*.sh
+          bash linux/build/validate-packages.sh linux/config/mint-packages.list
+          bash linux/build/validate-packages.sh linux/config/cinnamon-packages.list
+          bash linux/build/validate-packages.sh linux/lite/lite-packages.list
+          bash linux/build/validate-packages.sh linux/lite/manifests/lite-openbox-packages.list
+          bash linux/build/validate-packages.sh linux/lite/manifests/lite-lxqt-packages.list
+          bash linux/hardware/nexus-hw-inventory.sh --json >/dev/null
+          bash linux/security/nexus-security-audit.sh --repo-only --repo . --strict
+
+      - name: Download and GPG-verify Linux Mint 22.3 base ISO (${{ matrix.base_edition }})
+        run: bash scripts/download-linux-mint.sh --edition "${{ matrix.base_edition }}"
+
+      - name: Build and verify NEXUS ${{ matrix.edition }} ISO
+        run: |
+          if [ "${{ matrix.edition }}" = "lite" ]; then
+            sudo bash linux/lite/build-nexus-lite-iso.sh
+          elif [ "${{ matrix.edition }}" = "lite-lxqt" ]; then
+            sudo bash linux/lite/scripts/build-nexus-lite-lxqt-iso.sh
+          else
+            sudo bash linux/build/build-nexus-iso.sh --edition "${{ matrix.edition }}"
+          fi
+          bash linux/build/verify-nexus-iso.sh --edition "${{ matrix.edition }}"
+          (cd build/iso/out && sha256sum -c "nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")
+          iso_sha="$(awk '{print $1}' "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")"
+          iso_bytes="$(stat -c %s "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso")"
+          echo "::notice title=NEXUS-ISO-${{ matrix.job_slug }}::file=nexus-os-22.3-${{ matrix.edition }}-amd64.iso bytes=${iso_bytes} sha256=${iso_sha}"
+          sudo rm -rf "build/iso/work-${{ matrix.edition }}" build/downloads/*.iso
+
+      - name: Run Graphical + Install + 3-Reboot QEMU RAM matrix (${{ matrix.ram_matrix }} MiB)
+        if: matrix.mode == 'matrix'
+        run: |
+          boot_sec="${{ github.event.inputs.boot_seconds || '45' }}"
+          primary_idle="${{ github.event.inputs.primary_idle || '300' }}"
+          set +e
+          bash linux/test/run-qemu-validation.sh \
+            --edition "${{ matrix.edition }}" \
+            --ram-matrix "${{ matrix.ram_matrix }}" \
+            --install-ram-matrix "${{ matrix.install_ram_matrix }}" \
+            --boot-seconds "$boot_sec" \
+            --idle-seconds "$primary_idle" \
+            --primary-idle "$primary_idle" \
+            --graphical \
+            --install-test \
+            --reliability > /tmp/qemu-runner.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/qemu-runner.log
+          if [ "$rc" -ne 0 ]; then
+            err_tail="$(tail -n 15 /tmp/qemu-runner.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-QEMU-ERR-${{ matrix.job_slug }}::rc=${rc} ${err_tail}"
+            exit "$rc"
+          fi
+          python3 - "build/qemu-test/qemu-results-${{ matrix.edition }}.json" "${{ matrix.job_slug }}" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          slug = sys.argv[2]
+          print(f"::notice title=NEXUS-QEMU-META-{slug}::edition={data['edition']} accel={data['accel']} runs={len(data['runs'])}")
+          for r in data["runs"]:
+              live_r = r.get("live_reps") or []
+              l0 = live_r[0] if live_r else {}
+              st0 = l0.get("stages") or {}
+              d0 = l0.get("desktop") or {}
+              ir0 = l0.get("install_report") or {}
+              zp0 = l0.get("zram_pressure") or {}
+              iboot = r.get("installed_boots") or []
+              live_mem = {k: {
+                  "u": v.get("used_ram_mib"),
+                  "a": v.get("available_ram_mib"),
+                  "c": v.get("cached_mib"),
+                  "sw": v.get("swap_used_mib"),
+                  "cpu": v.get("cpu_usage_pct"),
+                  "oom": v.get("oom_kill_count"),
+                  "zr": (v.get("zram") or [{}])[0].get("compression_ratio") if v.get("zram") else None,
+              } for k, v in st0.items()}
+              compact_boots = [{
+                  "b": b.get("boot_num"),
+                  "vda": b.get("booted_from_vda"),
+                  "no_iso": b.get("live_iso_absent"),
+                  "login": b.get("login_success"),
+                  "desk": b.get("graphical_session_success"),
+                  "wm_s": b.get("wm_ready_sec"),
+                  "pnl_s": b.get("panel_ready_sec"),
+                  "apps": b.get("application_test_success"),
+                  "persist": (b.get("persistence") or {}).get("persistence_verified"),
+                  "net": (b.get("network") or {}).get("nmcli_state"),
+                  "err": (b.get("installed_checks") or {}).get("journal_err_count"),
+                  "fail_u": (b.get("installed_checks") or {}).get("failed_systemd_units"),
+                  "idle_u": ((b.get("stages") or {}).get("3_idle") or {}).get("used_ram_mib"),
+                  "close_u": ((b.get("stages") or {}).get("7_post_close") or {}).get("used_ram_mib"),
+                  "shots": [(s.get("name"), s.get("non_black_pct")) for s in (b.get("screenshots") or [])],
+              } for b in iboot]
+              summary = {
+                  "ram": r.get("ram_mib"),
+                  "uefi": r.get("uefi_boot_success"),
+                  "live": f"{r.get('live_successes')}/{r.get('live_attempts')}",
+                  "inst": f"{r.get('install_successes')}/{r.get('install_attempts')}",
+                  "iboot": f"{r.get('installed_boot_successes')}/{r.get('installed_boot_attempts')}",
+                  "persist": r.get("persistence_verified"),
+                  "ub_ui": (l0.get("ubiquity_ui") or {}).get("window_verified"),
+                  "wm_s": d0.get("wm_ready_sec"),
+                  "pnl_s": d0.get("panel_ready_sec"),
+                  "pnl_rss": d0.get("panel_rss_mib"),
+                  "zram": zp0.get("status") if not zp0.get("skipped") else "N/A",
+                  "inst_sec": ir0.get("elapsed_sec"),
+                  "hw": (r.get("first_live_summary") or {}).get("hw_summary"),
+                  "sec": (r.get("first_live_summary") or {}).get("sec_summary"),
+                  "live_mem": live_mem,
+                  "live_shots": [(s.get("name"), s.get("non_black_pct")) for s in (l0.get("screenshots") or [])],
+                  "boots": compact_boots,
+              }
+              print(f"::notice title=NEXUS-124-{slug}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
+          bad = [
+              r.get("ram_mib") for r in data["runs"]
+              if r.get("install_attempts", 0) > 0 and (
+                  (data["edition"] in ("lite", "lite-lxqt") and r.get("ram_mib") in (1024, 2048))
+                  or (data["edition"] in ("xfce", "cinnamon") and r.get("ram_mib") == 4096)
+              ) and (r.get("install_successes", 0) == 0 or r.get("installed_boot_successes", 0) == 0)
+          ]
+          if bad:
+              print(f"::error title=NEXUS-124-FAIL-{slug}::Primary tier install/installed-boot failure at RAM={bad}")
+              sys.exit(1)
+          PY
+
+      - name: Run Phase 12.5 Qualification (${{ matrix.job_slug }})
+        if: matrix.mode == 'phase125'
+        run: |
+          set +e
+          eval "bash linux/test/run-phase125-tests.sh --edition '${{ matrix.edition }}' --test-dir 'build/qemu-test' ${{ matrix.phase125_flags }}" > /tmp/phase125-runner.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/phase125-runner.log
+          if [ "$rc" -ne 0 ]; then
+            err_tail="$(tail -n 15 /tmp/phase125-runner.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-125-ERR-${{ matrix.job_slug }}::rc=${rc} ${err_tail}"
+            exit "$rc"
+          fi
+          python3 - "build/qemu-test/phase125-results-${{ matrix.edition }}.json" "${{ matrix.job_slug }}" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          slug = sys.argv[2]
+          unenc = data.get("unencrypted_installer_tests") or {}
+          luks = data.get("luks_encrypted_installer_tests") or {}
+          bench = data.get("browser_benchmarks") or {}
+          if unenc:
+              print(f"::notice title=NEXUS-125-UNENC-{slug}::" + json.dumps(unenc, separators=(",", ":")))
+          if luks:
+              print(f"::notice title=NEXUS-125-LUKS-{slug}::" + json.dumps(luks, separators=(",", ":")))
+          if bench:
+              for tier, tdata in sorted((bench.get("tiers") or {}).items()):
+                  compact = {"rc": bench.get("browsers_installed_rc"), "falkon": bench.get("falkon_bin"), "firefox": bench.get("firefox_bin"), "sys_ram": tdata.get("system_ram_mib"), "browsers": {}}
+                  for bname, bres in (tdata.get("browsers") or {}).items():
+                      st = bres.get("stages") or {}
+                      steps = []
+                      for sk, tnum in (("tab_1", 1), ("tabs_2", 2), ("tabs_4", 4), ("tabs_6", 6)):
+                          sv = st.get(sk) or {}
+                          sn = sv.get("snapshot") or {}
+                          steps.append({
+                              "t": tnum,
+                              "load_ms": sv.get("page_load_ms") if tnum == 1 else sv.get("avg_page_load_ms"),
+                              "rss": sn.get("browser_rss_mib"),
+                              "used": sn.get("ram_used_mib"),
+                              "sw": sn.get("swap_used_mib"),
+                              "zr": sn.get("zram_ratio"),
+                              "cpu": sn.get("cpu_pct"),
+                              "alive": sv.get("alive", sn.get("browser_procs", 0) > 0),
+                              "oom": sv.get("oom_delta", 0),
+                          })
+                      pc = bres.get("post_close") or {}
+                      compact["browsers"][bname] = {
+                          "ok": bool(bres.get("available") and bres.get("window_mapped")),
+                          "start_s": bres.get("startup_sec"),
+                          "tabs_ok": bres.get("stable_tabs_max"),
+                          "oom": bres.get("oom_kills_delta"),
+                          "crashes": bres.get("crashes"),
+                          "delta_6t": bres.get("ram_delta_6tabs_mib"),
+                          "retained": bres.get("ram_retained_post_close_mib"),
+                          "post_rss": pc.get("browser_rss_mib"),
+                          "post_used": pc.get("ram_used_mib"),
+                          "steps": steps,
+                      }
+                  print(f"::notice title=NEXUS-125-BENCH-{slug}-{tier}::" + json.dumps(compact, separators=(",", ":")))
+          bad = []
+          for m, mv in unenc.items():
+              if not (mv.get("install_success") and mv.get("installed_boot_ok")):
+                  bad.append(f"unenc:{m}")
+          if luks and not (luks.get("install_success") and luks.get("boot1_from_luks") and luks.get("boot2_from_luks") and luks.get("boot2_persistence_verified") and (luks.get("luks_unlock_diag") or {}).get("wrong_passphrase_rejected")):
+              bad.append("luks")
+          if bench:
+              tiers = bench.get("tiers") or {}
+              if not tiers:
+                  bad.append("bench:no_tiers")
+              for tier, tdata in tiers.items():
+                  bs = tdata.get("browsers") or {}
+                  if not bs.get("falkon", {}).get("available") or not bs.get("firefox", {}).get("available"):
+                      bad.append(f"bench:{tier}:missing_results")
+          if bad:
+              print(f"::error title=NEXUS-125-FAIL-{slug}::Failures: {bad}")
+              sys.exit(1)
+          PY
+
+      - name: Run Phase 13.0 Qualification (${{ matrix.job_slug }})
+        if: matrix.mode == 'phase130'
+        run: |
+          set +e
+          eval "bash linux/test/run-phase130-tests.sh --edition '${{ matrix.edition }}' --test-dir 'build/qemu-test' ${{ matrix.phase130_flags }}" > /tmp/phase130-runner.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/phase130-runner.log
+          if [ "$rc" -ne 0 ]; then
+            err_tail="$(tail -n 15 /tmp/phase130-runner.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-130-ERR-${{ matrix.job_slug }}::rc=${rc} ${err_tail}"
+            exit "$rc"
+          fi
+          python3 - "build/qemu-test/phase130-results-${{ matrix.edition }}.json" "${{ matrix.job_slug }}" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          slug = sys.argv[2]
+          db = data.get("dualboot_test") or {}
+          sb = data.get("secure_boot_test") or {}
+          if db:
+              print(f"::notice title=NEXUS-130-DUALBOOT-{slug}::" + json.dumps(db, separators=(",", ":")))
+          if sb:
+              print(f"::notice title=NEXUS-130-SECBOOT-{slug}::" + json.dumps(sb, separators=(",", ":")))
+          bad = []
+          if db and not (db.get("install_success") and db.get("installed_boot_ok") and db.get("dualboot_preflight_detected") and db.get("dualboot_efi_preserved_after_boot") and db.get("dualboot_os_part_preserved_after_boot")):
+              bad.append("dualboot")
+          if sb.get("tested") and not (sb.get("install_success") and sb.get("installed_boot_ok") and sb.get("efi_boot_ok") and sb.get("secure_boot_state") == "enabled"):
+              bad.append(f"secure_boot:{sb.get('secure_boot_state')}")
+          if bad:
+              print(f"::error title=NEXUS-130-FAIL-{slug}::Failures: {bad}")
+              sys.exit(1)
+          PY
+
+      - name: Upload ISO, SHA-256, and build metadata (${{ matrix.edition }})
+        if: always() && matrix.upload_iso
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-iso-${{ matrix.edition }}
+          if-no-files-found: warn
+          path: |
+            build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso
+            build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256
+            build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.build-info.json
+
+      - name: Upload QEMU results, serial logs, and screenshots (${{ matrix.job_slug }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-qemu-results-${{ matrix.job_slug }}
+          if-no-files-found: warn
+          path: build/qemu-test/
+
+  compare-lite-report:
+    needs: iso-and-qemu
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download Lite Openbox and LXQt QEMU artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nexus-qemu-results-lite*
+          path: /tmp/lite-artifacts
+          merge-multiple: false
+
+      - name: Generate Openbox vs LXQt comparison JSON & Markdown
+        run: |
+          mapfile -t ob_jsons < <(find /tmp/lite-artifacts -path '*openbox*' -name 'qemu-results-lite.json' | sort)
+          mapfile -t lx_jsons < <(find /tmp/lite-artifacts -path '*lxqt*' -name 'qemu-results-lite-lxqt.json' | sort)
+          if [ "${#ob_jsons[@]}" -gt 0 ] && [ "${#lx_jsons[@]}" -gt 0 ]; then
+            python3 linux/lite/scripts/nexus-lite-compare.py \
+              --openbox-json "${ob_jsons[@]}" \
+              --lxqt-json "${lx_jsons[@]}" \
+              --out-json build/lite-comparison.json \
+              --out-md build/lite-comparison.md
+            cat build/lite-comparison.md
+            python3 - build/lite-comparison.json <<'PY'
+          import json, sys
+          comp = json.load(open(sys.argv[1], encoding="utf-8"))
+          for row in comp.get("comparison", []):
+              print(f"::notice title=NEXUS-124-COMPARE-{row['ram_mib']}M::" + json.dumps(row, separators=(",", ":")))
+          PY
+          else
+            echo "::warning title=NEXUS-124-COMPARE::Missing Openbox or LXQt QEMU JSON artifacts (ob=${#ob_jsons[@]}, lx=${#lx_jsons[@]})."
+          fi
+
+      - name: Upload Lite comparison report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-lite-comparison-report
+          if-no-files-found: warn
+          path: |
+            build/lite-comparison.json
+            build/lite-comparison.md

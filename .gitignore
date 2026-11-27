@@ -1,0 +1,18 @@
+# Generated images, VM state, caches, and local secrets
+/build/
+__pycache__/
+*.pyc
+*.iso
+*.qcow2
+*.img
+*.raw
+*.vdi
+*.vmdk
+*.ova
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example

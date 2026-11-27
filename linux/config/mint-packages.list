@@ -1,0 +1,52 @@
+# Curated APT package manifest for Linux Mint 22.3 Xfce (Ubuntu 24.04 Noble base).
+# Consumed by linux/mint/provision-nexus-guest.sh and linux/build/build-nexus-iso.sh.
+# Format: <category>:<apt-package>
+#
+# Categories:
+#   core        Essential security, verification, and base system tools
+#   desktop     Xfce session, panel plugin, updater, and VFS desktop integration
+#   nexus       Application distribution / Flatpak integration for NEXUS Store
+#   gaming      Optional Vulkan, GameMode, and Steam installer (--with-gaming)
+#   development Optional compiler, Git, and Python tooling (--with-dev)
+#   optional    Optional productivity apps not installed automatically (--with-optional)
+
+# Core system & security
+core:ufw
+core:unattended-upgrades
+core:ca-certificates
+core:gnupg
+core:curl
+core:grub2-common
+core:grub-efi-amd64-bin
+core:grub-efi-amd64-signed
+core:shim-signed
+core:mokutil
+core:efibootmgr
+core:parted
+core:dosfstools
+core:ntfs-3g
+core:os-prober
+
+# Desktop (Linux Mint Xfce)
+desktop:xfce4-genmon-plugin
+desktop:xfce4-whiskermenu-plugin
+desktop:xfce4-terminal
+desktop:gvfs-backends
+
+# NEXUS applications & store backend
+nexus:flatpak
+
+# Gaming (optional via --with-gaming)
+gaming:vulkan-tools
+gaming:mesa-vulkan-drivers
+gaming:gamemode
+gaming:steam-installer
+
+# Development (optional via --with-dev)
+development:git
+development:build-essential
+development:python3
+
+# Optional user software (optional via --with-optional)
+optional:libreoffice-writer
+optional:gimp

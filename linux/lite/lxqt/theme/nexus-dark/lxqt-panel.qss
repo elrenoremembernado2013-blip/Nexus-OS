@@ -1,0 +1,55 @@
+/* NEXUS OS Lite LXQt Dark Glass Theme (lightweight Qt stylesheet, zero compositor dependency) */
+LXQtPanel,
+LXQtPanel #BackgroundWidget {
+    background: rgba(12, 19, 36, 236);
+    color: #eef4ff;
+    border-top: 1px solid rgba(102, 163, 255, 95);
+}
+
+#MainMenu {
+    background: rgba(59, 130, 246, 48);
+    color: #eef4ff;
+    border: 1px solid rgba(102, 163, 255, 110);
+    border-radius: 6px;
+    padding: 2px 10px;
+    margin: 3px 4px;
+    font-weight: 600;
+}
+
+#MainMenu:hover {
+    background: rgba(59, 130, 246, 95);
+}
+
+#TaskBar QToolButton {
+    background: rgba(255, 255, 255, 10);
+    color: #dbe7ff;
+    border: 1px solid rgba(102, 163, 255, 35);
+    border-radius: 5px;
+    margin: 3px 2px;
+    padding: 2px 8px;
+}
+
+#TaskBar QToolButton:checked {
+    background: rgba(59, 130, 246, 75);
+    border: 1px solid rgba(102, 163, 255, 150);
+    color: #ffffff;
+}
+
+#DesktopSwitch QToolButton {
+    background: rgba(255, 255, 255, 12);
+    color: #9fb7e0;
+    border: 1px solid rgba(102, 163, 255, 40);
+    border-radius: 4px;
+    margin: 4px 2px;
+    padding: 1px 6px;
+}
+
+#DesktopSwitch QToolButton:checked {
+    background: rgba(102, 163, 255, 110);
+    color: #ffffff;
+}
+
+#Clock {
+    color: #eef4ff;
+    padding: 0 8px;
+}

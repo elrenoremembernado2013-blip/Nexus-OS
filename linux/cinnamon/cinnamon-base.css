@@ -1,0 +1,77 @@
+/* NEXUS OS Cinnamon Shell Theme: __THEME_LABEL__
+ * Generated cleanly by linux/cinnamon/apply-nexus-cinnamon.sh.
+ */
+
+stage {
+  font-family: "Inter", "Ubuntu", "Noto Sans", sans-serif;
+  color: __TEXT__;
+}
+
+.panel-top,
+.panel-bottom,
+.panel-left,
+.panel-right {
+  background-color: __PANEL__;
+  border: 1px solid __BORDER__;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+  color: __TEXT__;
+}
+
+.grouped-window-list-item-box {
+  border-radius: 10px;
+  margin: 2px 3px;
+  padding: 0 6px;
+  transition-duration: 140ms;
+}
+
+.grouped-window-list-item-box:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.grouped-window-list-item-box:active,
+.grouped-window-list-item-box:checked,
+.grouped-window-list-item-box:focus {
+  background-color: __SURFACE__;
+  border-bottom: 2px solid __ACCENT__;
+}
+
+.menu-background,
+.popup-menu-boxpointer,
+.popup-menu {
+  background-color: __BG__;
+  border: 1px solid __BORDER__;
+  border-radius: 14px;
+  color: __TEXT__;
+}
+
+.menu-favorites-box {
+  background-color: __SURFACE__;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.menu-selected-app-box,
+.popup-menu-item:active {
+  background-color: __SURFACE__;
+  border: 1px solid __ACCENT__;
+  border-radius: 9px;
+}
+
+#notification {
+  background-color: __BG__;
+  border: 1px solid __BORDER__;
+  border-radius: 14px;
+  color: __TEXT__;
+  padding: 10px 14px;
+}
+
+.workspace-switcher,
+.window-list-box {
+  spacing: 6px;
+}
+
+.workspace-button:outlined {
+  border: 1px solid __ACCENT__;
+  background-color: __SURFACE__;
+  border-radius: 8px;
+}

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NEXUS Security Audit
+Comment=Run read-only security audit (APT signing, firewall, services, listeners)
+Exec=/usr/local/bin/nexus-security-audit --markdown
+Icon=security-high
+Terminal=true
+Categories=System;Security;
+Keywords=security;audit;ufw;apt;firewall;

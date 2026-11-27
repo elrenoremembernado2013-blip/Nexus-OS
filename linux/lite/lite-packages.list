@@ -1,0 +1,51 @@
+# Curated APT package manifest for NEXUS Lite (Linux Mint 22.3 / Ubuntu 24.04 Noble).
+# Excludes Cinnamon, heavy compositors, Steam, and web browsers from default 512 MB install.
+# Format: <category>:<apt-package>
+
+# Core system, security, networking, and memory management (never removed)
+core:ufw
+core:unattended-upgrades
+core:ca-certificates
+core:gnupg
+core:curl
+core:network-manager
+core:zram-tools
+core:policykit-1-gnome
+core:grub2-common
+core:grub-efi-amd64-bin
+core:grub-efi-amd64-signed
+core:shim-signed
+core:mokutil
+core:efibootmgr
+core:parted
+core:dosfstools
+core:ntfs-3g
+core:os-prober
+core:cryptsetup
+core:cryptsetup-initramfs
+
+# Minimal Openbox + tint2 desktop (no Cinnamon, no picom compositor by default)
+desktop:openbox
+desktop:obconf
+desktop:tint2
+desktop:lightdm
+desktop:lightdm-gtk-greeter
+desktop:feh
+desktop:pcmanfm
+desktop:lxterminal
+desktop:mousepad
+desktop:gpicview
+desktop:lxtask
+desktop:network-manager-gnome
+desktop:xorg
+desktop:x11-utils
+desktop:x11-xserver-utils
+
+# NEXUS lightweight integration & CLI tools
+nexus:python3
+nexus:gvfs
+
+# Optional extras & browsers (never installed automatically into 512 MB profile)
+optional:gvfs-backends
+optional:falkon
+optional:firefox

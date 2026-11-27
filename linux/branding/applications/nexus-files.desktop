@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS Files
+Comment=Browse local folders and mounted storage
+Exec=sh -c 'command -v nemo >/dev/null 2>&1 && exec nemo || command -v pcmanfm >/dev/null 2>&1 && exec pcmanfm || exec thunar'
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileManager;
+StartupNotify=true

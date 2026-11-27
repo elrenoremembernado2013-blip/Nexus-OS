@@ -1,0 +1,62 @@
+{
+  "midnight": {
+    "displayName": "NEXUS-Midnight",
+    "label": "NEXUS Midnight",
+    "baseGtk": "Mint-Y-Dark-Blue",
+    "bg": "#0d1424",
+    "panel": "rgba(13, 20, 36, 0.88)",
+    "surface": "#162038",
+    "border": "rgba(148, 197, 255, 0.18)",
+    "text": "#eef4ff",
+    "muted": "#9fb3d1",
+    "accent": "#66a3ff"
+  },
+  "nebula": {
+    "displayName": "NEXUS-Nebula",
+    "label": "NEXUS Nebula",
+    "baseGtk": "Mint-Y-Dark-Purple",
+    "bg": "#141024",
+    "panel": "rgba(20, 16, 36, 0.88)",
+    "surface": "#1f1938",
+    "border": "rgba(196, 168, 255, 0.18)",
+    "text": "#f4f0ff",
+    "muted": "#b8add9",
+    "accent": "#b185ff"
+  },
+  "arctic": {
+    "displayName": "NEXUS-Arctic",
+    "label": "NEXUS Arctic",
+    "baseGtk": "Mint-Y-Dark-Aqua",
+    "bg": "#101922",
+    "panel": "rgba(16, 25, 34, 0.88)",
+    "surface": "#182736",
+    "border": "rgba(125, 211, 252, 0.18)",
+    "text": "#f0f9ff",
+    "muted": "#a3bfd4",
+    "accent": "#38bdf8"
+  },
+  "emerald": {
+    "displayName": "NEXUS-Emerald",
+    "label": "NEXUS Emerald",
+    "baseGtk": "Mint-Y-Dark-Teal",
+    "bg": "#0d1914",
+    "panel": "rgba(13, 25, 20, 0.88)",
+    "surface": "#162921",
+    "border": "rgba(110, 231, 183, 0.18)",
+    "text": "#ecfdf5",
+    "muted": "#a3cbb9",
+    "accent": "#34d399"
+  },
+  "solar": {
+    "displayName": "NEXUS-Solar",
+    "label": "NEXUS Solar",
+    "baseGtk": "Mint-Y-Dark-Sand",
+    "bg": "#191a20",
+    "panel": "rgba(25, 26, 32, 0.88)",
+    "surface": "#252630",
+    "border": "rgba(255, 173, 122, 0.20)",
+    "text": "#f4f0ed",
+    "muted": "#bcb5ba",
+    "accent": "#ffad7a"
+  }
+}

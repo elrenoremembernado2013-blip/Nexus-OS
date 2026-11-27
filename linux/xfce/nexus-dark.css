@@ -1,0 +1,75 @@
+/* NEXUS OS GTK3 desktop styling for Linux Mint 22.3 Xfce (Xfce 4.18)
+ * Target palette matches the NEXUS browser prototype (dark slate + #ffad7a copper).
+ * Installed into ~/.config/gtk-3.0/gtk.css by linux/mint/apply-nexus-xfce.sh.
+ */
+
+@define-color nexus_bg #191a20;
+@define-color nexus_panel rgba(29, 30, 38, 0.90);
+@define-color nexus_surface #252630;
+@define-color nexus_border rgba(255, 255, 255, 0.14);
+@define-color nexus_text #f4f0ed;
+@define-color nexus_muted #bcb5ba;
+@define-color nexus_accent #ffad7a;
+
+.xfce4-panel,
+.xfce4-panel background {
+  background-color: @nexus_panel;
+  color: @nexus_text;
+  border-color: @nexus_border;
+}
+
+.xfce4-panel button,
+.xfce4-panel .tasklist button {
+  color: @nexus_text;
+  border-radius: 9px;
+  margin: 2px;
+  padding: 2px 8px;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.xfce4-panel button:hover,
+.xfce4-panel .tasklist button:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.xfce4-panel button:checked,
+.xfce4-panel .tasklist button:checked {
+  background-color: alpha(@nexus_accent, 0.22);
+  border: 1px solid alpha(@nexus_accent, 0.55);
+  color: @nexus_text;
+}
+
+#whiskermenu-window {
+  background-color: @nexus_bg;
+  color: @nexus_text;
+  border: 1px solid @nexus_border;
+  border-radius: 14px;
+}
+
+#whiskermenu-window entry {
+  background-color: @nexus_surface;
+  color: @nexus_text;
+  border: 1px solid @nexus_border;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+#whiskermenu-window treeview:selected,
+#whiskermenu-window iconview:selected {
+  background-color: alpha(@nexus_accent, 0.24);
+  color: @nexus_text;
+}
+
+.xfce4-panel #genmon-button,
+.xfce4-panel .genmon_value {
+  color: @nexus_text;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid @nexus_border;
+  border-radius: 10px;
+  padding: 2px 10px;
+  font-weight: 500;
+}
+
+.xfce4-panel #genmon-button:hover {
+  border-color: alpha(@nexus_accent, 0.55);
+}

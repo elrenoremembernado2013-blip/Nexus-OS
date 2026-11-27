@@ -1,0 +1,27 @@
+/* NEXUS OS GTK3 Override: __THEME_LABEL__ */
+
+@define-color nexus_bg __BG__;
+@define-color nexus_surface __SURFACE__;
+@define-color nexus_border __BORDER__;
+@define-color nexus_text __TEXT__;
+@define-color nexus_muted __MUTED__;
+@define-color nexus_accent __ACCENT__;
+
+headerbar,
+.titlebar {
+  background-color: @nexus_bg;
+  color: @nexus_text;
+  border-bottom: 1px solid @nexus_border;
+}
+
+button.suggested-action {
+  background-color: @nexus_accent;
+  color: #141418;
+  border-radius: 9px;
+}
+
+selection,
+*:selected {
+  background-color: alpha(@nexus_accent, 0.28);
+  color: @nexus_text;
+}

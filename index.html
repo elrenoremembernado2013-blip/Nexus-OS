@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>NEXUS OS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="desktop" id="desktop">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">N</span><span>NEXUS</span></div>
+      <div class="top-center" id="clock">--:--</div>
+      <div class="top-actions">
+        <button class="top-icon" aria-label="Open Control Centre notifications" id="notificationButton" title="Notifications" aria-controls="controlPanel" aria-expanded="false">◉</button>
+        <button class="status-pill" id="controlButton" aria-controls="controlPanel" aria-expanded="false"><span><img class="control-centre-icon" src="assets/icons/control-centre.svg" alt=""></span> Control Centre <span class="chevron">⌄</span></button>
+      </div>
+    </header>
+    <section class="desktop-welcome">
+      <p class="eyebrow">PERSONAL WORKSPACE</p>
+      <h1>Good evening.</h1>
+      <p class="welcome-sub">A quieter space to get things done.</p>
+    </section>
+    <div class="desktop-shortcuts" id="shortcuts">
+      <button class="shortcut" data-app="files"><span class="shortcut-icon"><img class="app-icon-image" src="assets/icons/files.svg" alt=""></span><span>File Manager</span></button>
+      <button class="shortcut" data-app="notes"><span class="shortcut-icon"><img class="app-icon-image" src="assets/icons/notes.svg" alt=""></span><span>Notes</span></button>
+      <button class="shortcut" data-app="settings"><span class="shortcut-icon"><img class="app-icon-image" src="assets/icons/settings.svg" alt=""></span><span>Settings</span></button>
+      <button class="shortcut" data-app="gaming"><span class="shortcut-icon"><img class="app-icon-image" src="assets/icons/games-hub.svg" alt=""></span><span>Gaming</span></button>
+    </div>
+    <div class="dock-wrap"><nav class="dock" aria-label="Application dock">
+      <button class="dock-app launcher-app" id="launcherButton" title="App launcher" aria-label="App launcher" aria-controls="launcher" aria-expanded="false"><img class="dock-icon-image" src="assets/icons/launcher.svg" alt=""></button>
+      <span class="dock-separator"></span>
+      <button class="dock-app" data-app="files" title="File Manager" aria-label="File Manager"><img class="dock-icon-image" src="assets/icons/files.svg" alt=""></button>
+      <button class="dock-app" data-app="browser" title="Browser" aria-label="Browser"><img class="dock-icon-image" src="assets/icons/browser.svg" alt=""></button>
+      <button class="dock-app" data-app="notes" title="Notes" aria-label="Notes"><img class="dock-icon-image" src="assets/icons/notes.svg" alt=""></button>
+      <button class="dock-app" data-app="terminal" title="Terminal" aria-label="Terminal"><img class="dock-icon-image" src="assets/icons/terminal.svg" alt=""></button>
+      <button class="dock-app" data-app="gaming" title="Gaming Hub" aria-label="Gaming Hub"><img class="dock-icon-image" src="assets/icons/games-hub.svg" alt=""></button>
+      <span class="dock-separator"></span>
+      <button class="dock-app" data-app="settings" title="Settings" aria-label="Settings"><img class="dock-icon-image" src="assets/icons/settings.svg" alt=""></button>
+    </nav></div>
+    <div class="panel control-panel hidden" id="controlPanel">
+      <div class="panel-heading"><div><h2>Control Centre</h2><p>Quick settings</p></div><button class="close-btn" data-close="controlPanel">×</button></div>
+      <div class="toggle-grid">
+        <button class="tile" type="button" disabled title="Network integration requires a native system service"><span>⌁</span><b>Wi-Fi</b><small>Native service unavailable</small></button>
+        <button class="tile" type="button" disabled title="Bluetooth integration requires a native system service"><span>ᛒ</span><b>Bluetooth</b><small>Native service unavailable</small></button>
+        <button class="tile" data-toggle="dnd" aria-pressed="false"><span>◐</span><b>Do Not Disturb</b><small>Off · preview</small></button>
+        <button class="tile" data-toggle="power" aria-pressed="false"><span>ϟ</span><b>Power Saver</b><small>Off · preview</small></button>
+      </div>
+      <div class="slider-row"><label for="brightness">Preview brightness</label><div class="slider-control"><input id="brightness" type="range" min="35" max="100" value="100"><output id="brightnessValue" for="brightness">100%</output></div></div>
+      <div class="slider-row audio-unavailable"><label for="volume">System volume</label><div class="slider-control"><input id="volume" type="range" min="0" max="100" value="65" disabled aria-describedby="volumeUnavailable"><output id="volumeValue" for="volume">Unavailable</output></div><span id="volumeUnavailable" class="visually-hidden">Audio integration requires a native system service.</span></div>
+      <section class="notification-section" id="controlNotifications" aria-labelledby="notificationHeading">
+        <div class="notification-heading"><h3 id="notificationHeading">Notifications</h3><button class="clear-notifications" id="clearNotifications" type="button">Clear</button></div>
+        <div id="notificationList" aria-live="polite"><div class="notification-empty"><p>You're all caught up.</p><small>Notifications will appear here.</small></div></div>
+      </section>
+      <div class="panel-foot">Brightness changes this desktop preview. Wi-Fi, Bluetooth, audio and system power need native services.</div>
+    </div>
+    <section class="launcher hidden" id="launcher">
+      <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>
+      <div class="app-grid" id="appGrid" aria-label="Installed applications"></div>
+    </section>
+    <div class="window-layer" id="windowLayer"></div>
+    <div class="toast hidden" id="toast"></div>
+  </main>
+  <script src="apps/app-registry.js"></script>
+  <script src="apps/window-manager.js"></script>
+  <script src="apps/native-services.js"></script>
+  <script src="apps/files.js"></script>
+  <script src="apps/calendar.js"></script>
+  <script src="apps/store-catalog.js"></script>
+  <script src="apps/software-centre.js"></script>
+  <script src="apps/system-monitor.js"></script>
+  <script src="apps/settings-sections.js"></script>
+  <script src="apps/personalisation-catalog.js"></script>
+  <script src="apps/notes.js"></script>
+  <script src="apps/settings.js"></script>
+  <script src="apps/browser.js"></script>
+  <script src="apps/terminal.js"></script>
+  <script src="apps/calculator.js"></script>
+  <script src="apps/gaming.js"></script>
+  <script src="apps/welcome.js"></script>
+  <script src="apps/quantum-engine.js"></script>
+  <script src="apps/quantum-content.js"></script>
+  <script src="apps/quantum.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
