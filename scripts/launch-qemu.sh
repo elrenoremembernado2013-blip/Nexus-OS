@@ -272,14 +272,7 @@ mkdir -p -- "$(dirname -- "$DISK_PATH")" "$VM_STATE_DIR" "$(dirname -- "$SERIAL_
 if [[ -e "$DISK_PATH" ]]; then
   # Only attach standalone qcow2 images. Backing chains can reach files outside
   # the disposable build tree, so reject them rather than following them.
-  qemu-img info --output=json "$DISK_PATH" | python3 -c '
-import json, sys
-info = json.load(sys.stdin)
-if info.get("format") != "qcow2":
-    raise SystemExit("QEMU disk safety abort: existing disk is not a qcow2 image")
-if info.get("backing-filename") or info.get("full-backing-filename"):
-    raise SystemExit("QEMU disk safety abort: qcow2 backing files are not permitted")
-'
+  qemu-img info --output=json "$DISK_PATH" | python3 "$ROOT_DIR/scripts/validate-qemu-image.py"
 fi
 if [[ "$RESET_DISK" == true && -e "$DISK_PATH" ]]; then
   echo "Resetting disposable qcow2 guest disk (--yes-reset-disk confirmed): $DISK_PATH"
