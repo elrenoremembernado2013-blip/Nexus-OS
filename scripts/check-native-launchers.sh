@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercise native launcher selection with harmless stub applications.
+# Exercise native launcher selection across Cinnamon, Xfce, Lite Openbox, and Lite LXQt with harmless stubs.
 set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 LAUNCHER="$ROOT_DIR/linux/branding/nexus-launch-app.sh"
@@ -20,6 +20,10 @@ STUB
   chmod 0755 "$STUB_DIR/$name"
 }
 
+clear_stubs() {
+  rm -f "$STUB_DIR"/*
+}
+
 run_case() {
   local expected="$1"
   shift
@@ -32,27 +36,74 @@ run_case() {
   }
 }
 
+expect_fail() {
+  if PATH="$STUB_DIR" NEXUS_STORE_CLI="$STUB_DIR/nexus-store-cli" /bin/bash "$LAUNCHER" "$@" >/dev/null 2>&1; then
+    printf 'Expected launcher failure for args: %s\n' "$*" >&2
+    exit 1
+  fi
+}
+
+# 1. Lite LXQt edition utilities
 make_stub pcmanfm-qt
 run_case "pcmanfm-qt " files
-rm "$STUB_DIR/pcmanfm-qt"
-
 make_stub qterminal
 run_case "qterminal " terminal
-rm "$STUB_DIR/qterminal"
-
 make_stub qps
 run_case "qps " monitor
-rm "$STUB_DIR/qps"
-
 make_stub lxqt-config
 run_case "lxqt-config " settings
-rm "$STUB_DIR/lxqt-config"
-
 make_stub nexus-store-cli
 run_case "qterminal -e $STUB_DIR/nexus-store-cli --help" store
+clear_stubs
 
+# 2. Lite Openbox edition utilities
+make_stub pcmanfm
+run_case "pcmanfm " files
+make_stub lxterminal
+run_case "lxterminal " terminal
+make_stub lxtask
+run_case "lxtask " monitor
+make_stub obconf
+run_case "obconf " settings
+make_stub nexus-store-cli
+run_case "lxterminal -e $STUB_DIR/nexus-store-cli --help" store
+clear_stubs
+
+# 3. Xfce edition utilities
+make_stub thunar
+run_case "thunar " files
+make_stub xfce4-terminal
+run_case "xfce4-terminal " terminal
+make_stub xfce4-taskmanager
+run_case "xfce4-taskmanager " monitor
+make_stub xfce4-settings-manager
+run_case "xfce4-settings-manager " settings
+make_stub nexus-store-cli
+run_case "xfce4-terminal -x $STUB_DIR/nexus-store-cli --help" store
+clear_stubs
+
+# 4. Cinnamon edition utilities
+make_stub nemo
+run_case "nemo " files
+make_stub gnome-terminal
+run_case "gnome-terminal " terminal
+make_stub gnome-system-monitor
+run_case "gnome-system-monitor " monitor
+make_stub cinnamon-settings
+run_case "cinnamon-settings " settings
 make_stub mintinstall
 run_case "mintinstall " store
+clear_stubs
+
+# 5. Missing utility & missing Store CLI failure paths
+expect_fail files
+expect_fail terminal
+expect_fail monitor
+expect_fail settings
+make_stub qterminal
+expect_fail store
+clear_stubs
+expect_fail unknown-target
 
 for pair in \
   "nexus-files.desktop:files" \
@@ -72,4 +123,4 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
   desktop-file-validate "$APP_DIR"/nexus-*.desktop
 fi
 
-echo "PASS native launcher selection, Store fallback, and desktop Exec targets"
+echo "PASS native launcher selection across Cinnamon/Xfce/Lite Openbox/Lite LXQt, Store fallback, and missing-tool failure paths"

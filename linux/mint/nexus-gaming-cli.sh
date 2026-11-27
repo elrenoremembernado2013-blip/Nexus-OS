@@ -186,6 +186,20 @@ for js in sorted(Path("/sys/class/input").glob("js*")):
     name = read_text(js / "device" / "name") or js.name
     controllers.append({"device": js.name, "name": name})
 
+def flatpak_app_installed(app_id: str) -> bool:
+    return any(
+        (root / app_id).is_dir()
+        for root in (
+            Path.home() / ".local" / "share" / "flatpak" / "app",
+            Path("/var/lib/flatpak/app"),
+        )
+    )
+
+lutris_bin = shutil.which("lutris")
+lutris_flatpak = flatpak_app_installed("net.lutris.Lutris")
+heroic_bin = shutil.which("heroic")
+heroic_flatpak = flatpak_app_installed("com.heroicgameslauncher.hgl")
+
 power_profile = "unavailable"
 if shutil.which("powerprofilesctl"):
     try:
@@ -202,6 +216,20 @@ payload = {
         "steamapps_found": steam_dir is not None,
         "installed_games": installed_games,
         "proton_versions": sorted(proton_versions),
+    },
+    "launchers": {
+        "lutris": {
+            "installed": bool(lutris_bin or lutris_flatpak),
+            "binary": lutris_bin,
+            "flatpak": lutris_flatpak,
+            "install_hint": "flatpak install flathub net.lutris.Lutris (or apt install lutris)",
+        },
+        "heroic": {
+            "installed": bool(heroic_bin or heroic_flatpak),
+            "binary": heroic_bin,
+            "flatpak": heroic_flatpak,
+            "install_hint": "flatpak install flathub com.heroicgameslauncher.hgl",
+        },
     },
     "graphics": {
         "gpus": gpus,
@@ -220,6 +248,10 @@ payload = {
         "gamemode_installed": shutil.which("gamemoded") is not None,
         "mangohud_installed": shutil.which("mangohud") is not None,
         "power_profile": power_profile,
+    },
+    "capabilities": {
+        "apt_available": shutil.which("apt-get") is not None,
+        "flatpak_available": shutil.which("flatpak") is not None,
     },
 }
 print(json.dumps(payload, indent=2))
@@ -291,6 +323,7 @@ PY
     action="$1"
     case "$action" in
       install)
+        [[ -n "$STORE_CLI" && -r "$STORE_CLI" ]] || { echo 'nexus-store-cli is unavailable; install steam-installer via APT manually.' >&2; exit 1; }
         if [[ "$DRY_RUN" == true ]]; then
           exec bash "$STORE_CLI" --dry-run install apt steam-installer
         else
@@ -298,6 +331,7 @@ PY
         fi
         ;;
       remove)
+        [[ -n "$STORE_CLI" && -r "$STORE_CLI" ]] || { echo 'nexus-store-cli is unavailable; remove steam-installer via APT manually.' >&2; exit 1; }
         if [[ "$DRY_RUN" == true ]]; then
           exec bash "$STORE_CLI" --dry-run remove apt steam-installer
         else

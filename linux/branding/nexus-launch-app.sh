@@ -15,16 +15,6 @@ has() {
   command -v "$1" >/dev/null 2>&1
 }
 
-launch_first() {
-  local candidate
-  for candidate in "$@"; do
-    if has "$candidate"; then
-      exec "$candidate"
-    fi
-  done
-  return 1
-}
-
 case "${1:-}" in
   files)
     shift
@@ -57,11 +47,12 @@ case "${1:-}" in
   store)
     shift
     if has mintinstall; then exec mintinstall "$@"; fi
+    [[ -x "$STORE_CLI" ]] || fail "NEXUS Store CLI is not installed at $STORE_CLI"
     for app in qterminal lxterminal; do
       if has "$app"; then exec "$app" -e "$STORE_CLI" --help; fi
     done
     if has gnome-terminal; then exec gnome-terminal -- "$STORE_CLI" --help; fi
-    if has xfce4-terminal; then exec xfce4-terminal --command "$STORE_CLI --help"; fi
+    if has xfce4-terminal; then exec xfce4-terminal -x "$STORE_CLI" --help; fi
     if has x-terminal-emulator; then exec x-terminal-emulator -e "$STORE_CLI" --help; fi
     fail "NEXUS Store CLI or a supported terminal emulator is unavailable"
     ;;

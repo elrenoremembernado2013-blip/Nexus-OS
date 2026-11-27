@@ -206,6 +206,10 @@ PY
   firewall)
     [[ $# -eq 1 ]] || { echo 'firewall requires enable or disable' >&2; exit 2; }
     action="$1"
+    if [[ "$DRY_RUN" == false ]]; then
+      command -v ufw >/dev/null 2>&1 || { echo 'ufw is not installed on this host.' >&2; exit 1; }
+      command -v pkexec >/dev/null 2>&1 || { echo 'pkexec (PolicyKit) is required to configure UFW safely.' >&2; exit 1; }
+    fi
     case "$action" in
       enable)
         run_mutating pkexec ufw default deny incoming
@@ -242,6 +246,9 @@ PY
         exit 2
         ;;
     esac
+    if [[ "$DRY_RUN" == false ]]; then
+      command -v flatpak >/dev/null 2>&1 || { echo 'flatpak is not installed on this host.' >&2; exit 1; }
+    fi
     run_mutating flatpak override --user "$flag" "$app_id"
     ;;
 
@@ -249,6 +256,9 @@ PY
     [[ $# -eq 1 ]] || { echo 'flatpak-reset requires <flatpak-app-id>' >&2; exit 2; }
     app_id="$1"
     validate_flatpak_id "$app_id"
+    if [[ "$DRY_RUN" == false ]]; then
+      command -v flatpak >/dev/null 2>&1 || { echo 'flatpak is not installed on this host.' >&2; exit 1; }
+    fi
     run_mutating flatpak override --user --reset "$app_id"
     ;;
 

@@ -70,12 +70,20 @@
       if (badge) {
         badge.textContent = available ? "Telemetry connected" : "No telemetry source";
       }
-      if (boundary && error) {
+      if (boundary) {
         boundary.replaceChildren();
         const strong = document.createElement("strong");
-        strong.textContent = "Native telemetry error";
         const msg = document.createElement("p");
-        msg.textContent = error;
+        if (error) {
+          strong.textContent = "Native telemetry error";
+          msg.textContent = error;
+        } else if (available) {
+          strong.textContent = "Native telemetry active";
+          msg.textContent = "Metrics are supplied directly by the connected Linux host telemetry adapter.";
+        } else {
+          strong.textContent = "Native integration required";
+          msg.textContent = "This browser prototype cannot read host CPU, memory, disks, processes or network counters. No sample values or synthetic graphs are shown.";
+        }
         boundary.append(strong, msg);
       }
 

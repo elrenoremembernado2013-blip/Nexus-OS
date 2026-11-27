@@ -140,8 +140,12 @@
       openBtn.textContent = "Open Linux Mint settings";
       openBtn.addEventListener("click", () => {
         try {
-          window.NexusNativeServices.call(section.serviceId, "openControl", section.id);
-          note.textContent = "Opened native Linux Mint settings panel.";
+          const res = window.NexusNativeServices.call(section.serviceId, "openControl", section.id);
+          if (res && res.ok === false) {
+            note.textContent = res.message || "No supported native settings tool is available.";
+          } else {
+            note.textContent = res?.message || "Opened native Linux Mint settings panel.";
+          }
         } catch (err) {
           note.textContent = err?.message || "Could not open native settings panel.";
         }

@@ -1003,6 +1003,43 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
   }
   console.log("PASS Linux .desktop launcher dispatcher parity across Cinnamon, Xfce, Lite Openbox, and Lite LXQt");
 }
+
+// 6. Native Settings failure honesty & System Monitor boundary recovery
+{
+  const env = bootDesktop({}, {
+    beforeAppJs(win) {
+      win.NexusNativeServices.register("display", {
+        openControl() {
+          return { ok: false, message: "Cannot launch xfce4-display-settings: no active X11 or Wayland display session." };
+        }
+      });
+    }
+  });
+  const { window: win, document: doc } = env;
+  win.NexusDesktopShell.openApp("settings");
+  const settingsWinEl = doc.getElementById(win.NexusWindowManager.getActive().id);
+  const openNativeBtn = Array.from(settingsWinEl.querySelectorAll("button")).find(b => b.textContent.includes("Open Linux Mint"));
+  assert.ok(openNativeBtn, "Expected Open Linux Mint panel button on Display settings");
+  openNativeBtn.click();
+  const settingsText = settingsWinEl.textContent;
+  assert.ok(settingsText.includes("no active X11 or Wayland display session"), "Settings must display native launch failure message");
+  assert.ok(!settingsText.includes("Opened native Linux Mint settings panel."), "Settings must never claim native launch succeeded when openControl returns ok:false");
+
+  let throwError = true;
+  win.NexusNativeServices.register("telemetry", {
+    snapshot() {
+      if (throwError) throw new Error("Bridge timed out");
+      return { processor: { summary: "14% used", detail: "Load avg (1m): 0.25" } };
+    }
+  });
+  win.NexusDesktopShell.openApp("monitor");
+  const monWinEl = doc.getElementById(win.NexusWindowManager.getActive().id);
+  assert.ok(monWinEl.querySelector("#monitorBoundary").textContent.includes("Bridge timed out"));
+  throwError = false;
+  monWinEl.querySelector("#monitorRefresh").click();
+  assert.ok(monWinEl.querySelector("#monitorBoundary").textContent.includes("Native telemetry active"), "System Monitor boundary must clear stale error banner after successful refresh");
+  console.log("PASS Native Settings failure honesty and System Monitor boundary recovery");
+}
 })().catch(error => {
   console.error(error);
   process.exit(1);

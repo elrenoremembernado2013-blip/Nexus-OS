@@ -258,7 +258,8 @@ for desktop_file in linux/branding/applications/*.desktop; do
   grep -Fq '[Desktop Entry]' "$desktop_file"
 done
 
-python3 -m py_compile linux/mint/nexus-system-bridge.py scripts/check-linux-bridge.py linux/test/nexus-guest-test.py linux/test/qemu-graphical-runner.py linux/test/nexus-browser-bench.py linux/lite/scripts/nexus-lite-compare.py
+python3 -m py_compile linux/mint/nexus-system-bridge.py scripts/check-linux-bridge.py scripts/check-native-services-reliability.py linux/test/nexus-guest-test.py linux/test/qemu-graphical-runner.py linux/test/nexus-browser-bench.py linux/lite/scripts/nexus-lite-compare.py
 python3 scripts/check-linux-bridge.py
+python3 scripts/check-native-services-reliability.py
 
 bash scripts/check-prototype.sh

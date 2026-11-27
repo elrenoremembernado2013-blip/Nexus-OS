@@ -93,7 +93,24 @@
         games.forEach(g => list.append(node("li", "", `${g.name} (AppID ${g.appid})`)));
         libCard.append(list);
       }
-      grid.append(steamCard, libCard);
+      const launchersCard = node("article", "content-card");
+      launchersCard.append(node("h3", "", "GameMode, Lutris & Heroic"));
+      if (!state.available) {
+        launchersCard.append(node("p", "", "Capability detection requires Linux Mint host. On Linux Mint / Ubuntu, install via APT/Flatpak: gamemode, net.lutris.Lutris, com.heroicgameslauncher.hgl."));
+      } else {
+        const gmOk = Boolean(state.data?.performance?.gamemode_installed);
+        const lutrisOk = Boolean(state.data?.launchers?.lutris?.installed);
+        const heroicOk = Boolean(state.data?.launchers?.heroic?.installed);
+        const list = node("ul", "store-requirements");
+        list.append(
+          node("li", "", gmOk ? "GameMode: installed (use gamemoderun %command%)" : "GameMode: not installed — run: sudo apt install gamemode"),
+          node("li", "", lutrisOk ? "Lutris: installed" : "Lutris: not installed — run: flatpak install flathub net.lutris.Lutris"),
+          node("li", "", heroicOk ? "Heroic Games Launcher: installed" : "Heroic: not installed — run: flatpak install flathub com.heroicgameslauncher.hgl")
+        );
+        launchersCard.append(list);
+      }
+
+      grid.append(steamCard, libCard, launchersCard);
       panel.append(grid);
     };
 

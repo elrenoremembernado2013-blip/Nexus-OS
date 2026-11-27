@@ -68,7 +68,7 @@ validate_pkg_id() {
 is_protected_apt_pkg() {
   local pkg="$1"
   case "$pkg" in
-    apt|apt-utils|base-files|base-passwd|bash|coreutils|dash|dpkg|e2fsprogs|findutils|grep|gzip|init|libc6|linux-base|linux-generic|linux-image-*|login|mintsystem|mintupdate|mount|passwd|sed|sudo|systemd|systemd-sysv|tar|ubuntu-minimal|ufw|util-linux|xfce4-session|xfwm4|cinnamon)
+    apt|apt-utils|base-files|base-passwd|bash|coreutils|cryptsetup|cryptsetup-initramfs|dash|dpkg|e2fsprogs|findutils|grep|grub2-common|grub-efi-amd64|grub-efi-amd64-bin|grub-efi-amd64-signed|gzip|init|libc6|lightdm|lightdm-gtk-greeter|linux-base|linux-generic|linux-image-*|login|lxqt-panel|lxqt-policykit|lxqt-session|mintsystem|mintupdate|mount|network-manager|openbox|passwd|pcmanfm|pcmanfm-qt|pkexec|policykit-1|policykit-1-gnome|polkitd|sed|sudo|systemd|systemd-sysv|tar|tint2|ubuntu-minimal|ufw|util-linux|xfce4-session|xfwm4|cinnamon|zram-tools)
       return 0
       ;;
     *)
@@ -92,14 +92,16 @@ case "$CMD" in
     apt_ok=false
     flatpak_ok=false
     mintupdate_ok=false
+    pkexec_ok=false
     command -v apt-cache >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1 && apt_ok=true
     command -v flatpak >/dev/null 2>&1 && flatpak_ok=true
     command -v mintupdate >/dev/null 2>&1 && mintupdate_ok=true
-    printf '{"apt":%s,"flatpak":%s,"mintupdate":%s}\n' "$apt_ok" "$flatpak_ok" "$mintupdate_ok"
+    command -v pkexec >/dev/null 2>&1 && pkexec_ok=true
+    printf '{"apt":%s,"flatpak":%s,"mintupdate":%s,"pkexec":%s}\n' "$apt_ok" "$flatpak_ok" "$mintupdate_ok" "$pkexec_ok"
     ;;
 
   search)
-    [[ $# -ge 1 && -n "$1" ]] || { echo 'search requires a query' >&2; exit 2; }
+    [[ $# -ge 1 && -n "${1//[[:space:]]/}" ]] || { echo 'search requires a non-empty query' >&2; exit 2; }
     query="$1"
     if command -v apt-cache >/dev/null 2>&1; then
       echo '=== APT ==='
@@ -163,8 +165,15 @@ case "$CMD" in
     pkg="$2"
     validate_pkg_id "$source" "$pkg"
     if [[ "$source" == "apt" ]]; then
+      if [[ "$DRY_RUN" == false ]]; then
+        command -v apt-get >/dev/null 2>&1 || { echo 'apt-get unavailable on this host.' >&2; exit 1; }
+        command -v pkexec >/dev/null 2>&1 || { echo 'pkexec (PolicyKit) is required for privileged APT installation.' >&2; exit 1; }
+      fi
       run_mutating pkexec env DEBIAN_FRONTEND=noninteractive apt-get install -y -- "$pkg"
     else
+      if [[ "$DRY_RUN" == false ]]; then
+        command -v flatpak >/dev/null 2>&1 || { echo 'flatpak unavailable on this host.' >&2; exit 1; }
+      fi
       run_mutating flatpak install -y -- "$pkg"
     fi
     ;;
@@ -179,8 +188,15 @@ case "$CMD" in
         printf 'Refusing to remove protected Linux Mint / NEXUS base package: %s\n' "$pkg" >&2
         exit 1
       fi
+      if [[ "$DRY_RUN" == false ]]; then
+        command -v apt-get >/dev/null 2>&1 || { echo 'apt-get unavailable on this host.' >&2; exit 1; }
+        command -v pkexec >/dev/null 2>&1 || { echo 'pkexec (PolicyKit) is required for privileged APT removal.' >&2; exit 1; }
+      fi
       run_mutating pkexec env DEBIAN_FRONTEND=noninteractive apt-get remove -y -- "$pkg"
     else
+      if [[ "$DRY_RUN" == false ]]; then
+        command -v flatpak >/dev/null 2>&1 || { echo 'flatpak unavailable on this host.' >&2; exit 1; }
+      fi
       run_mutating flatpak uninstall -y -- "$pkg"
     fi
     ;;

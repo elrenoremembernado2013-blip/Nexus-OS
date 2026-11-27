@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import pty
 import pwd
+import re
 import secrets
 import select
 import shutil
@@ -36,16 +37,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
-    "files": [["nemo"], ["thunar"], ["xdg-open", str(Path.home())]],
-    "browser": [["firefox"], ["chromium"], ["chromium-browser"], ["x-www-browser"]],
-    "terminal": [["xfce4-terminal"], ["gnome-terminal"], ["x-terminal-emulator"]],
-    "monitor": [["gnome-system-monitor"], ["xfce4-taskmanager"], ["mate-system-monitor"]],
-    "display": [["cinnamon-settings", "display"], ["xfce4-display-settings"]],
-    "sound": [["cinnamon-settings", "sound"], ["pavucontrol"]],
+    "files": [["nemo"], ["pcmanfm-qt"], ["pcmanfm"], ["thunar"], ["xdg-open", str(Path.home())]],
+    "browser": [["firefox"], ["chromium"], ["chromium-browser"], ["falkon"], ["x-www-browser"]],
+    "terminal": [["qterminal"], ["lxterminal"], ["gnome-terminal"], ["xfce4-terminal"], ["x-terminal-emulator"]],
+    "monitor": [["gnome-system-monitor"], ["qps"], ["lxtask"], ["xfce4-taskmanager"], ["mate-system-monitor"]],
+    "display": [["cinnamon-settings", "display"], ["xfce4-display-settings"], ["lxqt-config-monitor"], ["lxrandr"], ["arandr"]],
+    "sound": [["cinnamon-settings", "sound"], ["pavucontrol-qt"], ["pavucontrol"]],
     "network": [["cinnamon-settings", "network"], ["nm-connection-editor"]],
     "bluetooth": [["cinnamon-settings", "bluetooth"], ["blueman-manager"]],
-    "power": [["cinnamon-settings", "power"], ["xfce4-power-manager-settings"]],
-    "accounts": [["cinnamon-settings", "users"], ["users-admin"]],
+    "power": [["cinnamon-settings", "power"], ["xfce4-power-manager-settings"], ["lxqt-config-power"]],
+    "accounts": [["cinnamon-settings", "users"], ["users-admin"], ["lxqt-config"]],
     "privacy-security": [["cinnamon-settings", "privacy"], ["gufw"]],
     "packages": [["mintinstall"], ["mintupdate"]],
     "gaming": [["steam"]],
@@ -70,14 +71,17 @@ def read_text(path: Path) -> str | None:
         return None
 
 
-def read_cpu_percent(sample_seconds: float = 0.08) -> float | None:
+def read_cpu_percent(sample_seconds: float = 0.08, proc_root: Path = Path("/proc")) -> float | None:
     def parse_stat() -> tuple[int, int] | None:
-        raw = read_text(Path("/proc/stat"))
+        raw = read_text(proc_root / "stat")
         if not raw:
             return None
         for line in raw.splitlines():
             if line.startswith("cpu "):
-                parts = [int(x) for x in line.split()[1:8]]
+                cols = line.split()[1:8]
+                if len(cols) < 4 or not all(col.isdigit() for col in cols):
+                    return None
+                parts = [int(x) for x in cols]
                 idle = parts[3] + (parts[4] if len(parts) > 4 else 0)
                 total = sum(parts)
                 return idle, total
@@ -98,8 +102,8 @@ def read_cpu_percent(sample_seconds: float = 0.08) -> float | None:
     return round(max(0.0, min(100.0, usage)), 1)
 
 
-def read_memory() -> dict[str, object] | None:
-    raw = read_text(Path("/proc/meminfo"))
+def read_memory(proc_root: Path = Path("/proc")) -> dict[str, object] | None:
+    raw = read_text(proc_root / "meminfo")
     if not raw:
         return None
     values: dict[str, int] = {}
@@ -107,9 +111,9 @@ def read_memory() -> dict[str, object] | None:
         if ":" not in line:
             continue
         key, rest = line.split(":", 1)
-        num = rest.strip().split()[0]
-        if num.isdigit():
-            values[key] = int(num)
+        toks = rest.strip().split()
+        if toks and toks[0].isdigit():
+            values[key] = int(toks[0])
     total_kb = values.get("MemTotal")
     avail_kb = values.get("MemAvailable", values.get("MemFree"))
     if not total_kb or avail_kb is None:
@@ -123,9 +127,9 @@ def read_memory() -> dict[str, object] | None:
     }
 
 
-def read_storage() -> dict[str, object] | None:
+def read_storage(mount: str = "/") -> dict[str, object] | None:
     try:
-        st = os.statvfs("/")
+        st = os.statvfs(mount)
     except OSError:
         return None
     total = st.f_blocks * st.f_frsize
@@ -133,15 +137,15 @@ def read_storage() -> dict[str, object] | None:
     used = max(0, total - (st.f_bfree * st.f_frsize))
     gib = 1024 ** 3
     return {
-        "mount": "/",
+        "mount": mount,
         "total_gib": round(total / gib, 1),
         "used_gib": round(used / gib, 1),
         "available_gib": round(avail / gib, 1),
     }
 
 
-def read_network() -> dict[str, object] | None:
-    raw = read_text(Path("/proc/net/dev"))
+def read_network(proc_root: Path = Path("/proc")) -> dict[str, object] | None:
+    raw = read_text(proc_root / "net" / "dev")
     if not raw:
         return None
     rx_total = 0
@@ -155,7 +159,7 @@ def read_network() -> dict[str, object] | None:
         if iface == "lo":
             continue
         cols = data.split()
-        if len(cols) >= 9:
+        if len(cols) >= 9 and cols[0].isdigit() and cols[8].isdigit():
             interfaces.append(iface)
             rx_total += int(cols[0])
             tx_total += int(cols[8])
@@ -166,8 +170,13 @@ def read_network() -> dict[str, object] | None:
     }
 
 
-def read_battery() -> dict[str, object] | None:
-    for bat in sorted(Path("/sys/class/power_supply").glob("BAT*")):
+def read_battery(sys_root: Path = Path("/sys")) -> dict[str, object] | None:
+    ps_dir = sys_root / "class" / "power_supply"
+    try:
+        entries = sorted(ps_dir.glob("BAT*"))
+    except OSError:
+        return None
+    for bat in entries:
         cap = read_text(bat / "capacity")
         status = read_text(bat / "status")
         if cap is not None and cap.isdigit():
@@ -175,8 +184,13 @@ def read_battery() -> dict[str, object] | None:
     return None
 
 
-def read_temperature() -> dict[str, object] | None:
-    for zone in sorted(Path("/sys/class/thermal").glob("thermal_zone*")):
+def read_temperature(sys_root: Path = Path("/sys")) -> dict[str, object] | None:
+    thermal_dir = sys_root / "class" / "thermal"
+    try:
+        zones = sorted(thermal_dir.glob("thermal_zone*"))
+    except OSError:
+        return None
+    for zone in zones:
         raw = read_text(zone / "temp")
         ztype = read_text(zone / "type") or zone.name
         if raw and raw.lstrip("-").isdigit():
@@ -186,9 +200,13 @@ def read_temperature() -> dict[str, object] | None:
     return None
 
 
-def read_processes(limit: int = 8) -> list[dict[str, object]]:
+def read_processes(limit: int = 8, proc_root: Path = Path("/proc")) -> list[dict[str, object]]:
     procs: list[dict[str, object]] = []
-    for entry in Path("/proc").iterdir():
+    try:
+        entries = list(proc_root.iterdir())
+    except OSError:
+        return procs
+    for entry in entries:
         if not entry.name.isdigit():
             continue
         pid = int(entry.name)
@@ -220,16 +238,22 @@ def read_processes(limit: int = 8) -> list[dict[str, object]]:
     return procs[:limit]
 
 
-def collect_telemetry_snapshot() -> dict[str, object]:
-    cpu_pct = read_cpu_percent()
-    load_raw = read_text(Path("/proc/loadavg"))
-    load_1m = load_raw.split()[0] if load_raw else None
-    mem = read_memory()
-    storage = read_storage()
-    net = read_network()
-    bat = read_battery()
-    temp = read_temperature()
-    procs = read_processes()
+def collect_telemetry_snapshot(
+    proc_root: Path = Path("/proc"),
+    sys_root: Path = Path("/sys"),
+    storage_mount: str = "/",
+    sample_seconds: float = 0.08,
+) -> dict[str, object]:
+    cpu_pct = read_cpu_percent(sample_seconds=sample_seconds, proc_root=proc_root)
+    load_raw = read_text(proc_root / "loadavg")
+    load_tokens = load_raw.split() if load_raw else []
+    load_1m = load_tokens[0] if load_tokens else None
+    mem = read_memory(proc_root=proc_root)
+    storage = read_storage(mount=storage_mount)
+    net = read_network(proc_root=proc_root)
+    bat = read_battery(sys_root=sys_root)
+    temp = read_temperature(sys_root=sys_root)
+    procs = read_processes(proc_root=proc_root)
 
     return {
         "processor": {
@@ -242,7 +266,7 @@ def collect_telemetry_snapshot() -> dict[str, object]:
         },
         "storage": {
             "summary": f"{storage['used_gib']} / {storage['total_gib']} GiB" if storage else "Unavailable",
-            "detail": f"{storage['available_gib']} GiB free on /" if storage else "Storage telemetry unavailable",
+            "detail": f"{storage['available_gib']} GiB free on {storage_mount}" if storage else "Storage telemetry unavailable",
         },
         "processes": {
             "summary": f"Top {len(procs)} by RSS" if procs else "Unavailable",
@@ -285,8 +309,17 @@ def launch_allowlisted_tool(category: str) -> dict[str, object]:
         return {"ok": False, "message": f"Unknown tool category: {category}"}
     for cmd in candidates:
         if shutil.which(cmd[0]):
-            subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return {"ok": True, "command": cmd[0], "message": f"Launched {cmd[0]}"}
+            if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+                return {
+                    "ok": False,
+                    "command": cmd[0],
+                    "message": f"Cannot launch {cmd[0]}: no active X11 or Wayland display session.",
+                }
+            try:
+                subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return {"ok": True, "command": cmd[0], "message": f"Launched {cmd[0]}"}
+            except OSError as err:
+                return {"ok": False, "command": cmd[0], "message": f"Failed to launch {cmd[0]}: {err}"}
     return {"ok": False, "message": f"No supported Linux tool installed for {category}."}
 
 
@@ -298,11 +331,37 @@ class TerminalSessionManager:
         self._lock = threading.Lock()
         self._max_sessions = max_sessions
 
+    def _cleanup_exited_locked(self) -> None:
+        now = time.monotonic()
+        expired = []
+        for sid, sess in self._sessions.items():
+            proc = sess["proc"]
+            assert isinstance(proc, subprocess.Popen)
+            if proc.poll() is not None:
+                exited_at = sess.get("exited_at")
+                if exited_at is None:
+                    sess["exited_at"] = now
+                elif now - float(exited_at) > 30.0:
+                    expired.append(sid)
+        for sid in expired:
+            sess = self._sessions.pop(sid, None)
+            if sess:
+                try:
+                    os.close(int(sess["fd"]))
+                except OSError:
+                    pass
+
+    def active_session_ids(self) -> list[str]:
+        with self._lock:
+            self._cleanup_exited_locked()
+            return list(self._sessions.keys())
+
     def open_session(self, cols: int = 80, rows: int = 24) -> str:
         bash_path = shutil.which("bash") or "/bin/bash"
         if not os.path.exists(bash_path):
             raise RuntimeError("GNU Bash (/bin/bash) was not found on this host.")
         with self._lock:
+            self._cleanup_exited_locked()
             if len(self._sessions) >= self._max_sessions:
                 raise RuntimeError("Maximum concurrent terminal sessions reached.")
             master_fd, slave_fd = pty.openpty()
@@ -328,7 +387,7 @@ class TerminalSessionManager:
             os.close(slave_fd)
             os.set_blocking(master_fd, False)
             sid = secrets.token_hex(12)
-            self._sessions[sid] = {"fd": master_fd, "proc": proc}
+            self._sessions[sid] = {"fd": master_fd, "proc": proc, "exited_at": None}
             return sid
 
     @staticmethod
@@ -341,12 +400,15 @@ class TerminalSessionManager:
         with self._lock:
             sess = self._sessions.get(sid)
         if not sess:
-            raise KeyError(f"Unknown session: {sid}")
+            raise KeyError(f"Unknown or closed session: {sid}")
         fd = int(sess["fd"])
         proc = sess["proc"]
         assert isinstance(proc, subprocess.Popen)
         chunks: list[bytes] = []
-        ready, _, _ = select.select([fd], [], [], timeout)
+        try:
+            ready, _, _ = select.select([fd], [], [], timeout)
+        except (OSError, ValueError):
+            ready = []
         if ready:
             while True:
                 try:
@@ -359,31 +421,46 @@ class TerminalSessionManager:
                 except OSError:
                     break
         exit_code = proc.poll()
+        if exit_code is not None and not chunks:
+            self.close_session(sid)
         return b"".join(chunks).decode("utf-8", errors="replace"), exit_code
 
     def write(self, sid: str, data: str) -> None:
+        if not isinstance(data, str) or len(data.encode("utf-8", errors="replace")) > 65536:
+            raise ValueError("Terminal input must be a string up to 64 KiB.")
         with self._lock:
             sess = self._sessions.get(sid)
         if not sess:
-            raise KeyError(f"Unknown session: {sid}")
+            raise KeyError(f"Unknown or closed session: {sid}")
+        proc = sess["proc"]
+        assert isinstance(proc, subprocess.Popen)
+        if proc.poll() is not None:
+            raise BrokenPipeError(f"Session has already exited: {sid}")
         os.write(int(sess["fd"]), data.encode("utf-8", errors="replace"))
 
     def resize(self, sid: str, cols: int, rows: int) -> None:
         with self._lock:
             sess = self._sessions.get(sid)
         if not sess:
-            raise KeyError(f"Unknown session: {sid}")
+            raise KeyError(f"Unknown or closed session: {sid}")
+        proc = sess["proc"]
+        assert isinstance(proc, subprocess.Popen)
+        if proc.poll() is not None:
+            raise BrokenPipeError(f"Session has already exited: {sid}")
         self._set_winsize(int(sess["fd"]), cols, rows)
 
     def interrupt(self, sid: str) -> None:
         with self._lock:
             sess = self._sessions.get(sid)
         if not sess:
-            raise KeyError(f"Unknown session: {sid}")
+            raise KeyError(f"Unknown or closed session: {sid}")
         proc = sess["proc"]
         assert isinstance(proc, subprocess.Popen)
         if proc.poll() is None:
-            os.killpg(proc.pid, signal.SIGINT)
+            try:
+                os.killpg(proc.pid, signal.SIGINT)
+            except ProcessLookupError as err:
+                raise BrokenPipeError(f"Session process no longer running: {sid}") from err
 
     def close_session(self, sid: str) -> None:
         with self._lock:
@@ -470,10 +547,38 @@ def serve_loopback(port: int) -> None:
             self.wfile.write(body)
 
         def _read_json(self) -> dict[str, object]:
-            length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0 or length > 65536:
+            raw_len = self.headers.get("Content-Length", "0")
+            try:
+                length = int(raw_len)
+            except ValueError as err:
+                raise ValueError("Invalid Content-Length header") from err
+            if length <= 0:
                 return {}
-            return json.loads(self.rfile.read(length).decode("utf-8"))
+            if length > 65536:
+                raise ValueError("Request body exceeds 64 KiB limit")
+            parsed = json.loads(self.rfile.read(length).decode("utf-8"))
+            if not isinstance(parsed, dict):
+                raise ValueError("JSON body must be an object")
+            return parsed
+
+        def _run_cli_json(self, cmd: list[str], timeout: float = 10.0) -> None:
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
+                payload = json.loads(proc.stdout)
+            except subprocess.TimeoutExpired:
+                self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": f"Helper timed out after {timeout}s"})
+                return
+            except FileNotFoundError as err:
+                self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                return
+            except subprocess.CalledProcessError as err:
+                msg = (err.stderr or err.stdout or str(err)).strip()
+                self._send_json(HTTPStatus.BAD_GATEWAY, {"error": msg})
+                return
+            except json.JSONDecodeError:
+                self._send_json(HTTPStatus.BAD_GATEWAY, {"error": "Helper returned malformed JSON output"})
+                return
+            self._send_json(HTTPStatus.OK, payload)
 
         def do_GET(self) -> None:
             parsed = urllib.parse.urlparse(self.path)
@@ -483,29 +588,26 @@ def serve_loopback(port: int) -> None:
             if parsed.path == "/api/telemetry":
                 self._send_json(HTTPStatus.OK, collect_telemetry_snapshot())
             elif parsed.path == "/api/security/status":
-                proc = subprocess.run(
-                    resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["status"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["status"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd)
             elif parsed.path == "/api/gaming/status":
-                proc = subprocess.run(
-                    resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["status"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["status"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd)
             elif parsed.path == "/api/installer/preflight":
-                proc = subprocess.run(
-                    resolve_helper("linux/installer/nexus-install-preflight.sh", "nexus-install-preflight"),
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                self._send_json(HTTPStatus.OK, json.loads(proc.stdout))
+                try:
+                    cmd = resolve_helper("linux/installer/nexus-install-preflight.sh", "nexus-install-preflight")
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd)
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":
@@ -523,19 +625,50 @@ def serve_loopback(port: int) -> None:
             if not self._authorized():
                 self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "Missing or invalid X-Nexus-Token"})
                 return
-            body = self._read_json()
+            try:
+                body = self._read_json()
+            except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as err:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"Invalid JSON request: {err}"})
+                return
+
             if self.path == "/api/terminal/open":
-                sid = pty_mgr.open_session(int(body.get("cols", 80)), int(body.get("rows", 24)))
-                self._send_json(HTTPStatus.OK, {"sessionId": sid})
+                try:
+                    cols = int(body.get("cols", 80))
+                    rows = int(body.get("rows", 24))
+                    sid = pty_mgr.open_session(cols, rows)
+                    self._send_json(HTTPStatus.OK, {"sessionId": sid})
+                except (TypeError, ValueError) as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+                except RuntimeError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
             elif self.path == "/api/terminal/write":
-                pty_mgr.write(str(body.get("sessionId", "")), str(body.get("data", "")))
-                self._send_json(HTTPStatus.OK, {"ok": True})
+                try:
+                    pty_mgr.write(str(body.get("sessionId", "")), body.get("data"))
+                    self._send_json(HTTPStatus.OK, {"ok": True})
+                except KeyError as err:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": str(err)})
+                except (BrokenPipeError, OSError) as err:
+                    self._send_json(HTTPStatus.GONE, {"error": str(err)})
+                except ValueError as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
             elif self.path == "/api/terminal/resize":
-                pty_mgr.resize(str(body.get("sessionId", "")), int(body.get("cols", 80)), int(body.get("rows", 24)))
-                self._send_json(HTTPStatus.OK, {"ok": True})
+                try:
+                    pty_mgr.resize(str(body.get("sessionId", "")), int(body.get("cols", 80)), int(body.get("rows", 24)))
+                    self._send_json(HTTPStatus.OK, {"ok": True})
+                except KeyError as err:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": str(err)})
+                except (BrokenPipeError, OSError) as err:
+                    self._send_json(HTTPStatus.GONE, {"error": str(err)})
+                except (TypeError, ValueError) as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
             elif self.path == "/api/terminal/interrupt":
-                pty_mgr.interrupt(str(body.get("sessionId", "")))
-                self._send_json(HTTPStatus.OK, {"ok": True})
+                try:
+                    pty_mgr.interrupt(str(body.get("sessionId", "")))
+                    self._send_json(HTTPStatus.OK, {"ok": True})
+                except KeyError as err:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": str(err)})
+                except (BrokenPipeError, OSError) as err:
+                    self._send_json(HTTPStatus.GONE, {"error": str(err)})
             elif self.path == "/api/terminal/close":
                 pty_mgr.close_session(str(body.get("sessionId", "")))
                 self._send_json(HTTPStatus.OK, {"ok": True})
@@ -547,17 +680,25 @@ def serve_loopback(port: int) -> None:
                 if mode_action not in ("enable", "disable"):
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid gaming mode action"})
                     return
-                proc = subprocess.run(
-                    resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["gaming-mode", mode_action],
-                    capture_output=True,
-                    text=True,
-                )
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["gaming-mode", mode_action]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10.0)
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Gaming mode helper timed out"})
+                    return
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
                 self._send_json(
                     HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.INTERNAL_SERVER_ERROR,
                     {"ok": proc.returncode == 0, "message": proc.stdout.strip() or proc.stderr.strip()},
                 )
             elif self.path == "/api/personalisation/apply":
-                cmd = resolve_helper("linux/cinnamon/apply-nexus-cinnamon.sh", "nexus-apply-cinnamon")
+                try:
+                    cmd = resolve_helper("linux/cinnamon/apply-nexus-cinnamon.sh", "nexus-apply-cinnamon")
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
                 if body.get("dryRun"):
                     cmd.append("--dry-run")
                 if body.get("revert"):
@@ -565,6 +706,8 @@ def serve_loopback(port: int) -> None:
                 else:
                     if body.get("theme") in ("midnight", "nebula", "arctic", "emerald", "solar"):
                         cmd.extend(["--theme", str(body["theme"])])
+                    if isinstance(body.get("accent"), str) and re.fullmatch(r"#[0-9a-fA-F]{6}", body["accent"]):
+                        cmd.extend(["--accent", body["accent"]])
                     if body.get("effectLevel") in ("off", "subtle", "balanced", "enhanced"):
                         cmd.extend(["--effect-level", str(body["effectLevel"])])
                     if body.get("dockPosition") in ("bottom", "left", "right"):
@@ -579,7 +722,11 @@ def serve_loopback(port: int) -> None:
                         cmd.extend(["--workspaces", str(body["workspaces"])])
                     if body.get("presetProfile") in ("default", "minimal", "gaming", "productivity", "cinematic", "lightweight"):
                         cmd.extend(["--preset-profile", str(body["presetProfile"])])
-                proc = subprocess.run(cmd, capture_output=True, text=True)
+                try:
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15.0)
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Personalisation apply timed out"})
+                    return
                 self._send_json(
                     HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
                     {"ok": proc.returncode == 0, "output": (proc.stdout + proc.stderr).strip()},
