@@ -2,7 +2,7 @@
 Type=Application
 Name=NEXUS Store
 Comment=Browse and manage APT and Flatpak software on Linux Mint
-Exec=sh -c 'command -v mintinstall >/dev/null 2>&1 && exec mintinstall || exec xfce4-terminal -e "/usr/local/bin/nexus-store-cli --help"'
+Exec=sh -c 'command -v mintinstall >/dev/null 2>&1 && exec mintinstall; for term in qterminal lxterminal xfce4-terminal gnome-terminal x-terminal-emulator; do command -v "$term" >/dev/null 2>&1 && exec "$term" -e /usr/local/bin/nexus-store-cli --help; done'
 Icon=system-software-install
 Terminal=false
 Categories=System;PackageManager;

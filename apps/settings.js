@@ -615,7 +615,18 @@
     async function restoreCustomWallpaper() {
       try {
         const blob = await readCustomWallpaper();
-        if (unmounted || !blob || !allowedImageTypes.includes(blob.type)) return;
+        if (unmounted) return;
+        const validBlob = Boolean(
+          blob &&
+          (typeof Blob === "undefined" || blob instanceof Blob) &&
+          allowedImageTypes.includes(blob.type)
+        );
+        if (!validBlob) {
+          if (readStorage("nexus-wallpaper") === "custom") {
+            applyWallpaper("alpine", true);
+          }
+          return;
+        }
         const activeCustomUrl = shell?.getCustomDesktopWallpaperUrl?.();
         if (readStorage("nexus-wallpaper") === "custom") {
           if (!activeCustomUrl) {
@@ -626,7 +637,12 @@
         $("#customWallpaperStatus").textContent = "A custom wallpaper is saved on this device.";
         $("#removeCustomWallpaper").hidden = false;
       } catch (error) {
-        if (!unmounted) $("#customWallpaperStatus").textContent = error.message;
+        if (!unmounted) {
+          if (readStorage("nexus-wallpaper") === "custom") {
+            applyWallpaper("alpine", true);
+          }
+          $("#customWallpaperStatus").textContent = error.message;
+        }
       }
     }
 
@@ -811,7 +827,12 @@
     let favSet = new Set();
     try {
       const rawFav = readStorage("nexus-wallpaper-favourites");
-      if (rawFav) favSet = new Set(JSON.parse(rawFav));
+      if (rawFav) {
+        const parsedFav = JSON.parse(rawFav);
+        if (Array.isArray(parsedFav)) {
+          favSet = new Set(parsedFav.filter(id => typeof id === "string"));
+        }
+      }
     } catch {
       favSet = new Set();
     }
@@ -834,20 +855,33 @@
       });
     };
 
+    const toggleWallpaperFavourite = favBtn => {
+      const wid = favBtn.dataset.wallpaperFav;
+      if (favSet.has(wid)) favSet.delete(wid);
+      else favSet.add(wid);
+      writeStorage("nexus-wallpaper-favourites", JSON.stringify([...favSet]));
+      syncFavouriteButtons();
+      filterWallpapers();
+    };
+
     $$("[data-wallpaper]").forEach(item => {
       item.addEventListener("click", event => {
         const favBtn = event.target.closest("[data-wallpaper-fav]");
         if (favBtn) {
           event.stopPropagation();
-          const wid = favBtn.dataset.wallpaperFav;
-          if (favSet.has(wid)) favSet.delete(wid);
-          else favSet.add(wid);
-          writeStorage("nexus-wallpaper-favourites", JSON.stringify([...favSet]));
-          syncFavouriteButtons();
-          filterWallpapers();
+          toggleWallpaperFavourite(favBtn);
           return;
         }
         openWallpaperPreview(item.dataset.wallpaper);
+      });
+    });
+    $$("[data-wallpaper-fav]").forEach(favBtn => {
+      favBtn.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleWallpaperFavourite(favBtn);
+        }
       });
     });
     syncFavouriteButtons();
@@ -1262,8 +1296,58 @@
       pendingAccent = null;
       resetSuggestedAccents();
 
+      setupRotation("off");
+      if (rotSelect) rotSelect.value = "off";
+      if (fitSelect) fitSelect.value = "cover";
+      if (resSelect) resSelect.value = "uhd";
+      shell?.setWallpaperFit?.("cover", false);
+      favSet.clear();
+      syncFavouriteButtons();
+      if ($("#wallpaperSearch")) $("#wallpaperSearch").value = "";
+      $$("[data-wallpaper-filter]").forEach(filter => {
+        filter.classList.toggle("active", filter.dataset.wallpaperFilter === "all");
+      });
+      filterWallpapers();
+
       applyWallpaper("alpine", true);
       applyTheme("dark");
+      applyEffectLevel("balanced");
+      $$("[data-theme-preset]").forEach(btn => {
+        btn.classList.remove("selected");
+        btn.setAttribute("aria-pressed", "false");
+      });
+      if (desktop?.dataset) {
+        delete desktop.dataset.nexusTheme;
+        delete desktop.dataset.themePreset;
+      }
+      removeStorage("nexus-theme-preset");
+
+      shell?.setDockPreferences?.({
+        position: "bottom",
+        size: "43",
+        gap: "8",
+        autoHide: false,
+        style: "glass",
+        showIndicators: true
+      }, false);
+      if (dockPos) dockPos.value = "bottom";
+      if (dockSize) dockSize.value = "43";
+      if (dockGap) dockGap.value = "8";
+      if (dockStyle) dockStyle.value = "glass";
+      if ($("#dockAutoHideToggle")) updateSwitchState($("#dockAutoHideToggle"), false);
+      if ($("#dockIndicatorsToggle")) updateSwitchState($("#dockIndicatorsToggle"), true);
+
+      shell?.setDesktopPreferences?.({ showShortcuts: true, clock24h: false }, false);
+      if ($("#desktopShortcutsToggle")) updateSwitchState($("#desktopShortcutsToggle"), true);
+      if ($("#clock24hToggle")) updateSwitchState($("#clock24hToggle"), false);
+
+      if (wsCountInput) wsCountInput.value = "4";
+      if (wsNamesInput) wsNamesInput.value = "Main, Research, Gaming, Media";
+      previousProfileSnapshot = null;
+      if ($("#undoProfileBtn")) $("#undoProfileBtn").disabled = true;
+      $$("[data-personalisation-profile]").forEach(c => c.classList.remove("selected"));
+      if ($("#profileStatus")) $("#profileStatus").textContent = "Preferences reset to defaults.";
+
       shell?.resetBrightness?.();
       shell?.resetControls?.();
       setAccent("#ffad7a");

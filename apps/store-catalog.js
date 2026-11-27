@@ -262,7 +262,7 @@
       launcherName: "Welcome",
       description: "First-boot walkthrough and Linux Mint Ubiquity live-session installer guide.",
       developer: "NEXUS",
-      category: "System",
+      category: "System Tools",
       type: "Desktop application",
       icon: "assets/icons/launcher.svg",
       version: "0.3",
@@ -526,7 +526,13 @@
   const byTarget = new Map(applications.filter(application => application.launchTarget).map(application => [application.launchTarget, application]));
 
   function emit() {
-    listeners.forEach(listener => listener());
+    listeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        console.error("NEXUS Store catalog listener failed:", error);
+      }
+    });
   }
 
   function persist(nextState) {

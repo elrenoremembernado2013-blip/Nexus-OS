@@ -182,7 +182,14 @@
     const draw = () => {
       const state = readGamingStatus();
       panel.replaceChildren();
-      tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.gamingTab === activeTab));
+      tabs.forEach(tab => {
+        const selected = tab.dataset.gamingTab === activeTab;
+        tab.classList.toggle("active", selected);
+        if (typeof tab.setAttribute === "function") {
+          tab.setAttribute("role", "tab");
+          tab.setAttribute("aria-selected", String(selected));
+        }
+      });
       if (state.error) setStatus(state.error, true);
 
       if (activeTab === "overview") drawOverview(state);

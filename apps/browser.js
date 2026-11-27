@@ -46,8 +46,9 @@
   function saveBookmarks(list) {
     try {
       window.localStorage.setItem(bookmarkStorageKey, JSON.stringify(list));
+      return true;
     } catch {
-      // Ignore restricted storage contexts.
+      return false;
     }
   }
 
@@ -80,7 +81,10 @@
     const engineSelect = root.querySelector("#browserEngine");
     const msg = root.querySelector("#browserMsg");
     const bookmarksEl = root.querySelector("#browserBookmarks");
+    const goButton = root.querySelector("#browserGo");
+    const bookmarkAddButton = root.querySelector("#browserBookmarkAdd");
     let bookmarks = readBookmarks();
+    let mounted = true;
 
     const openExternal = url => {
       const validUrl = validateExternalUrl(url);
@@ -88,12 +92,22 @@
         msg.textContent = "Please enter a valid HTTP or HTTPS address.";
         return;
       }
-      const opened = window.open(validUrl, "_blank", "noopener,noreferrer");
-      if (opened) opened.opener = null;
-      msg.textContent = `Opened ${validUrl} in your system browser.`;
+      let opened = null;
+      try {
+        opened = window.open(validUrl, "_blank", "noopener,noreferrer");
+      } catch {
+        opened = null;
+      }
+      if (opened) {
+        opened.opener = null;
+        msg.textContent = `Opened ${validUrl} in your system browser.`;
+      } else {
+        msg.textContent = `Popup blocked by your browser. Allow popups to open ${validUrl}.`;
+      }
     };
 
     const drawBookmarks = () => {
+      if (!mounted) return;
       bookmarksEl.replaceChildren();
       if (!bookmarks.length) {
         const empty = document.createElement("span");
@@ -103,19 +117,46 @@
         return;
       }
       bookmarks.forEach(url => {
+        const chip = document.createElement("span");
+        chip.style.display = "inline-flex";
+        chip.style.alignItems = "center";
+        chip.style.gap = "4px";
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "action-button secondary-button";
         btn.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
         btn.addEventListener("click", () => openExternal(url));
-        bookmarksEl.append(btn);
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "action-button secondary-button";
+        removeBtn.textContent = "×";
+        removeBtn.setAttribute("aria-label", `Remove bookmark ${url}`);
+        removeBtn.addEventListener("click", () => {
+          bookmarks = bookmarks.filter(item => item !== url);
+          const saved = saveBookmarks(bookmarks);
+          drawBookmarks();
+          msg.textContent = saved
+            ? `Removed bookmark ${url}.`
+            : `Removed bookmark ${url} for this session (storage unavailable).`;
+        });
+        chip.append(btn, removeBtn);
+        bookmarksEl.append(chip);
       });
     };
 
     const submitAddress = () => {
       const raw = input.value.trim();
-      const direct = raw.includes(".") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw) ? validateExternalUrl(raw) : null;
-      const target = direct || buildSearchUrl(raw, engineSelect.value);
+      if (!raw) {
+        msg.textContent = "Please enter a valid HTTP or HTTPS address or search query.";
+        return;
+      }
+      const hasExplicitScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw);
+      if (hasExplicitScheme && !/^https?:/i.test(raw)) {
+        msg.textContent = "Only HTTP and HTTPS web addresses are allowed.";
+        return;
+      }
+      const looksLikeAddress = hasExplicitScheme || (raw.includes(".") && !/\s/.test(raw));
+      const target = looksLikeAddress ? validateExternalUrl(raw) : buildSearchUrl(raw, engineSelect.value);
       if (!target) {
         msg.textContent = "Please enter a valid HTTP or HTTPS address or search query.";
         return;
@@ -123,27 +164,42 @@
       openExternal(target);
     };
 
-    root.querySelector("#browserGo").addEventListener("click", submitAddress);
-    root.querySelector("#browserBookmarkAdd").addEventListener("click", () => {
+    const handleAddBookmark = () => {
       const valid = validateExternalUrl(input.value);
       if (!valid) {
         msg.textContent = "Only valid HTTP or HTTPS URLs can be bookmarked.";
         return;
       }
-      if (!bookmarks.includes(valid)) {
-        bookmarks = [valid, ...bookmarks].slice(0, 12);
-        saveBookmarks(bookmarks);
-        drawBookmarks();
-        msg.textContent = `Bookmarked ${valid}.`;
+      if (bookmarks.includes(valid)) {
+        msg.textContent = `Bookmark already saved: ${valid}.`;
+        return;
       }
-    });
-    input.addEventListener("keydown", event => {
+      bookmarks = [valid, ...bookmarks].slice(0, 12);
+      const saved = saveBookmarks(bookmarks);
+      drawBookmarks();
+      msg.textContent = saved
+        ? `Bookmarked ${valid}.`
+        : `Bookmarked ${valid} for this session (storage unavailable).`;
+    };
+
+    const handleKeydown = event => {
       if (event.key === "Enter") {
         event.preventDefault();
         submitAddress();
       }
-    });
+    };
+
+    goButton.addEventListener("click", submitAddress);
+    bookmarkAddButton.addEventListener("click", handleAddBookmark);
+    input.addEventListener("keydown", handleKeydown);
     drawBookmarks();
+
+    return () => {
+      mounted = false;
+      goButton.removeEventListener("click", submitAddress);
+      bookmarkAddButton.removeEventListener("click", handleAddBookmark);
+      input.removeEventListener("keydown", handleKeydown);
+    };
   }
 
   window.NexusBrowser = Object.freeze({ validateExternalUrl, buildSearchUrl });

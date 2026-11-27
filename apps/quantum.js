@@ -201,7 +201,7 @@
           context.notify?.(`Completed ${lesson.title} (+${outcome.awardedXp} XP)`);
         }
       }
-      renderActiveView();
+      renderActiveView(lesson.id);
     }
 
     function renderLearnView() {
@@ -344,7 +344,7 @@
       body.append(grid);
     }
 
-    function renderGuideView() {
+    function renderGuideView(restoreFocus = false) {
       const intro = el("div", "quantum-section-intro");
       intro.append(
         el("h3", "", "Offline Lesson Guide"),
@@ -367,7 +367,7 @@
         event.preventDefault();
         lastGuideQuery = input.value;
         guideResult = content.queryGuide(lastGuideQuery, activeLessonId);
-        renderActiveView();
+        renderActiveView("guide-input");
       });
 
       const responseCard = el("div", "quantum-card quantum-guide-card");
@@ -381,6 +381,7 @@
       responseCard.append(el("p", "", guideResult.body));
 
       body.append(intro, form, responseCard);
+      if (restoreFocus && typeof input.focus === "function") input.focus();
     }
 
     function setView(viewId) {
@@ -393,22 +394,35 @@
       renderActiveView();
     }
 
-    function renderActiveView() {
+    function renderActiveView(focusTarget = null) {
       syncProgressHeader();
       body.replaceChildren();
       if (activeView === "lab") renderLabView();
       else if (activeView === "languages") renderLanguagesView();
       else if (activeView === "coding") renderCodingView();
-      else if (activeView === "guide") renderGuideView();
+      else if (activeView === "guide") renderGuideView(focusTarget === "guide-input");
       else renderLearnView();
+
+      if (focusTarget && focusTarget !== "guide-input") {
+        const targetCard = body.querySelector(`[data-lesson-id="${focusTarget}"]`);
+        const focusEl = targetCard?.querySelector("input, button");
+        if (typeof focusEl?.focus === "function") focusEl.focus();
+      }
     }
 
-    root.querySelectorAll("[data-quantum-view]").forEach(button => {
-      button.addEventListener("click", () => setView(button.dataset.quantumView));
+    const viewButtons = [...root.querySelectorAll("[data-quantum-view]")];
+    const viewHandlers = viewButtons.map(button => {
+      const handler = () => setView(button.dataset.quantumView);
+      button.addEventListener("click", handler);
+      return [button, handler];
     });
 
     loadSavedProgress();
     renderActiveView();
+
+    return () => {
+      viewHandlers.forEach(([button, handler]) => button.removeEventListener("click", handler));
+    };
   }
 
   window.NexusAppRegistry.register({ id: "quantum", name: "Quantum", render, mount });

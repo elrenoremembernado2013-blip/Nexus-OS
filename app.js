@@ -88,14 +88,17 @@
         request.onerror = () => reject(new Error("Could not read the saved wallpaper."));
         tx.oncomplete = () => db.close();
       });
-      if (blob && ["image/jpeg", "image/png", "image/webp"].includes(blob.type)) {
+      if (blob && (typeof Blob === "undefined" || blob instanceof Blob) &&
+          ["image/jpeg", "image/png", "image/webp"].includes(blob.type)) {
         setCustomDesktopWallpaper(URL.createObjectURL(blob), false);
-      } else if (!blob) {
+      } else {
         writeStorage("nexus-wallpaper", "alpine");
         setDesktopWallpaper("alpine", false);
       }
     } catch (error) {
       console.warn("NEXUS custom wallpaper restore:", error);
+      writeStorage("nexus-wallpaper", "alpine");
+      setDesktopWallpaper("alpine", false);
     }
   }
 
@@ -193,8 +196,16 @@
   });
 
   $("#clearNotifications").addEventListener("click", () => {
-    $("#notificationList").innerHTML =
-      '<div class="notification-empty"><p>You are all caught up.</p><small>Notifications will appear here.</small></div>';
+    const list = $("#notificationList");
+    list.replaceChildren();
+    const empty = document.createElement("div");
+    empty.className = "notification-empty";
+    const title = document.createElement("p");
+    title.textContent = "You're all caught up.";
+    const sub = document.createElement("small");
+    sub.textContent = "Notifications will appear here.";
+    empty.append(title, sub);
+    list.append(empty);
     notify("Notifications cleared");
   });
 
@@ -259,7 +270,13 @@
     button.querySelector("small").textContent = (enabled ? "On" : "Off") + " · preview";
     writeStorage("nexus-control-" + key, String(enabled));
     if (key === "power") desktop.classList.toggle("lightweight", enabled);
-    controlListeners.forEach(listener => listener({ ...controlState }));
+    controlListeners.forEach(listener => {
+      try {
+        listener({ ...controlState });
+      } catch (error) {
+        console.error("NEXUS control listener failed:", error);
+      }
+    });
   }
 
   function setControlPreference(key, enabled) {
@@ -389,6 +406,7 @@
       brightness.value = "100";
       updateBrightness();
     },
+    openApp: appId => openApp(appId),
     notify
   });
 
@@ -396,7 +414,16 @@
 
   function focusAppButton(appId) {
     const button = $(`.dock-app[data-app="${appId}"]`);
-    if (button) button.focus();
+    if (button) {
+      button.focus();
+      return;
+    }
+    const nextActive = window.NexusWindowManager.getActive();
+    if (nextActive) {
+      windowRecords.get(nextActive.id)?.contentEl.focus();
+      return;
+    }
+    $("#launcherButton")?.focus();
   }
 
   function syncDockIndicators() {
@@ -650,7 +677,45 @@
     }
 
     const record = createWindowElement(appId, appNames[appId]);
-    record.contentEl.innerHTML = app.render();
+    const renderErrorFallback = error => {
+      console.error(`NEXUS app failed (${appId}):`, error);
+      record.contentEl.replaceChildren();
+      const box = document.createElement("section");
+      box.className = "content-card";
+      const heading = document.createElement("h2");
+      heading.className = "content-title";
+      heading.textContent = `${appNames[appId]} encountered an error`;
+      const desc = document.createElement("p");
+      desc.className = "content-sub";
+      desc.textContent = error?.message
+        ? `This application could not finish loading: ${error.message}`
+        : "This application could not finish loading. Other NEXUS apps are unaffected.";
+      const actions = document.createElement("div");
+      actions.style.marginTop = "12px";
+      const closeFallback = document.createElement("button");
+      closeFallback.type = "button";
+      closeFallback.className = "action-button";
+      closeFallback.textContent = "Close window";
+      closeFallback.addEventListener("click", () => {
+        if (record.id) window.NexusWindowManager.close(record.id);
+      });
+      actions.append(closeFallback);
+      box.append(heading, desc, actions);
+      record.contentEl.append(box);
+      notify(`${appNames[appId]} failed to load`);
+    };
+
+    let html = "";
+    let renderFailed = null;
+    try {
+      html = app.render();
+    } catch (error) {
+      renderFailed = error;
+    }
+
+    if (!renderFailed) {
+      record.contentEl.innerHTML = html;
+    }
     windowLayer.append(record.el);
 
     const winId = window.NexusWindowManager.open(appId, appNames[appId], {
@@ -670,12 +735,20 @@
     record.el.setAttribute("aria-labelledby", titleId);
     windowRecords.set(winId, record);
 
-    window.NexusAppRegistry.mountApp(appId, record.contentEl, {
-      notify,
-      launchApp: openApp,
-      desktopShell: window.NexusDesktopShell,
-      windowId: winId
-    });
+    if (renderFailed) {
+      renderErrorFallback(renderFailed);
+    } else {
+      try {
+        window.NexusAppRegistry.mountApp(appId, record.contentEl, {
+          notify,
+          launchApp: openApp,
+          desktopShell: window.NexusDesktopShell,
+          windowId: winId
+        });
+      } catch (error) {
+        renderErrorFallback(error);
+      }
+    }
 
     syncWindowElements();
     record.contentEl.focus();
@@ -771,6 +844,26 @@
     window.NexusWindowManager.list().forEach(win => {
       if (!window.NexusApplicationCatalog.isTargetInstalled(win.appId)) {
         window.NexusWindowManager.close(win.id);
+      }
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    const maxW = Math.max(320, windowLayer.clientWidth || window.innerWidth || 0);
+    const maxH = Math.max(240, windowLayer.clientHeight || window.innerHeight || 0);
+    windowRecords.forEach(record => {
+      if (!record.el || record.el.classList.contains("maximized")) return;
+      const curLeft = parseFloat(record.el.style.left);
+      const curTop = parseFloat(record.el.style.top);
+      const curWidth = record.el.offsetWidth || parseFloat(record.el.style.width) || 320;
+      const curHeight = record.el.offsetHeight || parseFloat(record.el.style.height) || 240;
+      if (Number.isFinite(curLeft)) {
+        const clampedLeft = Math.max(8, Math.min(curLeft, Math.max(8, maxW - Math.min(curWidth, maxW) - 8)));
+        record.el.style.left = `${clampedLeft}px`;
+      }
+      if (Number.isFinite(curTop)) {
+        const clampedTop = Math.max(8, Math.min(curTop, Math.max(8, maxH - Math.min(curHeight, maxH) - 8)));
+        record.el.style.top = `${clampedTop}px`;
       }
     });
   });

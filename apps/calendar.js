@@ -75,7 +75,11 @@
         if (!Array.isArray(parsed) || parsed.some(event =>
           !event || typeof event.title !== "string" || !event.title.trim() || !parseDateKey(event.date)
         )) throw new Error("Saved events have an unsupported format.");
-        events = parsed;
+        events = parsed.map((event, index) => ({
+          id: typeof event.id === "string" && event.id ? event.id : `restored-${index}-${event.date}`,
+          date: event.date,
+          title: event.title
+        }));
       }
       status.textContent = "";
     } catch (error) {
@@ -89,7 +93,7 @@
     }
 
     function drawAgenda() {
-      const date = parseDateKey(selectedDate);
+      const date = parseDateKey(selectedDate) || now;
       const label = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
       agendaTitle.textContent = date.toLocaleDateString(undefined, { month: "long", day: "numeric" });
       selectedDateLabel.textContent = label;
@@ -176,15 +180,17 @@
       }
     }
 
-    root.querySelector("#calendarPrevious").addEventListener("click", () => {
+    const prevBtn = root.querySelector("#calendarPrevious");
+    const nextBtn = root.querySelector("#calendarNext");
+    const onPrev = () => {
       month = new Date(month.getFullYear(), month.getMonth() - 1, 1);
       drawMonth();
-    });
-    root.querySelector("#calendarNext").addEventListener("click", () => {
+    };
+    const onNext = () => {
       month = new Date(month.getFullYear(), month.getMonth() + 1, 1);
       drawMonth();
-    });
-    form.addEventListener("submit", event => {
+    };
+    const onSubmit = event => {
       event.preventDefault();
       const title = eventTitle.value.trim();
       if (!title) {
@@ -207,10 +213,19 @@
         status.textContent = `Could not save event: ${error.message}`;
         status.classList.add("error");
       }
-    });
+    };
+
+    prevBtn.addEventListener("click", onPrev);
+    nextBtn.addEventListener("click", onNext);
+    form.addEventListener("submit", onSubmit);
 
     drawMonth();
     drawAgenda();
+    return () => {
+      prevBtn.removeEventListener("click", onPrev);
+      nextBtn.removeEventListener("click", onNext);
+      form.removeEventListener("submit", onSubmit);
+    };
   }
 
   window.NexusAppRegistry.register({ id: "calendar", name: "Calendar", render, mount });

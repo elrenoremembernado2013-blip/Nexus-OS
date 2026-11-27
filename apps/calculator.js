@@ -3,7 +3,7 @@
     if (typeof input !== "string") throw new TypeError("Expression must be a string");
     const source = input.replace(/\s/g, "");
     if (!source || source.length > 120) throw new Error("Invalid expression length");
-    const tokens = source.match(/\d+(?:\.\d*)?|\.\d+|[()+\-*/]/g) || [];
+    const tokens = source.match(/\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?|[()+\-*/]/g) || [];
     if (tokens.length > 64 || tokens.join("") !== source) throw new Error("Invalid expression");
     let pos = 0;
 
@@ -18,7 +18,7 @@
         const value = primary();
         return t === "-" ? -value : value;
       }
-      if (!t || !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(t)) throw new Error("Expected number");
+      if (!t || !/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(t)) throw new Error("Expected number");
       const value = Number(t);
       if (!Number.isFinite(value)) throw new Error("Invalid number");
       return value;
@@ -98,20 +98,26 @@
       }
     }
 
-    root.querySelectorAll("[data-calc]").forEach(button => {
-      button.addEventListener("click", () => pressKey(button.dataset.calc));
+    const buttons = [...root.querySelectorAll("[data-calc]")];
+    const buttonHandlers = buttons.map(button => {
+      const handler = () => pressKey(button.dataset.calc);
+      button.addEventListener("click", handler);
+      return [button, handler];
     });
 
     const onKeyDown = event => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const key = event.key;
+      if (key === "Enter" && event.target && typeof event.target.matches === "function" && event.target.matches("[data-calc]")) {
+        return;
+      }
       if (/^[0-9.+\-*/()]$/.test(key)) {
         event.preventDefault();
         pressKey(key);
       } else if (key === "Enter" || key === "=") {
         event.preventDefault();
         pressKey("=");
-      } else if (key === "Escape") {
+      } else if (key === "Escape" || key === "c" || key === "C") {
         event.preventDefault();
         pressKey("C");
       } else if (key === "Backspace") {
@@ -120,7 +126,10 @@
       }
     };
     root.addEventListener("keydown", onKeyDown);
-    return () => root.removeEventListener("keydown", onKeyDown);
+    return () => {
+      root.removeEventListener("keydown", onKeyDown);
+      buttonHandlers.forEach(([button, handler]) => button.removeEventListener("click", handler));
+    };
   }
 
   window.NexusCalculator = Object.freeze({ evaluateExpression, formatResult });

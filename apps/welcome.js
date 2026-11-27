@@ -187,6 +187,7 @@
 
     const drawInstaller = () => {
       const pre = readPreflight();
+      if (pre.error) setStatus(pre.error, true);
       const hwCard = node("article", "content-card");
       hwCard.append(
         node("h3", "", "Linux Mint Ubiquity Installer & Hardware Check"),
@@ -248,7 +249,14 @@
 
     const draw = () => {
       panel.replaceChildren();
-      modeTabs.forEach(t => t.classList.toggle("active", t.dataset.welcomeMode === mode));
+      modeTabs.forEach(t => {
+        const selected = t.dataset.welcomeMode === mode;
+        t.classList.toggle("active", selected);
+        if (typeof t.setAttribute === "function") {
+          t.setAttribute("role", "tab");
+          t.setAttribute("aria-selected", String(selected));
+        }
+      });
       if (mode === "firstboot") drawFirstBoot();
       else drawInstaller();
     };

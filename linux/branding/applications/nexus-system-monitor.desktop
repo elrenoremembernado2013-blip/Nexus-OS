@@ -2,7 +2,7 @@
 Type=Application
 Name=NEXUS System Monitor
 Comment=Inspect live CPU, memory, storage, and process resource usage
-Exec=sh -c 'command -v gnome-system-monitor >/dev/null 2>&1 && exec gnome-system-monitor || command -v lxtask >/dev/null 2>&1 && exec lxtask || exec xfce4-taskmanager'
+Exec=sh -c 'command -v gnome-system-monitor >/dev/null 2>&1 && exec gnome-system-monitor || command -v qps >/dev/null 2>&1 && exec qps || command -v lxtask >/dev/null 2>&1 && exec lxtask || exec xfce4-taskmanager'
 Icon=utilities-system-monitor
 Terminal=false
 Categories=System;Monitor;

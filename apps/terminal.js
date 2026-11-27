@@ -45,11 +45,16 @@
       </section>`;
   }
 
+  const maxTerminalLines = 500;
+
   function appendLine(out, text, className) {
     const line = document.createElement("p");
     if (className) line.className = className;
     line.textContent = String(text ?? "");
     out.append(line);
+    while (out.childElementCount > maxTerminalLines && out.firstElementChild) {
+      out.firstElementChild.remove();
+    }
     out.scrollTop = out.scrollHeight;
   }
 
@@ -65,6 +70,14 @@
     const reportUnavailable = () => {
       appendLine(out, "Bash backend unavailable — command was not executed.", "terminal-warning");
       inp.value = "";
+    };
+
+    const setDisconnectedState = (message, modeText = "PREVIEW") => {
+      sessionId = null;
+      if (modeEl) modeEl.textContent = modeText;
+      if (statusEl) statusEl.textContent = "Native Bash backend: unavailable · Browser JavaScript cannot run Ubuntu commands.";
+      if (interruptBtn) interruptBtn.disabled = true;
+      if (message) appendLine(out, message, "terminal-warning");
     };
 
     const connectNativeSession = () => {
@@ -87,13 +100,13 @@
           },
         });
         sessionId = typeof opened === "string" ? opened : opened?.sessionId || null;
-        return Boolean(sessionId);
+        if (!sessionId) {
+          setDisconnectedState("Bash backend unavailable — native PTY session did not return a session ID.");
+          return false;
+        }
+        return true;
       } catch (err) {
-        if (modeEl) modeEl.textContent = "PREVIEW";
-        if (statusEl) statusEl.textContent = "Native Bash backend: unavailable · Browser JavaScript cannot run Ubuntu commands.";
-        if (interruptBtn) interruptBtn.disabled = true;
-        appendLine(out, err?.message || "Bash backend unavailable — command was not executed.", "terminal-warning");
-        sessionId = null;
+        setDisconnectedState(err?.message || "Bash backend unavailable — command was not executed.");
         return false;
       }
     };
@@ -110,6 +123,10 @@
       try {
         window.NexusNativeServices.call("terminal", "write", sessionId, `${value}\n`);
       } catch (err) {
+        if (err?.name === "NativeIntegrationUnavailableError") {
+          setDisconnectedState(err.message || "Native terminal session disconnected.", "CLOSED");
+          return;
+        }
         appendLine(out, err?.message || "Failed to write to native terminal session.", "terminal-warning");
       }
     };
@@ -119,6 +136,10 @@
       try {
         window.NexusNativeServices.call("terminal", "interrupt", sessionId);
       } catch (err) {
+        if (err?.name === "NativeIntegrationUnavailableError") {
+          setDisconnectedState(err.message || "Native terminal session disconnected.", "CLOSED");
+          return;
+        }
         appendLine(out, err?.message || "Failed to interrupt native terminal session.", "terminal-warning");
       }
     };

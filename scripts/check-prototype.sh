@@ -36,6 +36,7 @@ node scripts/check-personalisation.js
 node scripts/check-installer.js
 node scripts/check-system-monitor.js
 node scripts/check-terminal-preview.js
+node scripts/check-desktop-integration.js
 
 python3 - <<'PY'
 from pathlib import Path

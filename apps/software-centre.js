@@ -256,14 +256,16 @@
     function renderHome() {
       const wrapper = node("div", "store-page store-home");
       const featured = getApplication(featuredId);
-      addFeatureBanner(
-        wrapper,
-        featured,
-        "NEXUS ORIGINAL · BUNDLED APP",
-        "Make room for what matters.",
-        "NEXUS Calendar keeps your plans in a simple month view. Events stay in this browser; reminders and cloud sync are not connected.",
-        catalog.isInstalled(featured) ? "Open Calendar" : "Add to launcher"
-      );
+      if (featured) {
+        addFeatureBanner(
+          wrapper,
+          featured,
+          "NEXUS ORIGINAL · BUNDLED APP",
+          "Make room for what matters.",
+          "NEXUS Calendar keeps your plans in a simple month view. Events stay in this browser; reminders and cloud sync are not connected.",
+          catalog.isInstalled(featured) ? "Open Calendar" : "Add to launcher"
+        );
+      }
       const categories = node("div", "store-category-strip");
       ["Productivity", "Games", "Utilities", "Development", "Multimedia", "Personalization"].forEach(category => {
         const button = node("button", "store-category-chip", category);
@@ -485,7 +487,11 @@
       intro.append(node("h3", "", "Updates"), node("p", "", "Updates queried from the connected Linux Mint package service (APT / Flatpak)."));
       wrapper.append(intro);
       try {
-        const updates = window.NexusNativeServices.call("packages", "checkUpdates") || [];
+        const rawUpdates = window.NexusNativeServices.call("packages", "checkUpdates");
+        if (rawUpdates !== undefined && rawUpdates !== null && !Array.isArray(rawUpdates)) {
+          throw new Error("Native package service returned an unexpected updates format.");
+        }
+        const updates = (rawUpdates || []).filter(item => item && (item.id || item.name));
         if (!updates.length) {
           const empty = node("aside", "store-trust-note");
           empty.append(node("strong", "", "No pending updates reported."), node("p", "", "APT and Flatpak reported no upgradable packages."));
@@ -501,9 +507,13 @@
             );
             const btn = node("button", "action-button primary", "Update");
             btn.type = "button";
-            btn.dataset.storeAction = "native-install";
-            btn.dataset.pkgId = item.id;
-            btn.dataset.pkgSource = item.source || "apt";
+            if (item.id) {
+              btn.dataset.storeAction = "native-install";
+              btn.dataset.pkgId = item.id;
+              btn.dataset.pkgSource = item.source || "apt";
+            } else {
+              btn.disabled = true;
+            }
             row.append(copy, btn);
             list.append(row);
           });

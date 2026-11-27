@@ -2,7 +2,7 @@
 Type=Application
 Name=NEXUS Settings
 Comment=Configure Linux Mint display, network, sound, and desktop preferences
-Exec=sh -c 'command -v cinnamon-settings >/dev/null 2>&1 && exec cinnamon-settings || command -v xfce4-settings-manager >/dev/null 2>&1 && exec xfce4-settings-manager || exec obconf'
+Exec=sh -c 'command -v cinnamon-settings >/dev/null 2>&1 && exec cinnamon-settings || command -v xfce4-settings-manager >/dev/null 2>&1 && exec xfce4-settings-manager || command -v lxqt-config >/dev/null 2>&1 && exec lxqt-config || command -v obconf-qt >/dev/null 2>&1 && exec obconf-qt || exec obconf'
 Icon=preferences-system
 Terminal=false
 Categories=Settings;DesktopSettings;

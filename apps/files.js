@@ -130,6 +130,7 @@
 
       try {
         const file = await entryFile(entry);
+        if (request !== previewGeneration) return;
         if (file.size > maxPreviewBytes) {
           const note = document.createElement("p");
           note.className = "files-preview-empty";
@@ -160,6 +161,7 @@
         note.textContent = file.type || "Preview is not available for this file type.";
         preview.append(note);
       } catch (error) {
+        if (request !== previewGeneration) return;
         setStatus(`Could not preview this file: ${error.message}`, true);
       }
     }
@@ -425,7 +427,11 @@
 
     $("#filesNewFolder").addEventListener("click", async () => {
       const name = window.prompt("New folder name");
-      if (!validName(name)) return;
+      if (name === null) return;
+      if (!validName(name)) {
+        setStatus("Enter a valid folder name without / or \\ (cannot be . or ..).", true);
+        return;
+      }
       try {
         await ensureWritePermission();
         if (await existsIn(currentHandle, name.trim())) throw new Error(`“${name.trim()}” already exists here.`);
@@ -437,7 +443,11 @@
 
     $("#filesNewFile").addEventListener("click", async () => {
       const name = window.prompt("New text file name", "Untitled.txt");
-      if (!validName(name)) return;
+      if (name === null) return;
+      if (!validName(name)) {
+        setStatus("Enter a valid file name without / or \\ (cannot be . or ..).", true);
+        return;
+      }
       try {
         await ensureWritePermission();
         if (await existsIn(currentHandle, name.trim())) throw new Error(`“${name.trim()}” already exists here.`);
@@ -452,12 +462,24 @@
 
     $("#filesRename").addEventListener("click", async () => {
       if (!selectedEntry?.handle || typeof selectedEntry.handle.move !== "function") return;
-      const name = window.prompt("Rename to", selectedEntry.name);
-      if (!validName(name) || name.trim() === selectedEntry.name) return;
+      const entry = selectedEntry;
+      const name = window.prompt("Rename to", entry.name);
+      if (name === null) return;
+      if (!validName(name)) {
+        setStatus("Enter a valid name without / or \\ (cannot be . or ..).", true);
+        return;
+      }
+      if (name.trim() === entry.name) return;
       try {
         await ensureWritePermission();
         if (await existsIn(currentHandle, name.trim())) throw new Error(`“${name.trim()}” already exists here.`);
-        await selectedEntry.handle.move(name.trim());
+        await entry.handle.move(name.trim());
+        if (clipboard?.entry) {
+          const sameEntry = typeof clipboard.entry.handle?.isSameEntry === "function"
+            ? await clipboard.entry.handle.isSameEntry(entry.handle)
+            : clipboard.entry.handle === entry.handle;
+          if (sameEntry) clipboard = null;
+        }
         setStatus(`Renamed to “${name.trim()}”.`);
         await drawEntries();
       } catch (error) { reportError(error); }
@@ -543,6 +565,8 @@
     updateActions();
     clearPreview();
     return () => {
+      previewGeneration += 1;
+      listingGeneration += 1;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = null;
     };

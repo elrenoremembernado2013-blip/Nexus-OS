@@ -141,6 +141,7 @@
       openBtn.addEventListener("click", () => {
         try {
           window.NexusNativeServices.call(section.serviceId, "openControl", section.id);
+          note.textContent = "Opened native Linux Mint settings panel.";
         } catch (err) {
           note.textContent = err?.message || "Could not open native settings panel.";
         }
