@@ -37,6 +37,24 @@ assert.equal(registry.unmountRoot(rootB), false);
 assert.throws(() => registry.register({ id: "invalid id" }), /NEXUS app requires/);
 assert.throws(() => registry.register({ id: "lifecycle-test", name: "Duplicate", render() {}, mount() {} }), /already registered/);
 assert.equal(registry.mountApp("unknown-app", {}, {}), false);
+assert.throws(
+  () => registry.register({ id: "invalid-render", name: "Invalid render", render: "not-a-function", mount() {} }),
+  /NEXUS app requires/
+);
+assert.throws(
+  () => registry.register({ id: "invalid-mount", name: "Invalid mount", render() {}, mount: "not-a-function" }),
+  /NEXUS app requires/
+);
+
+// A broken Settings extension must not prevent later extensions from running.
+const enhancementCalls = [];
+registry.registerSettingsEnhancement(() => {
+  enhancementCalls.push("broken");
+  throw new Error("simulated Settings extension failure");
+});
+registry.registerSettingsEnhancement(root => enhancementCalls.push(root === rootA ? "healthy-A" : "healthy-other"));
+assert.doesNotThrow(() => registry.enhanceSettings(rootA));
+assert.deepEqual(enhancementCalls, ["broken", "healthy-A"]);
 // A failing cleanup must not prevent other app instances from being unmounted.
 const cleanupCalls = [];
 registry.register({
