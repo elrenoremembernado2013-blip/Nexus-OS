@@ -328,6 +328,17 @@ if sbdir.is_dir():
             "secure_boot_chain": hw.get("secure_boot_chain") or {},
             "efi_boot_ok": ic.get("efi_boot_ok"),
             "failed_systemd_units": ic.get("failed_systemd_units"),
+            "live_diag": {
+                "desktop_failed": live.get("desktop_failed"),
+                "install_reason": ir.get("reason"),
+                "install_rc": ir.get("returncode"),
+                "stderr_tail": (ir.get("stderr_tail") or [])[-5:],
+            } if not ir.get("install_success") else None,
+            "inst_diag": {
+                "desktop_failed": inst.get("desktop_failed"),
+                "vm_exited_cleanly": inst.get("vm_exited_cleanly"),
+                "cycles": len(inst.get("boot_cycles") or []),
+            } if not (ic.get("booted_from_vda") and ic.get("live_iso_absent")) else None,
         }
 
 out_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

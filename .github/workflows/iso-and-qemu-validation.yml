@@ -143,12 +143,22 @@ jobs:
                   "upload_iso": False,
               },
               {
+                  "job_slug": "cinnamon-2048",
+                  "edition": "cinnamon",
+                  "base_edition": "cinnamon",
+                  "mode": "matrix",
+                  "ram_matrix": "2048",
+                  "install_ram_matrix": "2048",
+                  "phase125_flags": "",
+                  "upload_iso": False,
+              },
+              {
                   "job_slug": "cinnamon",
                   "edition": "cinnamon",
                   "base_edition": "cinnamon",
                   "mode": "matrix",
-                  "ram_matrix": "2048 4096",
-                  "install_ram_matrix": "2048 4096",
+                  "ram_matrix": "4096",
+                  "install_ram_matrix": "4096",
                   "phase125_flags": "",
                   "upload_iso": True,
               },
@@ -157,7 +167,7 @@ jobs:
                   "edition": "xfce",
                   "base_edition": "xfce",
                   "mode": "matrix",
-                  "ram_matrix": "4096",
+                  "ram_matrix": "2048 4096",
                   "install_ram_matrix": "4096",
                   "phase125_flags": "",
                   "upload_iso": True,
@@ -294,6 +304,8 @@ jobs:
                   "b": b.get("boot_num"),
                   "vda": b.get("booted_from_vda"),
                   "no_iso": b.get("live_iso_absent"),
+                  "efi": b.get("efi_boot_ok"),
+                  "fw": ((b.get("installed_checks") or {}).get("hw_summary") or {}).get("firmware"),
                   "login": b.get("login_success"),
                   "desk": b.get("graphical_session_success"),
                   "wm_s": b.get("wm_ready_sec"),
@@ -303,6 +315,9 @@ jobs:
                   "net": (b.get("network") or {}).get("nmcli_state"),
                   "err": (b.get("installed_checks") or {}).get("journal_err_count"),
                   "fail_u": (b.get("installed_checks") or {}).get("failed_systemd_units"),
+                  "user_fail_u": (b.get("installed_checks") or {}).get("systemd_user_failed_units"),
+                  "fb_bin": (b.get("installed_checks") or {}).get("nexus_firstboot_bin"),
+                  "fb_auto": (b.get("installed_checks") or {}).get("nexus_firstboot_autostart"),
                   "idle_u": ((b.get("stages") or {}).get("3_idle") or {}).get("used_ram_mib"),
                   "close_u": ((b.get("stages") or {}).get("7_post_close") or {}).get("used_ram_mib"),
                   "shots": [(s.get("name"), s.get("non_black_pct")) for s in (b.get("screenshots") or [])],
@@ -329,6 +344,12 @@ jobs:
                   "boots": compact_boots,
               }
               print(f"::notice title=NEXUS-124-{slug}-{r.get('ram_mib')}M::" + json.dumps(summary, separators=(",", ":")))
+              svc_payload = {
+                  "ram": r.get("ram_mib"),
+                  "live": l0.get("native_services"),
+                  "installed": [b.get("native_services") for b in iboot],
+              }
+              print(f"::notice title=NEXUS-16-SVC-{slug}-{r.get('ram_mib')}M::" + json.dumps(svc_payload, separators=(",", ":")))
           bad = [
               r.get("ram_mib") for r in data["runs"]
               if r.get("install_attempts", 0) > 0 and (

@@ -10,9 +10,12 @@ import pwd
 import secrets
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 
 VSERIAL_PATH = "/dev/virtio-ports/org.nexus.test.0"
 PROBE_SH = "/usr/local/libexec/nexus-test/guest-mem-probe.sh"
@@ -179,6 +182,281 @@ def run_probe(stage):
     if res.returncode == 0 and res.stdout.strip():
         return json.loads(res.stdout)
     return {"stage": stage, "error": res.stderr.strip()}
+
+
+def user_systemd_env(sess):
+    env = x_env(sess)
+    uid = sess["uid"]
+    rt = f"/run/user/{uid}"
+    env["HOME"] = sess["home"]
+    env["USER"] = sess["user"]
+    env["LOGNAME"] = sess["user"]
+    env["XDG_RUNTIME_DIR"] = rt
+    if not env.get("DBUS_SESSION_BUS_ADDRESS"):
+        env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={rt}/bus"
+    return env
+
+
+def run_as_user_capture(sess, cmd_list, timeout=15):
+    def preexec():
+        pw = pwd.getpwuid(sess["uid"])
+        os.setgid(pw.pw_gid)
+        os.setuid(pw.pw_uid)
+
+    return subprocess.run(
+        cmd_list,
+        env=user_systemd_env(sess),
+        preexec_fn=preexec,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def http_json(url, method="GET", token=None, body=None, timeout=10):
+    headers = {}
+    if token is not None:
+        headers["X-Nexus-Token"] = token
+    data = None
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            return resp.status, json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as err:
+        raw = err.read().decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            parsed = {"raw": raw}
+        return err.code, parsed
+    except Exception as exc:
+        return 0, {"error": str(exc)}
+
+
+def check_port_loopback_only(port):
+    hex_port = f"{int(port):04X}"
+    loopback_found = False
+    wildcard_found = False
+    for proc_file, is_v6 in (("/proc/net/tcp", False), ("/proc/net/tcp6", True)):
+        p = Path(proc_file)
+        if not p.is_file():
+            continue
+        for line in p.read_text(encoding="utf-8", errors="replace").splitlines()[1:]:
+            cols = line.split()
+            if len(cols) < 4:
+                continue
+            local_addr = cols[1]
+            st = cols[3]
+            if st != "0A" or ":" not in local_addr:
+                continue
+            addr_hex, port_hex = local_addr.split(":", 1)
+            if port_hex.upper() != hex_port:
+                continue
+            if not is_v6 and addr_hex.upper() == "0100007F":
+                loopback_found = True
+            elif is_v6 and addr_hex.upper() == "00000000000000000000000001000000":
+                loopback_found = True
+            else:
+                wildcard_found = True
+    return loopback_found and not wildcard_found, loopback_found, wildcard_found
+
+
+def check_native_services(sess, edition):
+    uid = sess["uid"]
+    svc_result = {
+        "unit_file_present": Path("/etc/systemd/user/nexus-system-bridge.service").is_file(),
+        "bridge_bin_present": bool(shutil.which("nexus-system-bridge")),
+        "service_state": "unknown",
+        "bridge_service_active": False,
+        "runtime_file_exists": False,
+        "runtime_file_mode": None,
+        "runtime_file_0600": False,
+        "runtime_url_loopback": False,
+        "loopback_only": False,
+        "unauth_rejected_401": False,
+        "pty_bash_ok": False,
+        "telemetry_ok": False,
+        "settings_tools_ok": False,
+        "settings_launch_ok": False,
+        "missing_app_error_ok": False,
+        "store_sources_ok": False,
+        "gaming_status_ok": False,
+        "security_status_ok": False,
+    }
+
+    # 1. Wait up to 16s for systemd --user nexus-system-bridge.service activation
+    rt_path = Path(f"/run/user/{uid}/nexus-os/system-bridge.json")
+    for _ in range(16):
+        try:
+            st_res = run_as_user_capture(sess, ["systemctl", "--user", "is-active", "nexus-system-bridge.service"], timeout=5)
+            svc_result["service_state"] = st_res.stdout.strip() or st_res.stderr.strip() or f"rc={st_res.returncode}"
+            if st_res.returncode == 0 and svc_result["service_state"] == "active" and rt_path.is_file():
+                break
+        except Exception as exc:
+            svc_result["service_state"] = f"err:{exc}"
+        time.sleep(1)
+    svc_result["bridge_service_active"] = svc_result["service_state"] == "active"
+    if not svc_result["bridge_service_active"]:
+        try:
+            jres = run_as_user_capture(sess, ["journalctl", "--user", "-u", "nexus-system-bridge.service", "-n", "15", "--no-pager"], timeout=5)
+            svc_result["bridge_journal_tail"] = (jres.stdout or jres.stderr).splitlines()[-10:]
+        except Exception:
+            pass
+
+    # 2. Runtime token file permissions (0600, owned by user) & loopback URL
+    bridge_url = None
+    bridge_token = None
+    if rt_path.is_file():
+        svc_result["runtime_file_exists"] = True
+        try:
+            st = rt_path.stat()
+            mode = stat.S_IMODE(st.st_mode)
+            svc_result["runtime_file_mode"] = oct(mode)
+            svc_result["runtime_file_owner_ok"] = st.st_uid == uid
+            svc_result["runtime_file_0600"] = (mode == 0o600 and st.st_uid == uid)
+            rt_data = json.loads(rt_path.read_text(encoding="utf-8"))
+            bridge_url = str(rt_data.get("url") or "")
+            bridge_token = str(rt_data.get("token") or "")
+            svc_result["runtime_url_loopback"] = bridge_url.startswith("http://127.0.0.1:")
+            svc_result["token_present"] = bool(bridge_token)
+            svc_result["bridge_pid"] = rt_data.get("pid")
+        except Exception as exc:
+            svc_result["runtime_error"] = str(exc)
+
+    # 3. Loopback-only socket + unauthorized rejection (401)
+    if bridge_url and bridge_token and svc_result["runtime_url_loopback"]:
+        try:
+            port = int(bridge_url.rsplit(":", 1)[1].split("/", 1)[0])
+            lb_only, lb_found, wild_found = check_port_loopback_only(port)
+            svc_result["loopback_only"] = lb_only
+            svc_result["loopback_socket_found"] = lb_found
+            svc_result["wildcard_socket_found"] = wild_found
+        except Exception as exc:
+            svc_result["socket_error"] = str(exc)
+
+        code_unauth, _ = http_json(f"{bridge_url}/api/telemetry", method="GET", token=None)
+        svc_result["unauth_status_code"] = code_unauth
+        svc_result["unauth_rejected_401"] = code_unauth == 401
+
+        # 4. Real GNU Bash PTY Terminal
+        c_open, r_open = http_json(f"{bridge_url}/api/terminal/open", method="POST", token=bridge_token, body={"cols": 100, "rows": 30})
+        sid = r_open.get("sessionId") if c_open == 200 else None
+        if sid:
+            try:
+                http_json(
+                    f"{bridge_url}/api/terminal/write",
+                    method="POST",
+                    token=bridge_token,
+                    body={"sessionId": sid, "data": 'printf "NEXUS_PTY_OK:%s\\n" "$BASH_VERSION"\n'},
+                )
+                out_acc = ""
+                deadline = time.time() + 6.0
+                while time.time() < deadline:
+                    c_rd, r_rd = http_json(f"{bridge_url}/api/terminal/read?sessionId={sid}", method="GET", token=bridge_token)
+                    if c_rd == 200:
+                        out_acc += str(r_rd.get("output") or "")
+                        if "NEXUS_PTY_OK:" in out_acc:
+                            break
+                    time.sleep(0.2)
+                for line in out_acc.splitlines():
+                    if "NEXUS_PTY_OK:" in line:
+                        svc_result["pty_bash_sample"] = line.strip()[:80]
+                        break
+                svc_result["pty_bash_ok"] = "NEXUS_PTY_OK:" in out_acc
+            finally:
+                http_json(f"{bridge_url}/api/terminal/close", method="POST", token=bridge_token, body={"sessionId": sid})
+
+        # 5. System Monitor /proc + /sys telemetry
+        c_tel, r_tel = http_json(f"{bridge_url}/api/telemetry", method="GET", token=bridge_token)
+        if c_tel == 200 and isinstance(r_tel, dict):
+            mem = r_tel.get("memory") or {}
+            procs_tel = r_tel.get("processes") or []
+            svc_result["telemetry_ok"] = bool(
+                (mem.get("totalBytes") or 0) > 0
+                and (mem.get("usedBytes") or 0) > 0
+                and len(procs_tel) > 0
+                and r_tel.get("telemetrySource")
+            )
+            svc_result["telemetry_summary"] = {
+                "cpu_pct": (r_tel.get("cpu") or {}).get("usagePercent"),
+                "mem_total_mib": round((mem.get("totalBytes") or 0) / (1024 * 1024), 1),
+                "mem_used_mib": round((mem.get("usedBytes") or 0) / (1024 * 1024), 1),
+                "proc_count": len(procs_tel),
+            }
+
+        # 6. Native Settings tools + real GUI launch
+        c_tools, r_tools = http_json(f"{bridge_url}/api/tools", method="GET", token=bridge_token)
+        if c_tools == 200 and isinstance(r_tools, dict):
+            svc_result["tools_detected"] = {k: (v.get("command") if v.get("available") else None) for k, v in r_tools.items()}
+            svc_result["settings_tools_ok"] = bool(
+                r_tools.get("files", {}).get("available")
+                and r_tools.get("terminal", {}).get("available")
+                and r_tools.get("monitor", {}).get("available")
+            )
+            launch_cat = next((c for c in ("display", "network", "power", "files", "terminal") if r_tools.get(c, {}).get("available")), None)
+            if launch_cat:
+                c_l, r_l = http_json(f"{bridge_url}/api/tools/launch", method="POST", token=bridge_token, body={"category": launch_cat})
+                svc_result["settings_launch_category"] = launch_cat
+                svc_result["settings_launch_cmd"] = r_l.get("command")
+                svc_result["settings_launch_ok"] = (c_l == 200 and r_l.get("ok") is True)
+                if not svc_result["settings_launch_ok"]:
+                    svc_result["settings_launch_msg"] = r_l.get("message")
+                else:
+                    time.sleep(1.0)
+                    cmd_name = str(r_l.get("command") or "")
+                    if cmd_name:
+                        subprocess.run(["pkill", "-u", str(uid), "-n", cmd_name], capture_output=True)
+
+            # 7. Useful missing-app error reporting (unknown category + uninstalled allowlisted category)
+            c_unk, r_unk = http_json(f"{bridge_url}/api/tools/launch", method="POST", token=bridge_token, body={"category": "nonexistent-tool"})
+            unk_ok = (c_unk == 400 and r_unk.get("ok") is False and "Unknown tool category" in str(r_unk.get("message", "")))
+            missing_cat = next((k for k, v in r_tools.items() if not v.get("available")), None)
+            miss_ok = True
+            if missing_cat:
+                c_m, r_m = http_json(f"{bridge_url}/api/tools/launch", method="POST", token=bridge_token, body={"category": missing_cat})
+                miss_ok = (c_m == 400 and r_m.get("ok") is False and len(str(r_m.get("message", ""))) > 10)
+                svc_result["missing_app_sample"] = {"category": missing_cat, "code": c_m, "message": r_m.get("message")}
+            svc_result["missing_app_error_ok"] = bool(unk_ok and miss_ok)
+
+        # 8. Gaming Hub capabilities (read-only, never installs gaming clients)
+        c_gam, r_gam = http_json(f"{bridge_url}/api/gaming/status", method="GET", token=bridge_token, timeout=15)
+        if c_gam == 200 and isinstance(r_gam, dict):
+            svc_result["gaming_status_ok"] = bool("steam" in r_gam and "graphics" in r_gam and "capabilities" in r_gam)
+            svc_result["gaming_summary"] = {
+                "steam_installed": (r_gam.get("steam") or {}).get("installed"),
+                "vulkan": (r_gam.get("graphics") or {}).get("vulkan"),
+                "gaming_mode": r_gam.get("gamingMode"),
+                "apt_avail": (r_gam.get("capabilities") or {}).get("apt_available"),
+            }
+
+        # 9. Security & Privacy actual status (read-only, never modifies firewall)
+        c_sec, r_sec = http_json(f"{bridge_url}/api/security/status", method="GET", token=bridge_token, timeout=15)
+        if c_sec == 200 and isinstance(r_sec, dict):
+            svc_result["security_status_ok"] = bool("firewall" in r_sec and "secureBoot" in r_sec and "diskEncryption" in r_sec)
+            svc_result["security_summary"] = {
+                "firewall": r_sec.get("firewall"),
+                "secure_boot": r_sec.get("secureBoot"),
+                "disk_encryption": r_sec.get("diskEncryption"),
+                "user": r_sec.get("user"),
+            }
+
+    # 10. Store APT / Flatpak availability (read-only)
+    store_bin = shutil.which("nexus-store-cli")
+    if store_bin:
+        try:
+            sres = run_as_user_capture(sess, [store_bin, "sources"], timeout=10)
+            if sres.returncode == 0 and sres.stdout.strip():
+                sdata = json.loads(sres.stdout)
+                svc_result["store_sources"] = sdata
+                svc_result["store_sources_ok"] = bool(sdata.get("apt") is True and "flatpak" in sdata)
+        except Exception as exc:
+            svc_result["store_error"] = str(exc)
+
+    return svc_result
 
 
 def read_proc_names():
@@ -826,6 +1104,13 @@ def main():
         except Exception as exc:
             recovery_diag = {"error": str(exc)}
 
+    native_services = {}
+    if not browser_bench:
+        try:
+            native_services = check_native_services(sess, edition)
+        except Exception as exc:
+            native_services = {"error": str(exc)}
+
     # Live-mode Ubiquity UI check (launch + multi-screen navigation) & actual disk installation
     ubiquity_ui = {
         "checked": False,
@@ -944,6 +1229,7 @@ def main():
                 "ubiquity_ui": ubiquity_ui,
                 "hw_summary": hw_summary,
                 "sec_summary": sec_summary,
+                "native_services": native_services,
                 "lsblk_vda_present": '"vda"' in lsblk_out,
             })
             install_report = perform_install_and_stage_test_agent(
@@ -981,6 +1267,12 @@ def main():
                     dualboot_os_part_preserved = (wmnt / "dualboot-ntfs-marker.txt").is_file() and (wmnt / "Windows/System32/winload.efi").is_file()
                     subprocess.run(["umount", str(wmnt)], capture_output=True)
                     break
+        user_failed_units = []
+        try:
+            uf = run_as_user_capture(sess, ["systemctl", "--user", "--failed", "--no-legend"], timeout=5)
+            user_failed_units = [ln.strip() for ln in uf.stdout.splitlines() if ln.strip()]
+        except Exception:
+            pass
         installed_checks = {
             "root_source": root_src,
             "booted_from_vda": root_src.startswith("/dev/vda") or luks_active,
@@ -995,9 +1287,13 @@ def main():
             "grub_cfg_ok": Path("/boot/grub/grub.cfg").is_file(),
             "installed_meta_ok": Path("/etc/nexus-installed.json").is_file(),
             "mint_user_absent": not Path("/home/mint").exists(),
+            "nexus_firstboot_bin": bool(shutil.which("nexus-firstboot")),
+            "nexus_firstboot_autostart": Path("/etc/xdg/autostart/nexus-firstboot.desktop").is_file(),
             "hw_summary": hw_summary,
             "sec_summary": sec_summary,
             "failed_systemd_units": len(failed_units),
+            "systemd_user_failed_units": len(user_failed_units),
+            "systemd_user_failed_sample": user_failed_units[:5],
             "journal_err_count": len(err_lines),
             "journal_err_sample": err_lines[:8],
         }
@@ -1049,6 +1345,7 @@ def main():
         "sec_summary": sec_summary,
         "update_status": update_status,
         "recovery_diag": recovery_diag,
+        "native_services": native_services,
         "lsblk_vda_present": '"vda"' in lsblk_out,
     })
 

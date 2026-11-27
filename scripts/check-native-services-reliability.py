@@ -497,6 +497,31 @@ def test_phase15_four_edition_service_parity(bridge) -> None:
         )
         assert "NEXUS First-Boot:" in fb.stdout
 
+    # 7. _resolve_display_env recovers WAYLAND_DISPLAY from user runtime socket when systemd --user starts early
+    import socket as _sock
+    with tempfile.TemporaryDirectory() as rt_tmp:
+        rt = Path(rt_tmp)
+        wsock = rt / "wayland-0"
+        srv = _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM)
+        try:
+            srv.bind(str(wsock))
+            saved_env = {k: os.environ.get(k) for k in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "PATH")}
+            try:
+                os.environ.pop("DISPLAY", None)
+                os.environ.pop("WAYLAND_DISPLAY", None)
+                os.environ["XDG_RUNTIME_DIR"] = str(rt)
+                os.environ["PATH"] = str(rt)  # hide systemctl so socket fallback is exercised cleanly
+                resolved = bridge._resolve_display_env()
+                assert resolved is not None and resolved.get("WAYLAND_DISPLAY") == "wayland-0", resolved
+            finally:
+                for k, v in saved_env.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+        finally:
+            srv.close()
+
     print("PASS Phase 15 4-edition bridge packaging, systemd unit, runtime token, Gaming Hub, and tool parity tests")
 
 

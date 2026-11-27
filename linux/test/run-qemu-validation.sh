@@ -470,6 +470,7 @@ for rep_file in sorted(live_runs_dir.glob("rep-*/live-result.json")):
         "zram_pressure": zp,
         "hw_summary": gr.get("hw_summary"),
         "sec_summary": gr.get("sec_summary"),
+        "native_services": gr.get("native_services"),
         "screenshots": ld.get("screenshots", []),
         "desktop_failed": ld.get("desktop_failed"),
     })
@@ -505,6 +506,7 @@ for src_name, src_path in (("warm_cycle", inst_warm_json), ("cold_boot", inst_co
             "stages": stages,
             "zram_pressure": zp,
             "installed_checks": ic,
+            "native_services": gr.get("native_services"),
             "screenshots": cyc.get("screenshots", []),
         })
 
@@ -556,6 +558,7 @@ entry = {
         "apps_ok": first_live.get("application_test_success"),
         "hw_summary": first_live.get("hw_summary"),
         "sec_summary": first_live.get("sec_summary"),
+        "native_services": first_live.get("native_services"),
     },
 }
 

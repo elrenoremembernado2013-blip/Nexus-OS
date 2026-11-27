@@ -24,6 +24,7 @@ import secrets
 import select
 import shutil
 import signal
+import stat
 import struct
 import subprocess
 import sys
@@ -411,20 +412,84 @@ def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
     return cmd
 
 
+def _resolve_display_env() -> dict[str, str] | None:
+    env = dict(os.environ)
+    if env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"):
+        return env
+
+    xdg_runtime = env.get("XDG_RUNTIME_DIR", "").strip()
+    if xdg_runtime and shutil.which("systemctl"):
+        try:
+            proc = subprocess.run(
+                ["systemctl", "--user", "show-environment"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+            )
+            if proc.returncode == 0:
+                for line in proc.stdout.splitlines():
+                    if line.startswith(("DISPLAY=", "WAYLAND_DISPLAY=", "XAUTHORITY=")):
+                        key, val = line.split("=", 1)
+                        if val:
+                            env[key] = val
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    if env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"):
+        return env
+
+    uid = os.geteuid()
+    if xdg_runtime:
+        rt_dir = Path(xdg_runtime)
+        try:
+            if rt_dir.is_dir() and rt_dir.stat().st_uid == uid:
+                for sock in sorted(rt_dir.glob("wayland-*")):
+                    try:
+                        if stat.S_ISSOCK(sock.stat().st_mode):
+                            env["WAYLAND_DISPLAY"] = sock.name
+                            return env
+                    except OSError:
+                        continue
+        except OSError:
+            pass
+
+    x11_sock_dir = Path("/tmp/.X11-unix")
+    xauth = Path.home() / ".Xauthority"
+    if x11_sock_dir.is_dir() and xauth.is_file():
+        try:
+            if xauth.stat().st_uid == uid:
+                for sock in sorted(x11_sock_dir.glob("X*")):
+                    suffix = sock.name[1:]
+                    if not suffix.isdigit():
+                        continue
+                    try:
+                        if stat.S_ISSOCK(sock.stat().st_mode):
+                            env["DISPLAY"] = f":{suffix}"
+                            env.setdefault("XAUTHORITY", str(xauth))
+                            return env
+                    except OSError:
+                        continue
+        except OSError:
+            pass
+
+    return None
+
+
 def launch_allowlisted_tool(category: str) -> dict[str, object]:
     candidates = ALLOWLISTED_TOOLS.get(category)
     if not candidates:
         return {"ok": False, "message": f"Unknown tool category: {category}"}
     for cmd in candidates:
         if shutil.which(cmd[0]):
-            if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+            launch_env = _resolve_display_env()
+            if launch_env is None:
                 return {
                     "ok": False,
                     "command": cmd[0],
                     "message": f"Cannot launch {cmd[0]}: no active X11 or Wayland display session.",
                 }
             try:
-                subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(cmd, env=launch_env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return {"ok": True, "command": cmd[0], "message": f"Launched {cmd[0]}"}
             except OSError as err:
                 return {"ok": False, "command": cmd[0], "message": f"Failed to launch {cmd[0]}: {err}"}
