@@ -20,7 +20,7 @@ Reports whether this host has the Linux ISO remastering tools, verified base
 Linux Mint 22.3 ISO, and free disk space needed by build-nexus-iso.sh.
 
 Options:
-  --edition NAME  xfce | cinnamon | lite (default: xfce)
+  --edition NAME  xfce | cinnamon | lite | lite-lxqt (default: xfce)
   --strict        Exit non-zero if any ISO build prerequisite is missing
   --help, -h      Show this help message
 USAGE

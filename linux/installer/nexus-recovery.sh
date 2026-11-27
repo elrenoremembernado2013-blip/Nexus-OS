@@ -59,8 +59,15 @@ done
 print_guide() {
   local topic="$1"
   case "$topic" in
-    all|backup)
-      cat <<'TXT'
+    all|backup|grub|fsck|luks|packages|dualboot) ;;
+    *)
+      printf 'Unknown guide topic: %s (expected all | backup | grub | fsck | luks | packages | dualboot)\n' "$topic" >&2
+      exit 2
+      ;;
+  esac
+
+  if [[ "$topic" == "all" || "$topic" == "backup" ]]; then
+    cat <<'TXT'
 [1] SAFE BACKUP FIRST (DO THIS BEFORE ANY REPAIR)
   - Never run destructive partition tools before copying personal files off the drive.
   - Boot a NEXUS OS live USB/ISO and mount your partition READ-ONLY first:
@@ -72,10 +79,10 @@ print_guide() {
       sudo mount -o ro /dev/mapper/nexus_ro /mnt/backup-ro
   - Copy /mnt/backup-ro/home/<user>/ to an external USB drive before making any changes.
 TXT
-      [[ "$topic" == "backup" ]] && return 0
-      ;&
-    grub)
-      cat <<'TXT'
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "grub" ]]; then
+    cat <<'TXT'
 
 [2] BOOTLOADER & UEFI GRUB RECOVERY (FROM LIVE SESSION)
   - Confirm the live session is booted in UEFI mode (ls /sys/firmware/efi).
@@ -90,10 +97,10 @@ TXT
   - If Secure Boot is enabled, verify /boot/efi/EFI/ubuntu/{shimx64.efi,grubx64.efi,grub.cfg}
     and /boot/efi/EFI/BOOT/BOOTX64.EFI exist.
 TXT
-      [[ "$topic" == "grub" ]] && return 0
-      ;&
-    fsck)
-      cat <<'TXT'
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "fsck" ]]; then
+    cat <<'TXT'
 
 [3] FILESYSTEM CHECKING GUIDANCE (NEVER RUN WRITE-MODE FSCK ON A MOUNTED DISK)
   - Step A: Run a strictly read-only check first (safe to inspect errors without writing):
@@ -103,10 +110,10 @@ TXT
       sudo e2fsck -f -p /dev/sdXY    # for ext4 root or /boot
       sudo dosfsck -v /dev/sdX1      # for FAT32 EFI System Partition
 TXT
-      [[ "$topic" == "fsck" ]] && return 0
-      ;&
-    luks)
-      cat <<'TXT'
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "luks" ]]; then
+    cat <<'TXT'
 
 [4] LUKS2 ENCRYPTED SYSTEM RECOVERY
   - Check LUKS2 header & active key slots (never exposes passphrases):
@@ -119,10 +126,10 @@ TXT
   - Back up your LUKS2 header offline after recovery:
       sudo cryptsetup luksHeaderBackup /dev/sdX3 --header-backup-file nexus-luks-header.img
 TXT
-      [[ "$topic" == "luks" ]] && return 0
-      ;&
-    packages)
-      cat <<'TXT'
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "packages" ]]; then
+    cat <<'TXT'
 
 [5] BROKEN PACKAGE / INTERRUPTED UPDATE REPAIR (INSTALLED SYSTEM OR CHROOT)
   - Complete half-configured packages first:
@@ -132,10 +139,10 @@ TXT
       sudo apt-get install -f
       sudo apt-get check
 TXT
-      [[ "$topic" == "packages" ]] && return 0
-      ;&
-    dualboot)
-      cat <<'TXT'
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "dualboot" ]]; then
+    cat <<'TXT'
 
 [6] DUAL-BOOT PRESERVATION & RECOVERY
   - Never format an existing EFI System Partition shared with Windows or another OS.
@@ -145,12 +152,7 @@ TXT
   - If an OS entry is missing from GRUB after install, ensure `GRUB_DISABLE_OS_PROBER=false` in
     `/etc/default/grub` and run `sudo update-grub`.
 TXT
-      ;;
-    *)
-      printf 'Unknown guide topic: %s (expected all | backup | grub | fsck | luks | packages | dualboot)\n' "$topic" >&2
-      exit 2
-      ;;
-  esac
+  fi
 }
 
 if [[ "$MODE" == "guide" ]]; then

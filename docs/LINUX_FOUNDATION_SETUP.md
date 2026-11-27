@@ -57,13 +57,19 @@ The Ubuntu media script remains available for an explicit Ubuntu alternative, bu
 ## Create and launch the QEMU VM
 
 ```sh
-bash scripts/launch-qemu.sh
+bash scripts/launch-qemu.sh --profile minimum --edition lite-lxqt
+# or recommended profile (4 vCPUs, 8192 MiB RAM, 50G disposable disk):
+bash scripts/launch-qemu.sh --profile recommended --edition xfce
+# after installation, boot directly from the installed disk without ISO media:
+bash scripts/launch-qemu.sh --profile minimum --edition lite-lxqt --disk-only
 ```
 
-To inspect the profile without creating a disk, locating firmware, or starting a VM:
+To inspect any profile without creating a disk, locating firmware, or starting a VM:
 
 ```sh
 bash scripts/launch-qemu.sh --dry-run
+bash scripts/launch-qemu.sh --profile minimum --edition lite-lxqt --dry-run
+bash scripts/launch-qemu.sh --profile recommended --edition xfce --dry-run
 ```
 
 The default 4 GiB guest RAM and 40 GiB virtual disk are for a VM on the development host. They are not a profile for running QEMU on the Chromebook's 4 GB/32 GB hardware. A sparse 40 GiB virtual disk also does not mean the Chromebook has 40 GiB available.

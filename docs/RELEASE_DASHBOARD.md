@@ -1,6 +1,7 @@
-# NEXUS OS Release Readiness Dashboard (Phase 13.1)
+# NEXUS OS Release Readiness Dashboard (Phase 13.2)
 
-**Current Release Stage:** `Development` / `Alpha` (Phase 13.0 QEMU/OVMF baseline `45919673389` passed **12/12 jobs** across all 4 edition ISOs, RAM matrices, LUKS2 cold-boot unlock, simulated dual-boot `--keep-efi` + NTFS preservation, and enforced OVMF Secure Boot; Phase 13.1 adds hardened preflight structured warnings, `nexus-lite-install` cross-edition fix, `nexus-disk-install` failure/partition guards, `nexus-recovery` tool + `RECOVERY_AND_BOOT.md`, QMP Ubiquity screen-navigation automation, and `test-installer-safety.sh`).
+**Current Release Stage:** `Development` / `Alpha` (Phase 13.0 QEMU/OVMF baseline `45919673389` passed **12/12 jobs** across all 4 edition ISOs, RAM matrices, LUKS2 cold-boot unlock, simulated dual-boot `--keep-efi` + NTFS preservation, and enforced OVMF Secure Boot; Phase 13.1/13.2 add hardened preflight structured warnings, `nexus-lite-install` cross-edition fix, `nexus-disk-install` locale/keymap/timezone/stage-progress/partition guards, `nexus-recovery` + `RECOVERY_AND_BOOT.md`, reproducible `minimum`/`recommended` QEMU profiles, `test-installer-safety.sh`, and `run-virtual-qualification.sh`).
+**Note on CI Run `45975265101` (`cffc55f`):** Failed in Step 5 (`Validate scripts`) due to `SC2319` (`if ! pkexec ...; then rc=$?`) in `nexus-installer-launcher.sh`, fixed in Phase 13.2.
 **Stable Release Decision:** **HOLD — Not eligible for `Beta` or `Stable`.** QEMU/OVMF passes do not substitute for physical bare-metal hardware qualification (Intel/AMD/NVIDIA GPUs, Wi-Fi/Bluetooth, SOF audio, touchpads, battery/suspend, physical NVMe/eMMC, physical-GPU browser runs, full interactive Ubiquity GUI installation, and physical OEM Secure Boot all remain **`NOT TESTED`** on physical computers).
 
 ## Edition Maturity Classification Matrix

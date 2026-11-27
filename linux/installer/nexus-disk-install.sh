@@ -18,7 +18,12 @@ PASSWORD_FILE=""
 AUTOLOGIN=false
 YES_ERASE=false
 DRY_RUN=false
+VALIDATE_ONLY=false
 EDITION_OVERRIDE=""
+LOCALE_NEW="en_US.UTF-8"
+KEYMAP_NEW="us"
+TIMEZONE_NEW="UTC"
+STATUS_FILE=""
 LOG_FILE="/var/log/nexus-install.log"
 CRYPT_NAME="nexus_crypt"
 
@@ -28,7 +33,8 @@ Usage: sudo bash linux/installer/nexus-disk-install.sh --disk /dev/sdX [OPTIONS]
 
 Installs the booted NEXUS OS live filesystem onto a target block device with
 UEFI FAT32 ESP + ext4 root (or LUKS2 encrypted root with separate /boot),
-UUID /etc/fstab, initramfs regeneration, and UEFI GRUB bootloader.
+locale/keyboard/timezone configuration, UUID /etc/fstab, initramfs
+regeneration, and UEFI GRUB bootloader.
 
 Options:
   --disk DEV                    Target block device (e.g. /dev/vda) [required]
@@ -39,10 +45,15 @@ Options:
   --luks-passphrase-file PATH   File containing LUKS passphrase (read & removed by caller, never logged)
   --hostname NAME               Installed system hostname (default: nexus-os)
   --user NAME                   Primary sudo user to create (default: nexus)
+  --locale CODE                 System locale (default: en_US.UTF-8)
+  --keymap LAYOUT               Console/X11 keyboard layout (default: us)
+  --timezone ZONE               IANA timezone (default: UTC)
   --password-hash HASH          Pre-hashed password (e.g. from openssl passwd -6)
   --password-file PATH          File containing plaintext password (read & hashed at runtime, never logged)
   --autologin                   Configure LightDM autologin for the created user
   --edition NAME                Override edition metadata (lite | lite-lxqt | cinnamon | xfce)
+  --status-file PATH            Write real stage-by-stage JSON progress to PATH
+  --validate-only               Validate all installer options without touching disks
   --yes-erase-disk              Required confirmation to format/install onto target
   --dry-run                     Print plan and safety checks without touching any disk
   --help, -h                    Show this help message
@@ -59,10 +70,15 @@ while (($#)); do
     --luks-passphrase-file) [[ $# -ge 2 ]] || { echo '--luks-passphrase-file requires a path' >&2; exit 2; }; LUKS_PASS_FILE="$2"; shift 2 ;;
     --hostname) [[ $# -ge 2 ]] || { echo '--hostname requires a value' >&2; exit 2; }; HOSTNAME_NEW="$2"; shift 2 ;;
     --user) [[ $# -ge 2 ]] || { echo '--user requires a value' >&2; exit 2; }; USERNAME_NEW="$2"; shift 2 ;;
+    --locale) [[ $# -ge 2 ]] || { echo '--locale requires a value' >&2; exit 2; }; LOCALE_NEW="$2"; shift 2 ;;
+    --keymap) [[ $# -ge 2 ]] || { echo '--keymap requires a value' >&2; exit 2; }; KEYMAP_NEW="$2"; shift 2 ;;
+    --timezone) [[ $# -ge 2 ]] || { echo '--timezone requires a value' >&2; exit 2; }; TIMEZONE_NEW="$2"; shift 2 ;;
     --password-hash) [[ $# -ge 2 ]] || { echo '--password-hash requires a hash' >&2; exit 2; }; PASSWORD_HASH="$2"; shift 2 ;;
     --password-file) [[ $# -ge 2 ]] || { echo '--password-file requires a path' >&2; exit 2; }; PASSWORD_FILE="$2"; shift 2 ;;
     --autologin) AUTOLOGIN=true; shift ;;
     --edition) [[ $# -ge 2 ]] || { echo '--edition requires a value' >&2; exit 2; }; EDITION_OVERRIDE="$2"; shift 2 ;;
+    --status-file) [[ $# -ge 2 ]] || { echo '--status-file requires a path' >&2; exit 2; }; STATUS_FILE="$2"; shift 2 ;;
+    --validate-only) VALIDATE_ONLY=true; shift ;;
     --yes-erase-disk) YES_ERASE=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -73,6 +89,9 @@ done
 [[ -n "$DISK" ]] || { echo 'Missing --disk /dev/... argument.' >&2; usage >&2; exit 2; }
 [[ "$HOSTNAME_NEW" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]] || { echo 'Invalid --hostname.' >&2; exit 2; }
 [[ "$USERNAME_NEW" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { echo 'Invalid --user.' >&2; exit 2; }
+[[ "$LOCALE_NEW" =~ ^[A-Za-z0-9_.-]{2,32}$ ]] || { echo 'Invalid --locale.' >&2; exit 2; }
+[[ "$KEYMAP_NEW" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo 'Invalid --keymap.' >&2; exit 2; }
+[[ "$TIMEZONE_NEW" != *..* && "$TIMEZONE_NEW" =~ ^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$ ]] || { echo 'Invalid --timezone.' >&2; exit 2; }
 
 if [[ -n "$EDITION_OVERRIDE" ]]; then
   case "$EDITION_OVERRIDE" in
@@ -97,6 +116,12 @@ if [[ "$LUKS_ENABLED" == true && -n "$EFI_PART" ]]; then
   exit 2
 fi
 
+if [[ "$VALIDATE_ONLY" == true ]]; then
+  echo "NEXUS Disk Installer Configuration Validated (read-only):"
+  echo "  disk=$DISK edition=${EDITION_OVERRIDE:-auto} locale=$LOCALE_NEW keymap=$KEYMAP_NEW timezone=$TIMEZONE_NEW user=$USERNAME_NEW hostname=$HOSTNAME_NEW luks=$LUKS_ENABLED keep_efi=$KEEP_EFI"
+  exit 0
+fi
+
 if [[ "$DRY_RUN" == true || "$YES_ERASE" == false ]]; then
   echo "NEXUS Disk Installer Plan (dry-run / unconfirmed):"
   echo "  Target disk: $DISK"
@@ -107,7 +132,7 @@ if [[ "$DRY_RUN" == true || "$YES_ERASE" == false ]]; then
   else
     echo "  Partitioning: Guided GPT -> 512 MiB FAT32 ESP (/boot/efi) + ext4 root (/)"
   fi
-  echo "  User: $USERNAME_NEW (hostname: $HOSTNAME_NEW, autologin: $AUTOLOGIN, luks: $LUKS_ENABLED)"
+  echo "  User: $USERNAME_NEW (hostname: $HOSTNAME_NEW, locale: $LOCALE_NEW, keymap: $KEYMAP_NEW, tz: $TIMEZONE_NEW, autologin: $AUTOLOGIN, luks: $LUKS_ENABLED)"
   echo "  Safety: Pass --yes-erase-disk as root inside a live ISO to execute."
   if [[ "$DRY_RUN" == true ]]; then
     exit 0
@@ -185,6 +210,31 @@ log_msg() {
   printf '%s\n' "$line" >> "$LOG_FILE"
 }
 
+write_status() {
+  local stage="$1" step="$2" status="$3" err_msg="${4:-}"
+  local total=8
+  local pct=$(( step * 100 / total ))
+  log_msg "[STAGE ${step}/${total}] ${stage} (${status}, ${pct}%)"
+  if [[ -n "$STATUS_FILE" ]]; then
+    mkdir -p -- "$(dirname "$STATUS_FILE")"
+    python3 - "$STATUS_FILE" "$stage" "$step" "$total" "$pct" "$status" "$err_msg" "$DISK" "$EDITION" <<'PY'
+import json, pathlib, sys
+sf, st, step, total, pct, status, err, disk, ed = sys.argv[1:]
+payload = {
+    "stage": st,
+    "step": int(step),
+    "total_steps": int(total),
+    "percent": int(pct),
+    "status": status,
+    "error": err or None,
+    "disk": disk,
+    "edition": ed,
+}
+pathlib.Path(sf).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+  fi
+}
+
 cleanup() {
   if [[ "$mounted" == true ]]; then
     umount -lf "$TARGET/dev/pts" 2>/dev/null || true
@@ -205,6 +255,7 @@ cleanup() {
 
 on_err() {
   local rc=$?
+  write_status "$CURRENT_STAGE" 0 "failed" "Installer failed at stage $CURRENT_STAGE (exit=$rc)" || true
   printf 'ERROR: NEXUS OS installation failed during stage [%s] (exit=%s).\n' "$CURRENT_STAGE" "$rc" >&2
   printf '  Disk modified: %s | Target: %s\n' "$DISK_MODIFIED" "$DISK" >&2
   printf '  Temporary mounts and any LUKS mapper are being safely detached.\n' >&2
@@ -216,6 +267,8 @@ on_err() {
 }
 trap cleanup EXIT
 trap on_err ERR
+
+write_status "preflight" 1 "running"
 
 # Interrupted-install recovery: detach any stale mounts or LUKS mapper left by a previous aborted run
 if mountpoint -q "$TARGET" 2>/dev/null || [[ -d "$TARGET/boot" ]]; then
@@ -244,6 +297,7 @@ PART_BOOT=""
 PART_LUKS=""
 LUKS_UUID=""
 
+write_status "partitioning" 2 "running"
 if [[ -n "$EFI_PART" ]]; then
   # Manual partitioning path: validate existing partitions and preserve partition table
   CURRENT_STAGE="manual_partition_validation"
@@ -376,6 +430,7 @@ else
 fi
 
 CURRENT_STAGE="mounting"
+write_status "mounting" 3 "running"
 mkdir -p -- "$TARGET"
 mount "$PART_ROOT" "$TARGET"
 mounted=true
@@ -387,6 +442,7 @@ mkdir -p -- "$TARGET/boot/efi"
 mount "$PART_EFI" "$TARGET/boot/efi"
 
 CURRENT_STAGE="filesystem_copy"
+write_status "filesystem_copy" 4 "running"
 log_msg "Copying live filesystem ($SOURCE_MODE) to $TARGET"
 if [[ "$SOURCE_MODE" == "rofs" ]]; then
   cp -a /rofs/. "$TARGET/"
@@ -448,6 +504,24 @@ cat > "$TARGET/etc/hosts" <<HOSTS
 ::1       localhost ip6-localhost ip6-loopback
 HOSTS
 
+# Language, keyboard, and timezone configuration
+write_status "system_config" 5 "running"
+printf 'LANG=%s\n' "$LOCALE_NEW" > "$TARGET/etc/default/locale"
+cat > "$TARGET/etc/default/keyboard" <<KEYB
+XKBMODEL="pc105"
+XKBLAYOUT="${KEYMAP_NEW}"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+KEYB
+printf 'KEYMAP=%s\n' "$KEYMAP_NEW" > "$TARGET/etc/vconsole.conf"
+if [[ -f "$TARGET/usr/share/zoneinfo/$TIMEZONE_NEW" ]]; then
+  ln -sf "/usr/share/zoneinfo/$TIMEZONE_NEW" "$TARGET/etc/localtime"
+  printf '%s\n' "$TIMEZONE_NEW" > "$TARGET/etc/timezone"
+else
+  log_msg "Warning: timezone /usr/share/zoneinfo/$TIMEZONE_NEW not found; preserving default timezone."
+fi
+
 # Remove live-only casper artifacts and ensure zero test services leak
 rm -f -- "$TARGET/etc/casper.conf" \
   "$TARGET/etc/systemd/system/nexus-test-agent.service" \
@@ -483,6 +557,7 @@ DM
 fi
 
 CURRENT_STAGE="initramfs"
+write_status "initramfs" 6 "running"
 # Remove casper/ubiquity live-only packages before regenerating initramfs
 chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive dpkg --purge --no-triggers casper lupin-casper >/dev/null 2>&1 || true
 
@@ -504,6 +579,7 @@ fi
 rm -f -- "$initrd_speed_conf"
 
 CURRENT_STAGE="bootloader_install"
+write_status "bootloader_install" 7 "running"
 # Install UEFI GRUB bootloader + fallback EFI/BOOT/BOOTX64.EFI
 log_msg "Installing UEFI GRUB bootloader onto $DISK ($PART_EFI)"
 chroot "$TARGET" /usr/sbin/grub-install \
@@ -551,6 +627,7 @@ fi
 chroot "$TARGET" /usr/sbin/update-grub
 
 CURRENT_STAGE="finalizing"
+write_status "finalizing" 8 "running"
 # Mark installed system metadata (zero secrets or passphrases stored)
 cat > "$TARGET/etc/nexus-installed.json" <<META
 {
@@ -563,12 +640,16 @@ cat > "$TARGET/etc/nexus-installed.json" <<META
   "efi_uuid": "${uuid_efi}",
   "user": "${USERNAME_NEW}",
   "hostname": "${HOSTNAME_NEW}",
+  "locale": "${LOCALE_NEW}",
+  "keymap": "${KEYMAP_NEW}",
+  "timezone": "${TIMEZONE_NEW}",
   "installed_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 META
 
 sync
 cleanup
+write_status "completed" 8 "completed"
 log_msg "NEXUS OS installation completed successfully (edition=${EDITION}, layout=${layout_name}, disk=${DISK})."
 echo "Next steps: Remove the live USB/ISO media and reboot into the installed system."
 if [[ "$LUKS_ENABLED" == true ]]; then

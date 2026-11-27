@@ -263,6 +263,11 @@ jobs:
             echo "::error title=NEXUS-QEMU-ERR-${{ matrix.job_slug }}::rc=${rc} ${err_tail}"
             exit "$rc"
           fi
+          bash linux/test/run-virtual-qualification.sh \
+            --edition "${{ matrix.edition }}" \
+            --from-qemu-json "build/qemu-test/qemu-results-${{ matrix.edition }}.json" \
+            --skip-foundation \
+            --out-dir "build/qemu-test" || true
           python3 - "build/qemu-test/qemu-results-${{ matrix.edition }}.json" "${{ matrix.job_slug }}" <<'PY'
           import json, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))

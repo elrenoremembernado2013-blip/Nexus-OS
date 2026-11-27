@@ -1,4 +1,4 @@
-# NEXUS OS Installation Architecture, Recovery, Dual-Boot & Secure Boot Qualification (Phase 13.1)
+# NEXUS OS Installation Architecture, Recovery, Dual-Boot & Secure Boot Qualification (Phase 13.2)
 
 ## Installer Components
 
@@ -11,6 +11,7 @@ NEXUS OS ships two complementary installation paths plus a dedicated read-only-b
 2. **Interactive Graphical Ubiquity Installer (`ubiquity` + `ubiquity-frontend-gtk` + `partman-auto-crypto` + `cryptsetup`)** — recommended for interactive guided, dual-boot, manual ("Something else"), and LUKS+LVM full-disk encryption installs on `>= 1024 MiB` systems.
    - `apps/welcome.js` surfaces edition-aware RAM floors, Secure Boot state, dual-boot detection, structured preflight warnings, destructive confirmation gating, and `nexus-recovery` references.
 3. **Safety-Guarded Deterministic Disk Installer (`linux/installer/nexus-disk-install.sh`, `/usr/local/bin/nexus-disk-install`)** — supports:
+   - **Language, Keyboard, Timezone & Configuration Validation:** `--locale` (default `en_US.UTF-8` → `/etc/default/locale`), `--keymap` (default `us` → `/etc/default/keyboard` + `/etc/vconsole.conf`), `--timezone` (default `UTC` → `/etc/localtime` + `/etc/timezone`), `--validate-only`, and real 8-stage progress reporting (`[STAGE 1/8]`..`[STAGE 8/8]` plus optional JSON `--status-file PATH`).
    - **Guided Unencrypted GPT+UEFI** (`512 MiB` FAT32 ESP + `ext4` root).
    - **Manual Pre-Partitioned & Dual-Boot ESP Preservation** (`--efi-part PART --root-part PART [--keep-efi]`): validates both partitions belong to `--disk`, are unmounted, `--root-part >= 8 GiB`, and `--efi-part` is `vfat` when `--keep-efi` is passed; preserves existing GPT tables, unrelated data/Windows NTFS partitions, and existing EFI loaders (`/EFI/Microsoft/Boot/bootmgfw.efi`), enables `GRUB_DISABLE_OS_PROBER=false` when `--keep-efi` is set, and installs signed `shimx64.efi` (`BOOTX64.EFI`) + `grubx64.efi` + `mmx64.efi` + `fbx64.efi` across `EFI/BOOT`, `EFI/nexus`, and `EFI/ubuntu`.
    - **Failure-Stage Reporting & Interrupted-Install Recovery**: tracks `CURRENT_STAGE` and `DISK_MODIFIED`, cleans up temporary mounts and LUKS mappers via `EXIT`/`ERR` traps, prints exact recovery instructions (`nexus-recovery --diagnose`, `lsblk -f`, `/var/log/nexus-install.log`), and on retry detaches stale `/mnt/nexus-install-target` mounts and `/dev/mapper/nexus_crypt` before formatting.

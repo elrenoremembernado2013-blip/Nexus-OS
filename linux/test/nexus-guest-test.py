@@ -783,6 +783,24 @@ def main():
             except Exception:
                 pass
 
+    update_status = {
+        "auto_upgrades_conf": Path("/etc/apt/apt.conf.d/20auto-upgrades").is_file(),
+        "unattended_upgrades_installed": shutil.which("unattended-upgrade") is not None,
+        "apt_check_ok": False,
+    }
+    if shutil.which("apt-get"):
+        ares = subprocess.run(["apt-get", "check"], capture_output=True, text=True, timeout=15)
+        update_status["apt_check_ok"] = ares.returncode == 0
+
+    recovery_diag = {}
+    if shutil.which("nexus-recovery"):
+        rres = subprocess.run(["nexus-recovery", "--diagnose", "--json", "--redacted"], capture_output=True, text=True, timeout=15)
+        if rres.returncode == 0 and rres.stdout.strip():
+            try:
+                recovery_diag = json.loads(rres.stdout)
+            except Exception:
+                pass
+
     # Live-mode Ubiquity UI check (launch + multi-screen navigation) & actual disk installation
     ubiquity_ui = {
         "checked": False,
@@ -1001,6 +1019,8 @@ def main():
         "browser_bench": browser_bench_result,
         "hw_summary": hw_summary,
         "sec_summary": sec_summary,
+        "update_status": update_status,
+        "recovery_diag": recovery_diag,
         "lsblk_vda_present": '"vda"' in lsblk_out,
     })
 

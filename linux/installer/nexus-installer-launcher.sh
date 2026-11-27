@@ -121,8 +121,9 @@ fi
 
 mkdir -p -- "$LOG_DIR"
 printf '[%s] Launching Linux Mint Ubiquity installer (uid=%s, ram_mib=%s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(id -u)" "$RAM_MIB" >> "$LOG_FILE"
-if ! pkexec ubiquity gtk_ui; then
-  rc=$?
+rc=0
+pkexec ubiquity gtk_ui || rc=$?
+if (( rc != 0 )); then
   printf '[%s] Ubiquity exited non-zero (rc=%s). Inspect /var/log/installer/syslog or run nexus-recovery --diagnose\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> "$LOG_FILE"
   echo "Ubiquity exited with code $rc. No success claimed; inspect /var/log/installer/syslog and $LOG_FILE, or run 'nexus-recovery --diagnose'." >&2
   exit "$rc"

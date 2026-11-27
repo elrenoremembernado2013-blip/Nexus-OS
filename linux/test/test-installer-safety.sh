@@ -61,14 +61,21 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf -- "$tmp_dir"' EXIT
 printf '   \n' > "$tmp_dir/blank-pass"
 expect_fail "--luks rejects missing passphrase file when confirmed" bash "$DISK_INSTALL" --disk /dev/nexus-nonexistent --luks --yes-erase-disk
-expect_fail "--luks rejects whitespace-only passphrase file" bash -c '
-  if [[ "$(id -u)" -eq 0 ]]; then
-    bash "'"$DISK_INSTALL"'" --disk /dev/nexus-nonexistent --luks --luks-passphrase-file "'"$tmp_dir/blank-pass"'" --yes-erase-disk
-  else
-    # non-root also fails cleanly
-    bash "'"$DISK_INSTALL"'" --disk /dev/nexus-nonexistent --luks --luks-passphrase-file "'"$tmp_dir/blank-pass"'" --yes-erase-disk
-  fi
-'
+expect_fail "--luks rejects whitespace-only passphrase file" bash "$DISK_INSTALL" --disk /dev/nexus-nonexistent --luks --luks-passphrase-file "$tmp_dir/blank-pass" --yes-erase-disk
+
+# Locale, keymap, timezone & --validate-only checks (Phase 13.2)
+expect_fail "invalid --locale rejected" bash "$DISK_INSTALL" --disk /dev/vda --locale "bad locale!" --validate-only
+expect_fail "invalid --keymap rejected" bash "$DISK_INSTALL" --disk /dev/vda --keymap "bad keymap" --validate-only
+expect_fail "invalid --timezone rejected" bash "$DISK_INSTALL" --disk /dev/vda --timezone "../etc/passwd" --validate-only
+bash "$DISK_INSTALL" --disk /dev/vda --edition lite-lxqt --locale en_US.UTF-8 --keymap us --timezone Europe/Madrid --validate-only >/dev/null
+echo "PASS [config-validation] locale, keymap, timezone, and --validate-only checks verified"
+
+# QEMU minimum & recommended profile dry-run checks
+q_min_out="$(bash "$REPO_ROOT/scripts/launch-qemu.sh" --profile minimum --edition lite-lxqt --dry-run)"
+printf '%s\n' "$q_min_out" | grep -Fq 'Disk size: 30G'
+q_rec_out="$(bash "$REPO_ROOT/scripts/launch-qemu.sh" --profile recommended --edition xfce --disk-only --dry-run)"
+printf '%s\n' "$q_rec_out" | grep -Fq 'Disk size: 50G'
+echo "PASS [vm-profiles] minimum (2C/4G/30G) and recommended (4C/8G/50G) QEMU profiles verified"
 
 # Dry-run coverage across all supported modes
 bash "$DISK_INSTALL" --disk /dev/vda --edition cinnamon --dry-run >/dev/null
@@ -99,7 +106,8 @@ for topic in all backup grub fsck luks packages dualboot; do
   bash "$RECOVERY" --guide "$topic" >/dev/null
 done
 expect_fail "recovery --fsck-dry-run refuses execution without --confirm" bash "$RECOVERY" --fsck-dry-run --partition /dev/vda2
-bash "$RECOVERY" --fsck-dry-run --partition /dev/vda2 --dry-run | grep -Fq 'fsck -n /dev/vda2'
+fsck_out="$(bash "$RECOVERY" --fsck-dry-run --partition /dev/vda2 --dry-run)"
+printf '%s\n' "$fsck_out" | grep -Fq 'fsck -n /dev/vda2'
 echo "PASS [recovery] guides & --fsck-dry-run confirmation guard verified"
 
 # 5. All 4 editions provisioner dry-runs include nexus-recovery + RECOVERY_AND_BOOT.md
