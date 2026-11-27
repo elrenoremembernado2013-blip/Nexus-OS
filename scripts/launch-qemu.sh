@@ -75,9 +75,9 @@ Environment configuration:
 
 Safety:
   - Existing qcow2 disks are preserved across boots and never overwritten without
-    explicit `--reset-disk --yes-reset-disk`.
+    explicit --reset-disk --yes-reset-disk.
   - OVMF_VARS state is preserved under build/qemu/OVMF_VARS.fd between installation
-    and subsequent `--disk-only` boots.
+    and subsequent --disk-only boots.
   - All VM state and disposable disks remain under ignored build/ and are never committed.
 USAGE
 }
@@ -241,7 +241,7 @@ command -v qemu-img >/dev/null 2>&1 || { echo 'Missing qemu-img (install qemu-ut
 
 if [[ "$INSTALLER_FIRST" == true && ! -r "$ISO_PATH" ]]; then
   printf 'Installer ISO not found or unreadable: %s\n' "$ISO_PATH" >&2
-  printf 'Run `bash scripts/download-linux-mint.sh` first or omit --installer-first.\n' >&2
+  printf 'Run bash scripts/download-linux-mint.sh first or omit --installer-first.\n' >&2
   exit 1
 fi
 
@@ -326,9 +326,10 @@ else
   ACTUAL_BOOT_MODE="installed-disk (ISO detached)"
 fi
 
-QEMU_VER=""
-IFS= read -r QEMU_VER < <("$QEMU" --version 2>/dev/null || true)
-QEMU_VER="${QEMU_VER:-unknown}"
+QEMU_VER="unknown"
+if QEMU_VER_OUT="$("$QEMU" --version 2>/dev/null)"; then
+  QEMU_VER="${QEMU_VER_OUT%%$'\n'*}"
+fi
 printf 'Starting QEMU (%s)\n' "$QEMU_VER"
 printf '  Profile: %s | Boot mode: %s\n' "$PROFILE_LABEL" "$ACTUAL_BOOT_MODE"
 printf '  RAM: %s MiB | CPUs: %s | Disk: %s (%s) | Video: %s | Display: %s\n' \
