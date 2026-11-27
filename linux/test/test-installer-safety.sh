@@ -98,9 +98,9 @@ echo "PASS [qemu-disk-path] build containment, symlink, and extension guards ver
 # Existing QEMU images must be standalone qcow2 files, never backing chains.
 image_guard="$REPO_ROOT/scripts/validate-qemu-image.py"
 printf '%s\n' '{"format":"qcow2","virtual-size":1073741824}' | python3 "$image_guard"
-printf '%s\\n' '{"format":"raw"}' > "$tmp_dir/non-qcow2.json"
-printf '%s\\n' '{"format":"qcow2","backing-filename":"../../host.img"}' > "$tmp_dir/backing-image.json"
-printf '%s\\n' 'not-json' > "$tmp_dir/invalid-image.json"
+printf '%s\n' '{"format":"raw"}' > "$tmp_dir/non-qcow2.json"
+printf '%s\n' '{"format":"qcow2","backing-filename":"../../host.img"}' > "$tmp_dir/backing-image.json"
+printf '%s\n' 'not-json' > "$tmp_dir/invalid-image.json"
 expect_fail "QEMU image validator rejects non-qcow2 format" python3 "$image_guard" < "$tmp_dir/non-qcow2.json"
 expect_fail "QEMU image validator rejects backing filename" python3 "$image_guard" < "$tmp_dir/backing-image.json"
 expect_fail "QEMU image validator rejects invalid JSON" python3 "$image_guard" < "$tmp_dir/invalid-image.json"
