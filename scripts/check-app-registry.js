@@ -37,4 +37,24 @@ assert.equal(registry.unmountRoot(rootB), false);
 assert.throws(() => registry.register({ id: "invalid id" }), /NEXUS app requires/);
 assert.throws(() => registry.register({ id: "lifecycle-test", name: "Duplicate", render() {}, mount() {} }), /already registered/);
 assert.equal(registry.mountApp("unknown-app", {}, {}), false);
+// A failing cleanup must not prevent other app instances from being unmounted.
+const cleanupCalls = [];
+registry.register({
+  id: "cleanup-failure-test",
+  name: "Cleanup failure test",
+  render() {},
+  mount(root) {
+    return () => {
+      cleanupCalls.push(root === rootA ? "A" : "B");
+      if (root === rootA) throw new Error("simulated cleanup failure");
+    };
+  }
+});
+registry.mountApp("cleanup-failure-test", rootA);
+registry.mountApp("cleanup-failure-test", rootB);
+assert.doesNotThrow(() => registry.unmountApp("cleanup-failure-test"));
+assert.deepEqual(cleanupCalls, ["A", "B"]);
+assert.equal(registry.unmountRoot(rootA), false);
+assert.equal(registry.unmountRoot(rootB), false);
+
 console.log("PASS app registry independent-instance lifecycle tests");
