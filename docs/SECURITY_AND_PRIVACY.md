@@ -23,7 +23,7 @@
 5. **Settings Privacy & Security UI (`apps/settings-sections.js`)**:
    - Displays transparent security status with an explicit `Unavailable` boundary in standalone browser preview.
 
-## Verification & Current Limits (`45876350800`, `45876358426`, `b4879cb`)
+## Verification & Current Limits (`45919673389`, `45919678771`, `b5594a2`)
 
-- **Verified in CI & QEMU:** `bash -n`, `shellcheck` across all scripts, `npm test`, `verify-nexus-iso.sh` (`0` test-agent leaks in `lite`, `lite-lxqt`, `cinnamon`, and `xfce` ISOs), `nexus-security-audit.sh --repo-only --repo . --strict` (`2 PASS, 0 WARN, 0 FAIL`), live QEMU `sec_summary` (`0 FAIL`), and end-to-end LUKS2 cold-boot wrong-passphrase rejection + valid unlock + reboot persistence.
-- **Untested (`NOT TESTED`, requires Phase 13.0 CI / bare-metal validation):** Enforced OVMF Secure Boot CI run (`--secure-boot-test`), live `pkexec ufw` Polkit GUI prompts, UEFI Secure Boot on physical OEM firmware, interactive Ubiquity GUI `partman-auto-crypto` dialogs, and multi-user physical non-autologin deployments.
+- **Verified in CI & QEMU:** `bash -n`, `shellcheck` across all scripts, `npm test`, `verify-nexus-iso.sh` (`0` test-agent leaks in `lite`, `lite-lxqt`, `cinnamon`, and `xfce` ISOs), `nexus-security-audit.sh --repo-only --repo . --strict` (`2 PASS, 0 WARN, 0 FAIL`), live QEMU `sec_summary` (`0 FAIL`), end-to-end LUKS2 cold-boot wrong-passphrase rejection + valid unlock + reboot persistence, simulated dual-boot `--keep-efi` + NTFS preservation, and enforced OVMF Secure Boot (`OVMF_CODE_4M.secboot.fd` + `OVMF_VARS_4M.ms.fd`, `secure_boot_state: "enabled"`) on `lite-lxqt`.
+- **Untested (`NOT TESTED`, requires bare-metal validation):** Live `pkexec ufw` Polkit GUI prompts, UEFI Secure Boot & MOK enrollment on physical OEM firmware, interactive Ubiquity GUI `partman-auto-crypto` dialogs, and multi-user physical non-autologin deployments.

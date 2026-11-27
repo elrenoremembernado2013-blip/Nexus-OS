@@ -460,7 +460,8 @@ fi
 if [[ -f "$TARGET/etc/default/grub" ]]; then
   sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=2/' "$TARGET/etc/default/grub" || true
   sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' "$TARGET/etc/default/grub" || true
-  if [[ "$KEEP_EFI" == true ]] && ! grep -q '^GRUB_DISABLE_OS_PROBER=' "$TARGET/etc/default/grub"; then
+  if [[ "$KEEP_EFI" == true ]]; then
+    sed -i '/^#*GRUB_DISABLE_OS_PROBER=/d' "$TARGET/etc/default/grub" || true
     printf 'GRUB_DISABLE_OS_PROBER=false\n' >> "$TARGET/etc/default/grub"
   fi
 fi

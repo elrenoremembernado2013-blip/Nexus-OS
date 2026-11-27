@@ -276,8 +276,10 @@ payload = {
         "manual_partitioning_cli": "tested_qemu",
         "interrupted_recovery_cli": "tested_qemu",
         "guided_luks2_cli": "tested_qemu",
-        "dual_boot_keep_efi_cli": "supported_qemu_simulated",
-        "ubiquity_gui_interactive": "available_manual_gui" if ubiquity_path else "unavailable_in_lite_or_host",
+        "dual_boot_keep_efi_cli": "tested_qemu_simulated",
+        "secure_boot_ovmf_cli": "tested_qemu_ovmf_secboot",
+        "ubiquity_gui_interactive": "untested_manual_gui_available" if ubiquity_path else "unavailable_in_lite_or_host",
+        "physical_bare_metal_install": "untested_bare_metal",
         "legacy_bios_mbr": "unsupported_by_nexus_disk_install_uefi_required",
     },
     "hardware": {

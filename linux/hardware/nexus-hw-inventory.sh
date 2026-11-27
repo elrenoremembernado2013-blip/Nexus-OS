@@ -45,6 +45,7 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import socket
 import subprocess
 import sys
 
@@ -57,6 +58,8 @@ if db_path.is_file():
     except Exception:
         db = {}
 drv_db = db.get("drivers", {})
+ACTIVE_HOST = socket.gethostname()
+ACTIVE_USER = os.environ.get("USER", "")
 
 
 def read_text(p: Path):
@@ -70,8 +73,23 @@ def redact_line(text: str) -> str:
     text = re.sub(r"\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b", "<REDACTED_MAC>", text)
     text = re.sub(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", "<REDACTED_UUID>", text)
     text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<REDACTED_IP>", text)
+    text = re.sub(r"\bfe80:[0-9a-fA-F:]+\b", "<REDACTED_IPV6>", text)
     text = re.sub(r"/home/[A-Za-z0-9._-]+", "/home/<USER>", text)
+    if ACTIVE_HOST and len(ACTIVE_HOST) > 2:
+        text = re.sub(rf"\b{re.escape(ACTIVE_HOST)}\b", "<REDACTED_HOST>", text)
+    if ACTIVE_USER and len(ACTIVE_USER) > 2 and ACTIVE_USER not in ("root", "user", "nexus"):
+        text = re.sub(rf"\b{re.escape(ACTIVE_USER)}\b", "<USER>", text)
     return text
+
+
+def redact_obj(obj):
+    if isinstance(obj, str):
+        return redact_line(obj)
+    if isinstance(obj, list):
+        return [redact_obj(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: redact_obj(v) for k, v in obj.items()}
+    return obj
 
 
 def classify(category: str, driver: str, fallback: str = "detected") -> dict:
@@ -197,19 +215,32 @@ if shutil.which("dpkg-query"):
         except Exception:
             sb_packages[pkg] = False
 
-kernel_sb_verified = "sbverify_unavailable"
-if shutil.which("sbverify") and kernel_images:
-    try:
-        sres = subprocess.run(["sbverify", "--list", kernel_images[0]], capture_output=True, text=True, timeout=3)
-        kernel_sb_verified = "signed_pe_present" if (sres.returncode == 0 and "subject=" in sres.stdout.lower()) else "unsigned_or_unverified"
-    except Exception:
-        kernel_sb_verified = "check_error"
+def check_pe_sig(paths):
+    if not shutil.which("sbverify"):
+        return "sbverify_unavailable"
+    existing = [p for p in paths if Path(p).is_file()]
+    if not existing:
+        return "binary_not_present"
+    for p in existing:
+        try:
+            sres = subprocess.run(["sbverify", "--list", p], capture_output=True, text=True, timeout=3)
+            low = (sres.stdout or "").lower()
+            if sres.returncode == 0 and ("signature 1" in low or "subject:" in low or "subject=" in low):
+                return "signed_pe_present"
+        except Exception:
+            return "check_error"
+    return "unsigned_or_unverified"
+
+
+kernel_sb_verified = check_pe_sig(kernel_images)
+shim_sb_verified = check_pe_sig(shim_paths)
+grub_sb_verified = check_pe_sig(grub_signed_paths)
 
 # Storage (explicitly excludes serials/UUIDs/WWNs)
 storage = []
 if shutil.which("lsblk"):
     try:
-        res = subprocess.run(["lsblk", "-J", "-d", "-o", "NAME,SIZE,TYPE,TRAN,RO,RM,MODEL"], capture_output=True, text=True, timeout=4)
+        res = subprocess.run(["lsblk", "-J", "-d", "-o", "NAME,SIZE,TYPE,TRAN,RO,RM,ROTA,MODEL"], capture_output=True, text=True, timeout=4)
         if res.returncode == 0 and res.stdout.strip():
             for dev in json.loads(res.stdout).get("blockdevices", []):
                 if dev.get("type") != "disk":
@@ -217,10 +248,27 @@ if shutil.which("lsblk"):
                 name = dev.get("name", "")
                 drv_link = Path(f"/sys/block/{name}/device/driver")
                 drv = drv_link.resolve().name if drv_link.is_symlink() else ("virtio_blk" if name.startswith("vd") else "unknown")
+                tran = dev.get("tran") or ("virtio" if name.startswith("vd") else "unknown")
+                rota = dev.get("rota")
+                if name.startswith("nvme"):
+                    drive_type = "nvme_ssd"
+                elif name.startswith("mmcblk"):
+                    drive_type = "emmc_or_sd"
+                elif name.startswith("vd") or tran == "virtio":
+                    drive_type = "virtio_virtual_disk"
+                elif tran == "usb":
+                    drive_type = "usb_disk"
+                elif rota in (False, 0, "0"):
+                    drive_type = "sata_ssd"
+                elif rota in (True, 1, "1"):
+                    drive_type = "sata_hdd"
+                else:
+                    drive_type = "unknown_disk"
                 storage.append({
                     "device": f"/dev/{name}",
                     "size": dev.get("size"),
-                    "transport": dev.get("tran") or ("virtio" if name.startswith("vd") else "unknown"),
+                    "transport": tran,
+                    "drive_type": drive_type,
                     "model": (dev.get("model") or "").strip() or "Generic Disk",
                     "driver": drv,
                     "classification": classify("storage", drv, "unknown"),
@@ -228,10 +276,28 @@ if shutil.which("lsblk"):
     except Exception:
         pass
 
-# PCI GPUs, Network, Audio, and USB Host Controllers
+# PCI GPUs, Network, Audio, Storage, and USB Host Controllers
+PCI_VENDORS = {
+    "0x8086": "Intel",
+    "0x1002": "AMD/ATI",
+    "0x10de": "NVIDIA",
+    "0x1234": "QEMU/Bochs",
+    "0x1af4": "Red Hat/VirtIO",
+    "0x10ec": "Realtek",
+    "0x14e4": "Broadcom",
+    "0x17cb": "Qualcomm",
+    "0x14c3": "MediaTek",
+    "0x15b3": "Mellanox",
+    "0x1b21": "ASMedia",
+    "0x144d": "Samsung",
+    "0x2646": "Kingston",
+    "0x15b7": "SanDisk/WD",
+    "0xc0a9": "Micron/Crucial",
+}
 gpus = []
 pci_network = []
 pci_audio = []
+storage_controllers = []
 usb_controllers = []
 try:
     pci_devs = sorted(Path("/sys/bus/pci/devices").glob("*")) if Path("/sys/bus/pci/devices").is_dir() else []
@@ -242,15 +308,19 @@ for dev in pci_devs:
     drv_link = dev / "driver"
     drv = drv_link.resolve().name if drv_link.is_symlink() else "none"
     vendor = read_text(dev / "vendor") or "unknown"
+    vendor_name = PCI_VENDORS.get(vendor.lower(), vendor)
     device = read_text(dev / "device") or "unknown"
     if cls.startswith("0x03"):
-        gpus.append({"slot": dev.name, "vendor": vendor, "device": device, "driver": drv, "classification": classify("gpu", drv)})
+        gpus.append({"slot": dev.name, "vendor": vendor, "vendor_name": vendor_name, "device": device, "driver": drv, "classification": classify("gpu", drv)})
     elif cls.startswith("0x02"):
-        pci_network.append({"slot": dev.name, "class": cls, "vendor": vendor, "device": device, "driver": drv, "classification": classify("network", drv)})
+        pci_network.append({"slot": dev.name, "class": cls, "vendor": vendor, "vendor_name": vendor_name, "device": device, "driver": drv, "classification": classify("network", drv)})
     elif cls.startswith("0x0403") or cls.startswith("0x0401"):
-        pci_audio.append({"slot": dev.name, "class": cls, "vendor": vendor, "device": device, "driver": drv, "classification": classify("audio", drv)})
+        pci_audio.append({"slot": dev.name, "class": cls, "vendor": vendor, "vendor_name": vendor_name, "device": device, "driver": drv, "classification": classify("audio", drv)})
+    elif cls.startswith("0x01"):
+        ctrl_kind = "nvme" if cls.startswith("0x0108") else ("sata_ahci" if cls.startswith("0x0106") else ("raid" if cls.startswith("0x0104") else "scsi_or_other"))
+        storage_controllers.append({"slot": dev.name, "class": cls, "controller_type": ctrl_kind, "vendor": vendor, "vendor_name": vendor_name, "device": device, "driver": drv, "classification": classify("storage", drv, "detected")})
     elif cls.startswith("0x0c03"):
-        usb_controllers.append({"slot": dev.name, "vendor": vendor, "device": device, "driver": drv, "classification": classify("usb", drv)})
+        usb_controllers.append({"slot": dev.name, "vendor": vendor, "vendor_name": vendor_name, "device": device, "driver": drv, "classification": classify("usb", drv)})
 
 # Network interfaces (explicitly omits MAC addresses, IP addresses, and SSIDs)
 wifi_adapters = []
@@ -299,13 +369,26 @@ if bt_dir.is_dir():
         drv = drv_link.resolve().name if drv_link.is_symlink() else "btusb"
         bluetooth.append({"adapter": hci.name, "driver": drv, "classification": classify("bluetooth", drv)})
 
-# Audio cards, ALSA playback/capture, PipeWire/PulseAudio, and SOF status (NO recording)
+# Audio cards, codecs, ALSA playback/capture, PipeWire/PulseAudio, and SOF status (NO recording)
 audio_cards = []
 asound = read_text(Path("/proc/asound/cards"))
 if asound:
     for line in asound.splitlines():
         if line and line[0].strip().isdigit() and ":" in line:
             audio_cards.append(line.strip())
+
+audio_codecs = []
+asound_dir = Path("/proc/asound")
+if asound_dir.is_dir():
+    try:
+        for cf in sorted(asound_dir.glob("card*/codec#*")):
+            txt = read_text(cf) or ""
+            for line in txt.splitlines():
+                if line.startswith("Codec:"):
+                    audio_codecs.append(line.split(":", 1)[1].strip())
+                    break
+    except OSError:
+        pass
 
 sof_modules = []
 proc_mods = read_text(Path("/proc/modules")) or ""
@@ -341,6 +424,7 @@ if shutil.which("arecord"):
         pass
 
 audio_server = "unavailable"
+audio_service_errors = []
 if shutil.which("pactl"):
     try:
         ires = subprocess.run(["pactl", "info"], capture_output=True, text=True, timeout=3)
@@ -349,10 +433,25 @@ if shutil.which("pactl"):
                 if line.startswith("Server Name:"):
                     audio_server = line.split(":", 1)[1].strip()
                     break
+        elif ires.stderr.strip():
+            audio_service_errors.append(redact_line(ires.stderr.strip().splitlines()[0][:160]))
     except Exception:
         pass
 elif shutil.which("wpctl"):
     audio_server = "pipewire_wpctl_present"
+
+if shutil.which("journalctl"):
+    try:
+        jres = subprocess.run(
+            ["journalctl", "--user", "-u", "pipewire", "-u", "wireplumber", "-u", "pipewire-pulse", "-p", "err", "-n", "5", "--no-pager", "-q"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if jres.returncode == 0 and jres.stdout.strip():
+            audio_service_errors.extend(redact_line(l[:160]) for l in jres.stdout.splitlines()[:5] if l.strip())
+    except Exception:
+        pass
 
 # Displays, DRI nodes, Mesa, GLX & Vulkan (read-only)
 displays = []
@@ -398,16 +497,49 @@ if shutil.which("vulkaninfo"):
     except Exception:
         pass
 
-# Touchpads & Input (no serials)
+# Touchpads & Input devices (explicitly excludes Uniq serials/MACs)
 touchpads = []
+input_devices = []
 inp_text = read_text(Path("/proc/bus/input/devices")) or ""
 for block in inp_text.split("\n\n"):
+    if not block.strip():
+        continue
     low = block.lower()
-    if any(k in low for k in ("touchpad", "trackpad", "elan", "synaptics")):
-        name_line = next((l[3:].strip().strip('"') for l in block.splitlines() if l.startswith("N: Name=")), "Touchpad")
+    name_line = next((l[3:].strip().strip('"') for l in block.splitlines() if l.startswith("N: Name=")), "")
+    handlers_line = next((l[3:].strip() for l in block.splitlines() if l.startswith("H: Handlers=")), "")
+    if not name_line:
+        continue
+    is_tp = any(k in low for k in ("touchpad", "trackpad", "elan", "synaptics"))
+    if is_tp:
+        cat = "touchpad"
         touchpads.append({"name": name_line, "classification": {"status": "detected", "test_environment": "untested", "notes": "Touchpad input device detected; gestures/palm rejection require physical test."}})
+    elif "kbd" in handlers_line or "keyboard" in low:
+        cat = "keyboard"
+    elif "mouse" in handlers_line or "pointer" in low or "tablet" in low:
+        cat = "pointer_or_mouse"
+    elif "touchscreen" in low:
+        cat = "touchscreen"
+    else:
+        cat = "other_input"
+    input_devices.append({"name": name_line, "category": cat})
 
-# USB devices (vendor:product & class only; NO serials)
+# USB devices (vendor:product, class, and peripheral category only; NO serials)
+USB_CLASS_MAP = {
+    "01": "audio",
+    "02": "communications_network",
+    "03": "hid_input",
+    "06": "imaging",
+    "07": "printer",
+    "08": "mass_storage",
+    "09": "usb_hub",
+    "0a": "cdc_data",
+    "0b": "smart_card",
+    "0e": "video_webcam",
+    "e0": "wireless_bluetooth",
+    "ef": "composite_misc",
+    "fe": "app_specific",
+    "ff": "vendor_specific",
+}
 usb_devices = []
 usb_dir = Path("/sys/bus/usb/devices")
 if usb_dir.is_dir():
@@ -420,10 +552,24 @@ if usb_dir.is_dir():
         pid = read_text(u / "idProduct")
         if not (vid and pid):
             continue
+        bcls = (read_text(u / "bDeviceClass") or "00").lower()
+        iface_classes = []
+        if bcls in ("00", "ef"):
+            try:
+                for icf in sorted(u.glob(f"{u.name}:*/bInterfaceClass")):
+                    ic = (read_text(icf) or "").lower()
+                    if ic:
+                        iface_classes.append(ic)
+            except OSError:
+                pass
+        eff_cls = iface_classes[0] if iface_classes else bcls
+        usb_cat = USB_CLASS_MAP.get(eff_cls, "other_usb")
         usb_devices.append({
             "id": f"{vid}:{pid}",
             "product": read_text(u / "product") or "USB Device",
-            "class": read_text(u / "bDeviceClass") or "00",
+            "class": bcls,
+            "interface_classes": iface_classes[:4],
+            "category": usb_cat,
         })
 
 # Power management, batteries, and suspend capabilities (STRICTLY READ-ONLY)
@@ -450,16 +596,21 @@ if ps_dir.is_dir():
 
 suspend_states = (read_text(Path("/sys/power/state")) or "").split()
 mem_sleep_modes = (read_text(Path("/sys/power/mem_sleep")) or "").split()
+scaling_governor = read_text(Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")) or "unavailable"
 upower_active = False
+ppd_active = False
 if shutil.which("systemctl"):
     try:
         upower_active = subprocess.run(["systemctl", "is-active", "--quiet", "upower"], capture_output=True, timeout=2).returncode == 0
+        ppd_active = subprocess.run(["systemctl", "is-active", "--quiet", "power-profiles-daemon"], capture_output=True, timeout=2).returncode == 0
     except Exception:
         pass
 
-# Firmware directory & kernel module visibility
+# Firmware directory & kernel module / driver error visibility
 fw_dir_present = Path("/lib/firmware").is_dir() or Path("/usr/lib/firmware").is_dir()
 missing_fw_hints = []
+gpu_driver_errors = []
+audio_driver_errors = []
 if shutil.which("dmesg"):
     try:
         dres = subprocess.run(["dmesg"], capture_output=True, text=True, timeout=3)
@@ -468,6 +619,10 @@ if shutil.which("dmesg"):
                 low = line.lower()
                 if "direct firmware load" in low or "failed to load" in low:
                     missing_fw_hints.append(redact_line(line[:180]))
+                if ("error" in low or "fail" in low or "fault" in low) and any(k in low for k in ("drm", "i915", "xe ", "amdgpu", "radeon", "nouveau", "nvidia")):
+                    gpu_driver_errors.append(redact_line(line[:180]))
+                if ("error" in low or "fail" in low) and any(k in low for k in ("sof", "snd_hda", "alsa", "audio")):
+                    audio_driver_errors.append(redact_line(line[:180]))
     except Exception:
         pass
 
@@ -624,13 +779,16 @@ payload = {
         "uefi_active": uefi_active,
         "secure_boot_state": secure_boot,
         "shim_signed_paths": shim_paths,
+        "shim_sb_status": shim_sb_verified,
         "grub_signed_paths": grub_signed_paths,
+        "grub_sb_status": grub_sb_verified,
         "kernel_images_count": len(kernel_images),
         "kernel_sb_status": kernel_sb_verified,
         "packages_installed": sb_packages,
     },
     "cpu": {"model": cpu_model, "category": cpu_category, "logical_cpus": cpu_cores, "hw_virt": hw_virt, "status": "detected"},
     "memory": {"ram_total_mib": ram_total_mib, "ram_available_mib": ram_avail_mib},
+    "storage_controllers": storage_controllers,
     "storage": storage,
     "gpus": gpus,
     "graphics_qualification": {
@@ -645,6 +803,7 @@ payload = {
         "hardware_acceleration": gpu_accel_mode,
         "software_rendering_fallback": software_render,
         "gpu_firmware_errors": [h for h in missing_fw_hints if any(k in h.lower() for k in ("i915", "amdgpu", "radeon", "nvidia", "xe", "drm"))],
+        "gpu_driver_errors": gpu_driver_errors[:10],
     },
     "displays": displays,
     "network": {"ethernet": ethernet_adapters, "wifi": wifi_adapters, "pci": pci_network},
@@ -660,6 +819,7 @@ payload = {
     "bluetooth": bluetooth,
     "audio": {
         "cards": audio_cards,
+        "codecs": audio_codecs,
         "pci": pci_audio,
         "sof_modules": sof_modules,
         "sof_firmware_files_count": sof_fw_count,
@@ -667,18 +827,24 @@ payload = {
         "playback_devices": playback_devices[:8],
         "capture_devices": capture_devices[:8],
         "audio_firmware_errors": [h for h in missing_fw_hints if any(k in h.lower() for k in ("sof", "snd", "audio", "hda"))],
+        "audio_service_errors": (audio_service_errors + audio_driver_errors)[:10],
     },
     "touchpads": touchpads,
+    "input_devices": input_devices[:30],
     "usb_controllers": usb_controllers,
     "usb_devices": usb_devices[:25],
     "power_management": {
         "batteries": batteries,
         "ac_adapters": ac_adapters,
         "upower_service_active": upower_active,
+        "power_profiles_daemon_active": ppd_active,
+        "cpu_scaling_governor": scaling_governor,
     },
     "suspend_capabilities": {"states": suspend_states, "mem_sleep": mem_sleep_modes, "tested": False},
     "component_matrix": component_matrix,
 }
+
+payload = redact_obj(payload)
 
 if fmt == "markdown":
     lines = [
@@ -686,14 +852,14 @@ if fmt == "markdown":
         "",
         f"- **Environment:** `{env_label}` (VM: `{is_vm}`, Chromebook board: `{is_chromebook}`)",
         f"- **Architecture:** {arch} (`{arch_status}`)",
-        f"- **Firmware & Secure Boot:** {payload['firmware']['mode']} (Secure Boot: `{secure_boot}`, Shim: `{bool(shim_paths)}`, Kernel SB: `{kernel_sb_verified}`)",
-        f"- **CPU:** {cpu_model} (`{cpu_category}`, {cpu_cores} logical CPUs, virt: `{hw_virt}`)",
+        f"- **Firmware & Secure Boot:** {payload['firmware']['mode']} (Secure Boot: `{secure_boot}`, Shim: `{bool(shim_paths)}` [`{shim_sb_verified}`], GRUB SB: `{grub_sb_verified}`, Kernel SB: `{kernel_sb_verified}`)",
+        f"- **CPU:** {cpu_model} (`{cpu_category}`, {cpu_cores} logical CPUs, virt: `{hw_virt}`, governor: `{scaling_governor}`)",
         f"- **RAM:** {ram_total_mib} MiB total / {ram_avail_mib} MiB available",
         f"- **Graphics Qualification:** `{gpu_accel_mode}` (Drivers: `{','.join(gpu_drivers) or 'none'}`, GLX: `{glx_renderer or 'no active X11 GLX'}`, Vulkan ICDs: `{len(vulkan_icds)}`)",
-        f"- **Storage ({len(storage)}):** " + (", ".join(f"{d['device']} ({d['size']}, {d['driver']}: {d['classification']['status']})" for d in storage) or "none detected"),
+        f"- **Storage ({len(storage)}):** " + (", ".join(f"{d['device']} ({d['size']}, {d['drive_type']}, {d['driver']}: {d['classification']['status']})" for d in storage) or "none detected"),
         f"- **Network:** NM=`{nm_state}`, Ethernet={len(ethernet_adapters)}, Wi-Fi={len(wifi_adapters)} (radio=`{wifi_radio}`), Bluetooth={len(bluetooth)}",
-        f"- **Audio:** Server=`{audio_server}`, Cards={len(audio_cards)}, Playback={len(playback_devices)}, Capture={len(capture_devices)}, SOF files={sof_fw_count}",
-        f"- **Touchpads ({len(touchpads)}):** " + (", ".join(t['name'] for t in touchpads) or "none"),
+        f"- **Audio:** Server=`{audio_server}`, Cards={len(audio_cards)}, Codecs={len(audio_codecs)}, Playback={len(playback_devices)}, Capture={len(capture_devices)}, SOF files={sof_fw_count}",
+        f"- **Touchpads / Input:** {len(touchpads)} touchpad(s), {len(input_devices)} input device(s)",
         f"- **Batteries ({len(batteries)}):** " + (", ".join(f"{b['name']} ({b['capacity_pct']}%)" for b in batteries) or "none") + f" (upower active: `{upower_active}`)",
         f"- **Suspend Modes Exposed:** " + (", ".join(mem_sleep_modes or suspend_states) or "unavailable") + " (`tested: false`)",
         f"- **Missing Firmware Hints:** {len(missing_fw_hints)}",
@@ -703,7 +869,7 @@ if fmt == "markdown":
         "| Category | Drivers | Recognized | Functional Status | Test Environment | Qualification |",
         "|---|---|---|---|---|---|",
     ]
-    for c in component_matrix:
+    for c in payload["component_matrix"]:
         lines.append(f"| `{c['category']}` | `{','.join(c['drivers'])}` | `{c['recognized']}` | `{c['functional_status']}` | `{c['test_environment']}` | **{c['qualification_status']}** |")
     lines += [
         "",

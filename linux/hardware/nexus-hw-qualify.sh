@@ -68,15 +68,19 @@ esac
 python3 - "$STAGE" "$RUN_TEST" "$CONFIRM_TEST" "$EXPORT_DIR" "$DRY_RUN" "$INTERACTIVE" "$INVENTORY_SH" "$DIAG_SH" <<'PY'
 import datetime
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
 import sys
 
 stage, run_test, confirm_test, export_dir, dry_run_s, interactive_s, inv_sh, diag_sh = sys.argv[1:9]
 dry_run = dry_run_s.lower() == "true"
 interactive = interactive_s.lower() == "true"
+ACTIVE_HOST = socket.gethostname()
+ACTIVE_USER = os.environ.get("USER", "")
 
 TEST_SPECS = {
     "gpu": {
@@ -126,8 +130,23 @@ def redact(text: str) -> str:
     text = re.sub(r"\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b", "<REDACTED_MAC>", text)
     text = re.sub(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", "<REDACTED_UUID>", text)
     text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<REDACTED_IP>", text)
+    text = re.sub(r"\bfe80:[0-9a-fA-F:]+\b", "<REDACTED_IPV6>", text)
     text = re.sub(r"/home/[A-Za-z0-9._-]+", "/home/<USER>", text)
+    if ACTIVE_HOST and len(ACTIVE_HOST) > 2:
+        text = re.sub(rf"\b{re.escape(ACTIVE_HOST)}\b", "<REDACTED_HOST>", text)
+    if ACTIVE_USER and len(ACTIVE_USER) > 2 and ACTIVE_USER not in ("root", "user", "nexus"):
+        text = re.sub(rf"\b{re.escape(ACTIVE_USER)}\b", "<USER>", text)
     return text
+
+
+def redact_obj(obj):
+    if isinstance(obj, str):
+        return redact(obj)
+    if isinstance(obj, list):
+        return [redact_obj(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: redact_obj(v) for k, v in obj.items()}
+    return obj
 
 
 def run_cmd(cmd, timeout=8):
@@ -220,14 +239,21 @@ def exec_single(name: str) -> dict:
         nq = inv.get("network_qualification") or {}
         has_wifi = nq.get("wifi_adapter_count", 0) > 0
         scan_note = "no_wifi_hardware"
+        scan_ap_count = None
         if has_wifi and shutil.which("nmcli"):
             rc, _ = run_cmd(["nmcli", "-t", "-f", "WIFI,WIFI-HW", "general"])
             scan_note = "nmcli_wifi_ready_ssid_redacted" if rc == 0 else "nmcli_error"
+            if rc == 0:
+                # Explicitly omit SSID, BSSID, and SECURITY fields to avoid network identification
+                src_rc, src_out = run_cmd(["nmcli", "-t", "-f", "MODE,CHAN", "dev", "wifi", "list"], timeout=10)
+                if src_rc == 0:
+                    scan_ap_count = sum(1 for ln in src_out.splitlines() if ln.strip())
         return {
             "wifi_adapter_count": nq.get("wifi_adapter_count", 0),
             "wifi_hw_enabled": nq.get("wifi_hw_enabled"),
             "wifi_radio_enabled": nq.get("wifi_radio_enabled"),
             "networkmanager_state": nq.get("networkmanager_state"),
+            "scan_ap_count_only": scan_ap_count,
             "check_result": scan_note,
             "missing_firmware": nq.get("missing_network_firmware", []),
         }
@@ -246,8 +272,10 @@ def exec_single(name: str) -> dict:
             tone_played = (rc == 0)
         return {
             "audio_server": au.get("audio_server"),
+            "codecs": au.get("codecs", []),
             "playback_devices": au.get("playback_devices", []),
             "sof_modules": au.get("sof_modules", []),
+            "audio_service_errors": au.get("audio_service_errors", []),
             "tone_test_440hz": "played" if tone_played else "skipped_no_playback_or_speaker_test",
         }
     if name == "microphone":
@@ -259,9 +287,11 @@ def exec_single(name: str) -> dict:
                 sources = [l for l in txt.splitlines() if l.strip()][:8]
         return {
             "recording_performed": False,
+            "codecs": au.get("codecs", []),
             "capture_devices": au.get("capture_devices", []),
             "pipewire_pulse_sources": sources,
             "sof_firmware_files_count": au.get("sof_firmware_files_count", 0),
+            "audio_service_errors": au.get("audio_service_errors", []),
         }
     if name == "touchpad":
         libinput_info = []
@@ -286,19 +316,41 @@ def exec_single(name: str) -> dict:
             return {"status": "skipped_in_vm", "notes": "QEMU VM suspend does not test bare-metal ACPI S3/s2idle wake."}
         if not shutil.which("systemctl"):
             return {"status": "unavailable", "notes": "systemctl not present"}
+        pre_nm = (inv.get("network_qualification") or {}).get("networkmanager_state")
         rc, txt = run_cmd(["systemctl", "suspend"], timeout=10)
-        return {"status": "suspend_invoked" if rc == 0 else "suspend_failed", "output": txt}
+        post_nm = "unknown"
+        if shutil.which("nmcli"):
+            _, nm_out = run_cmd(["nmcli", "-t", "-f", "STATE", "general"], timeout=5)
+            post_nm = nm_out.strip() or "unknown"
+        return {
+            "status": "suspend_invoked" if rc == 0 else "suspend_failed",
+            "pre_suspend_nm_state": pre_nm,
+            "post_resume_nm_state": post_nm,
+            "output": txt,
+        }
     return {}
 
 
 targets = ["gpu", "wifi", "bluetooth", "audio-output", "microphone", "touchpad", "usb", "battery"] if run_test == "all-safe" else [run_test]
-results = {
+results = redact_obj({
     "stage": "B",
     "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "privacy_redacted": True,
     "environment": env,
     "tests_executed": {t: exec_single(t) for t in targets},
+    "human_review_required_before_sharing": True,
     "auto_upload": False,
-}
+})
+
+raw_b = json.dumps(results)
+leaks_b = []
+if re.search(r"\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b", raw_b):
+    leaks_b.append("mac_address")
+if re.search(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", raw_b):
+    leaks_b.append("uuid")
+if re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", raw_b):
+    leaks_b.append("ipv4_address")
+results["privacy_audit"] = {"passed": len(leaks_b) == 0, "detected_unredacted_patterns": leaks_b}
 
 if export_dir:
     out_d = Path(export_dir)

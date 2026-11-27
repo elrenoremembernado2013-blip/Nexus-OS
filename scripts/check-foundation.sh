@@ -97,9 +97,10 @@ bash linux/lite/build-nexus-lite-iso.sh --dry-run >/dev/null
 bash linux/lite/scripts/build-nexus-lite-lxqt-iso.sh --dry-run >/dev/null
 bash linux/lite/nexus-lite-install.sh --dry-run >/dev/null
 bash linux/hardware/nexus-hw-inventory.sh --json >/dev/null
+bash linux/hardware/nexus-hw-inventory.sh --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["schema_version"]==2 and d["privacy_redacted"] is True and "storage_controllers" in d and "input_devices" in d and "codecs" in d["audio"] and "shim_sb_status" in d["secure_boot_chain"]'
 bash linux/hardware/nexus-hw-inventory.sh --markdown >/dev/null
-bash linux/hardware/nexus-hw-diagnostics.sh --json >/dev/null
-bash linux/hardware/nexus-hw-diagnostics.sh --contribute-template >/dev/null
+bash linux/hardware/nexus-hw-diagnostics.sh --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["privacy_audit"]["passed"] is True and d["privacy_audit"]["auto_upload"] is False and "service_states" in d'
+bash linux/hardware/nexus-hw-diagnostics.sh --contribute-template | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["schema_version"]==2 and d["auto_upload"] is False and d["human_review_required"] is True and "compatibility_status" in d and "untested_components" in d and "evidence_references" in d'
 bash linux/hardware/nexus-hw-qualify.sh --stage a >/dev/null
 bash linux/hardware/nexus-hw-qualify.sh --run-test suspend --dry-run >/dev/null
 if bash linux/hardware/nexus-hw-qualify.sh --run-test suspend >/dev/null 2>&1; then

@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "last_updated_utc": "2026-11-24T00:00:00Z",
+  "last_updated_utc": "2026-11-27T00:00:00Z",
   "foundation": "Ubuntu 24.04 Noble / Linux Mint 22.3 (x86_64)",
   "status_taxonomy": [
     "verified",
@@ -217,12 +217,23 @@
       "id": "secure_boot_shim",
       "label": "UEFI Secure Boot & Signed Shim",
       "drivers": ["shimx64.efi", "grubx64.efi"],
-      "tested_editions": [],
-      "test_environment": "qemu_ovmf_non_sb",
+      "tested_editions": ["lite-lxqt"],
+      "test_environment": "qemu_ovmf_secboot_and_non_sb",
       "compatibility_status": "partially_verified",
-      "required_firmware": ["Ubuntu/Mint signed shimx64.efi"],
-      "known_issues": "CI OVMF runs with Secure Boot disabled; enforced Secure Boot signature chain and DKMS MOK enrollment are untested.",
-      "evidence": "EFI/ubuntu/grub.cfg + shim copy logic verified in installer; Secure Boot enforcement untested"
+      "required_firmware": ["shim-signed", "grub-efi-amd64-signed", "mokutil"],
+      "known_issues": "Enforced OVMF Secure Boot (OVMF_CODE_4M.secboot.fd + OVMF_VARS_4M.ms.fd, smm=on) verified on lite-lxqt in CI Run 45919673389; physical OEM UEFI Secure Boot firmware and DKMS MOK enrollment remain untested on bare metal.",
+      "evidence": "CI Run 45919673389 (lite-lxqt-phase130): secure_boot_state=enabled, efi_boot_ok=true, failed_systemd_units=0"
+    },
+    {
+      "id": "dual_boot_ntfs_esp",
+      "label": "Dual-Boot ESP & NTFS Partition Preservation",
+      "drivers": ["ntfs3", "ntfs-3g", "os-prober"],
+      "tested_editions": ["lite-lxqt"],
+      "test_environment": "qemu_ovmf_tcg",
+      "compatibility_status": "partially_verified",
+      "required_firmware": [],
+      "known_issues": "Simulated GPT ESP + NTFS Windows partition preservation (--keep-efi) verified in disposable QEMU CI Run 45919673389; physical Windows BitLocker/Fast Startup and Ubiquity GUI click-through remain untested.",
+      "evidence": "CI Run 45919673389 (lite-lxqt-phase130): dualboot_preflight_detected=true, dualboot_efi_preserved_after_boot=true, dualboot_os_part_preserved_after_boot=true"
     }
   ]
 }

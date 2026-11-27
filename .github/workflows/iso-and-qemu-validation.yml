@@ -28,6 +28,7 @@ on:
   push:
     branches:
       - arena/33e911d5-nexus-os
+      - arena/f18c36a4-nexus-os
     paths:
       - "linux/**"
       - "scripts/download-linux-mint.sh"
@@ -211,6 +212,10 @@ jobs:
           bash linux/build/validate-packages.sh linux/lite/manifests/lite-openbox-packages.list
           bash linux/build/validate-packages.sh linux/lite/manifests/lite-lxqt-packages.list
           bash linux/hardware/nexus-hw-inventory.sh --json >/dev/null
+          bash linux/hardware/nexus-hw-diagnostics.sh --json >/dev/null
+          bash linux/hardware/nexus-hw-diagnostics.sh --contribute-template >/dev/null
+          bash linux/hardware/nexus-hw-qualify.sh --stage a >/dev/null
+          bash linux/hardware/nexus-browser-qualify.sh --dry-run >/dev/null
           bash linux/security/nexus-security-audit.sh --repo-only --repo . --strict
 
       - name: Download and GPG-verify Linux Mint 22.3 base ISO (${{ matrix.base_edition }})

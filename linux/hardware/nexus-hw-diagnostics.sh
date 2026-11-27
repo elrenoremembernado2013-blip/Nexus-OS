@@ -44,6 +44,7 @@ done
 python3 - "$MODE" "$EXPORT_DIR" "$INVENTORY_SH" <<'PY'
 import datetime
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -55,6 +56,7 @@ mode = sys.argv[1]
 export_dir = sys.argv[2]
 inv_sh = sys.argv[3]
 hostname = socket.gethostname()
+active_user = os.environ.get("USER", "")
 
 
 def redact(text: str) -> str:
@@ -65,6 +67,8 @@ def redact(text: str) -> str:
     text = re.sub(r"/home/[A-Za-z0-9._-]+", "/home/<USER>", text)
     if hostname and len(hostname) > 2:
         text = re.sub(rf"\b{re.escape(hostname)}\b", "<REDACTED_HOST>", text)
+    if active_user and len(active_user) > 2 and active_user not in ("root", "user", "nexus"):
+        text = re.sub(rf"\b{re.escape(active_user)}\b", "<USER>", text)
     return text
 
 
@@ -132,7 +136,7 @@ if shutil.which("glxinfo"):
     except Exception:
         pass
 
-# Audio server & sinks (read-only metadata; NEVER captures microphone audio)
+# Audio server, sinks & service health (read-only metadata; NEVER captures microphone audio)
 audio_sinks = []
 if shutil.which("pactl"):
     try:
@@ -141,6 +145,21 @@ if shutil.which("pactl"):
             audio_sinks = [redact(l) for l in pres.stdout.splitlines()[:8]]
     except Exception:
         pass
+
+service_states = {}
+if shutil.which("systemctl"):
+    for unit in ("NetworkManager", "wpa_supplicant", "bluetooth", "upower", "power-profiles-daemon"):
+        try:
+            sres = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True, timeout=2)
+            service_states[unit] = (sres.stdout or sres.stderr or "unknown").strip()
+        except Exception:
+            service_states[unit] = "unknown"
+    for uunit in ("pipewire", "pipewire-pulse", "wireplumber", "pulseaudio"):
+        try:
+            ures = subprocess.run(["systemctl", "--user", "is-active", uunit], capture_output=True, text=True, timeout=2)
+            service_states[uunit] = (ures.stdout or ures.stderr or "unknown").strip()
+        except Exception:
+            service_states[uunit] = "unknown"
 
 # Read-only block device I/O error stats from sysfs (no smartctl/disk writes)
 block_stats = []
@@ -180,9 +199,11 @@ report = redact_obj({
         "default_route_present": has_default_route,
         "rfkill": rfkill_items,
     },
+    "service_states": service_states,
     "graphics_glx": glx_summary,
     "graphics_qualification": inv.get("graphics_qualification", {}),
     "audio_sinks": audio_sinks,
+    "audio_service_errors": (inv.get("audio") or {}).get("audio_service_errors", []),
     "batteries": (inv.get("power_management") or {}).get("batteries", []),
     "suspend_capabilities": inv.get("suspend_capabilities", {}),
     "secure_boot_chain": inv.get("secure_boot_chain", {}),
@@ -199,8 +220,12 @@ if re.search(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
     leaks.append("uuid")
 if re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", raw_check):
     leaks.append("ipv4_address")
+if re.search(r"\bfe80:[0-9a-fA-F:]+\b", raw_check):
+    leaks.append("ipv6_address")
 if re.search(r"/home/(?!<USER>)[A-Za-z0-9._-]+", raw_check):
     leaks.append("home_username")
+if hostname and len(hostname) > 2 and re.search(rf"\b{re.escape(hostname)}\b", raw_check):
+    leaks.append("hostname")
 
 report["privacy_audit"] = {
     "passed": len(leaks) == 0,
@@ -212,6 +237,9 @@ report["privacy_audit"] = {
 env_info = inv.get("environment") or {}
 gq = inv.get("graphics_qualification") or {}
 sb = inv.get("secure_boot_chain") or {}
+comp_matrix = inv.get("component_matrix", [])
+untested_cats = [c["category"] for c in comp_matrix if c.get("qualification_status") in ("untested", "supported_untested")]
+verified_cats = [c["category"] for c in comp_matrix if c.get("qualification_status") == "verified"]
 
 contrib_template = redact_obj({
     "schema_version": 2,
@@ -221,7 +249,20 @@ contrib_template = redact_obj({
     "auto_upload": False,
     "nexus_edition": edition,
     "test_environment": env_info.get("label", "bare_metal_user_report"),
+    "compatibility_status": {
+        "overall": "unverified_bare_metal" if env_info.get("is_virtual_machine") else "pending_manual_review",
+        "verified_in_current_env": verified_cats,
+        "untested_components": untested_cats,
+    },
+    "untested_components": untested_cats,
+    "evidence_references": [
+        "nexus-hw-inventory --json (schema_version=2)",
+        "nexus-hw-diagnostics --json (privacy_audit)",
+        "docs/HARDWARE_TESTING_GUIDE.md",
+        "linux/hardware/hw-compatibility-db.json",
+    ],
     "hardware_safety_notice": "Never run destructive disk/installer tests on a primary computer or personal Chromebook.",
+    "review_instructions": "Inspect every field below in a text editor before sharing. Community submissions require human maintainer review before entering hw-compatibility-db.json.",
     "system_summary": {
         "architecture": (inv.get("architecture") or {}).get("arch"),
         "is_virtual_machine": env_info.get("is_virtual_machine"),
@@ -236,7 +277,7 @@ contrib_template = redact_obj({
         "glx_renderer": gq.get("glx_renderer"),
         "vulkan_icds": gq.get("vulkan_icds", []),
     },
-    "component_matrix": inv.get("component_matrix", []),
+    "component_matrix": comp_matrix,
     "browser_gpu_qualification": {
         "firefox": {"status": "NOT TESTED", "webgl": "NOT TESTED", "video_playback": "NOT TESTED"},
         "falkon": {"status": "NOT TESTED", "webgl": "NOT TESTED", "video_playback": "NOT TESTED"},
