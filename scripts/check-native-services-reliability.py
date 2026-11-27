@@ -310,7 +310,7 @@ def test_gaming_and_security_cli_boundaries() -> None:
             assert launch_fail.returncode != 0 and "Steam is not installed" in launch_fail.stderr
 
         # Security CLI refuses firewall enable cleanly when ufw/pkexec are absent
-        for tool in ("bash", "python3", "grep", "id"):
+        for tool in ("bash", "python3", "grep", "id", "readlink", "dirname"):
             found = shutil.which(tool)
             if found:
                 os.symlink(found, bin_dir / tool)
@@ -432,7 +432,7 @@ def test_phase15_four_edition_service_parity(bridge) -> None:
         # Full gaming mock: vulkaninfo, gamemoded, mangohud, apt-get, flatpak, pkexec
         gbin = tmp / "gaming-bin"
         gbin.mkdir()
-        for tool in ("bash", "python3", "grep", "id"):
+        for tool in ("bash", "python3", "grep", "id", "readlink", "dirname"):
             found = shutil.which(tool)
             if found:
                 os.symlink(found, gbin / tool)

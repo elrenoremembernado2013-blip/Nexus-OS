@@ -32,6 +32,10 @@ jobs:
           node-version: "22"
       - name: Install shellcheck and desktop-file-utils
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck desktop-file-utils
+      - name: Run ShellCheck on added/modified scripts
+        run: shellcheck scripts/check-native-launchers.sh linux/branding/nexus-launch-app.sh linux/mint/nexus-firstboot.sh linux/mint/nexus-gaming-cli.sh linux/lite/provision-nexus-lite.sh linux/lite/scripts/provision-nexus-lite-lxqt.sh linux/mint/provision-nexus-guest.sh
+      - name: Validate .desktop launchers
+        run: desktop-file-validate linux/branding/applications/*.desktop linux/branding/nexus-firstboot.desktop
       - name: Run foundation and prototype checks
         run: bash scripts/check-foundation.sh
 
