@@ -229,6 +229,7 @@ bash linux/mint/nexus-gaming-cli.sh --dry-run gaming-mode disable >/dev/null
 bash linux/mint/nexus-gaming-cli.sh --dry-run steam install >/dev/null
 bash linux/mint/nexus-gaming-cli.sh --dry-run steam remove >/dev/null
 bash linux/installer/nexus-install-preflight.sh --summary >/dev/null
+bash linux/installer/nexus-install-preflight.sh --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "dual_boot_detection" in d and "secure_boot_status" in d'
 bash linux/installer/nexus-installer-launcher.sh --check >/dev/null
 bash linux/installer/nexus-installer-launcher.sh --dry-run >/dev/null
 bash linux/mint/nexus-firstboot.sh --dry-run --theme-preset nebula --security-summary >/dev/null

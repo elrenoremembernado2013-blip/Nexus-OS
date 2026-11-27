@@ -15,6 +15,7 @@ dual-boot/NTFS/ESP partition detection, network, audio, battery, and installer
 availability. Read-only.
 
 Options:
+  --json      Print JSON output (default)
   --summary   Print human-readable preflight summary instead of JSON
   --help, -h  Show this help message
 USAGE
@@ -22,6 +23,7 @@ USAGE
 
 while (($#)); do
   case "$1" in
+    --json) FORMAT="json"; shift ;;
     --summary) FORMAT="summary"; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
