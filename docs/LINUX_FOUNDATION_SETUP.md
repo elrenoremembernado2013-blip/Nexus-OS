@@ -56,6 +56,49 @@ The Ubuntu media script remains available for an explicit Ubuntu alternative, bu
 
 ## Create and launch the QEMU VM
 
+`scripts/launch-qemu.sh` boots either the stock Linux Mint 22.3 Xfce ISO (`linuxmint-22.3-xfce-64bit.iso`) or a built NEXUS edition (`--edition`), using UEFI/OVMF (`pflash`), persistent `build/qemu/OVMF_VARS.fd`, an absolute `usb-tablet` + `usb-kbd` on `qemu-xhci` (for accurate GUI clicks/double-clicks), HMP/QMP monitor sockets (`build/qemu/monitor.sock`, `build/qemu/qmp.sock`), and serial console logging (`build/qemu/serial.log`). Existing qcow2 disks are **never** overwritten without explicit `--reset-disk --yes-reset-disk`.
+
+### Interactive Stock Mint Installation Workflow (Task 2 / Task 3)
+
+1. **Boot the verified Mint ISO in installer-first mode** (use `--compat-video` for `-vga std` and `--vnc` if Cocoa/GTK has display or notification errors):
+
+   ```sh
+   # Standard desktop window (GTK on Linux, Cocoa on macOS):
+   bash scripts/launch-qemu.sh --profile minimum --installer-first --compat-video
+
+   # Or VNC frontend (recommended on macOS if Cocoa menus/notifications misbehave, or headless Linux):
+   bash scripts/launch-qemu.sh --profile minimum --installer-first --compat-video --vnc 127.0.0.1:0
+   # Connect with a VNC viewer (macOS Screen Sharing -> vnc://127.0.0.1:5900 or vncviewer 127.0.0.1:5900)
+   ```
+
+2. **Reach live desktop & launch Ubiquity reliably:**
+   - At GRUB, choose **Start Linux Mint 22.3 Xfce 64-bit (compatibility mode)** if normal mode outputs a blank screen.
+   - Double-click **Install Linux Mint** (accurate via `usb-tablet`). If selecting the icon only highlights it without opening the installer, press `Enter` twice on the focused desktop icon, or open a terminal (`Ctrl+Alt+T`) / `Alt+F2` and run:
+     ```sh
+     pkexec ubiquity gtk_ui
+     # Inspect installer process & logs if needed:
+     pgrep -af ubiquity && tail -n 50 /var/log/installer/debug
+     ```
+   - Inspect QEMU monitor from another host shell at any time:
+     ```sh
+     socat - UNIX-CONNECT:build/qemu/monitor.sock   # or: nc -U build/qemu/monitor.sock
+     # Useful commands: info status | screendump build/qemu/screen.ppm | sendkey ret | system_powerdown
+     ```
+
+3. **Install onto the disposable qcow2 disk & pause for owner credentials:**
+   - Proceed through Language, Keyboard, Multimedia codecs, and **Erase disk and install Linux Mint** (targeting only the disposable virtual VirtIO disk `/dev/vda`, never physical host storage).
+   - **Stop at the "Who are you?" account creation screen** so the owner can enter their preferred name, computer name, username, and password, then continue installation to completion.
+
+4. **Shut down cleanly, detach ISO, and boot the installed stock Mint system:**
+   - When installation finishes, choose **Shut Down** inside the live guest (or run `system_powerdown` in `build/qemu/monitor.sock`) rather than **Restart Now** with the ISO still attached.
+   - Boot directly from the installed virtual disk with the ISO detached:
+     ```sh
+     bash scripts/launch-qemu.sh --profile minimum --disk-only --compat-video --vnc 127.0.0.1:0
+     ```
+   - Log in with the owner's created credentials and verify the installed stock Mint Xfce desktop reaches its session cleanly. *(Note: this produces a **stock Linux Mint** guest, not yet customized NEXUS OS.)*
+
+### Edition Profiles & Dry-Run Inspection
+
 ```sh
 bash scripts/launch-qemu.sh --profile minimum --edition lite-lxqt
 # or recommended profile (4 vCPUs, 8192 MiB RAM, 50G disposable disk):
@@ -68,6 +111,7 @@ To inspect any profile without creating a disk, locating firmware, or starting a
 
 ```sh
 bash scripts/launch-qemu.sh --dry-run
+bash scripts/launch-qemu.sh --installer-first --compat-video --vnc --dry-run
 bash scripts/launch-qemu.sh --profile minimum --edition lite-lxqt --dry-run
 bash scripts/launch-qemu.sh --profile recommended --edition xfce --dry-run
 ```

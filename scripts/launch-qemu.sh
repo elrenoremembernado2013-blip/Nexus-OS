@@ -19,40 +19,66 @@ VM_STATE_DIR="$BUILD_DIR/qemu"
 
 PROFILE="${NEXUS_QEMU_PROFILE:-}"
 EDITION="${NEXUS_EDITION:-}"
+BOOT_MODE="auto"
 DISK_ONLY=false
+INSTALLER_FIRST=false
+COMPAT_VIDEO=false
+VNC_DISPLAY=""
+CUSTOM_ISO_PATH=""
+CUSTOM_DISK_PATH=""
+RESET_DISK=false
+YES_RESET_DISK=false
 DRY_RUN=false
 
 usage() {
   cat <<'USAGE'
 Usage: bash scripts/launch-qemu.sh [OPTIONS]
 
-Boots a NEXUS OS ISO or installed disposable qcow2 virtual disk under QEMU/OVMF UEFI.
+Boots a verified Linux Mint / NEXUS OS ISO or installed disposable qcow2 virtual
+disk under QEMU/OVMF UEFI with absolute USB tablet pointer, HMP/QMP monitor
+sockets, and serial log output.
 
 Options:
-  --profile NAME     VM hardware profile:
-                       minimum     2 vCPUs, 4096 MiB RAM, 30G disposable disk
-                       recommended 4 vCPUs, 8192 MiB RAM, 50G disposable disk
-  --edition NAME     Select built NEXUS ISO: cinnamon | xfce | lite | lite-lxqt
-  --disk-only        Do not attach ISO; boot directly from the installed virtual disk
-  --dry-run          Print resolved QEMU profile and host tool availability without launching
-  --help, -h         Show this help message
+  --profile NAME       VM hardware profile:
+                         minimum     2 vCPUs, 4096 MiB RAM, 30G disposable disk
+                         recommended 4 vCPUs, 8192 MiB RAM, 50G disposable disk
+  --edition NAME       Select built NEXUS ISO: cinnamon | xfce | lite | lite-lxqt
+                       (omit to use stock Linux Mint 22.3 Xfce ISO)
+  --installer-first    Require ISO media and boot installer first (order=d)
+  --disk-only          Detach ISO; boot directly from the installed virtual disk (order=c)
+  --installed          Alias for --disk-only
+  --iso-path PATH      Override ISO path
+  --disk-path PATH     Override disposable qcow2 virtual disk path (under ignored build/)
+  --compat-video       Use standard VGA (-vga std) for Mint compatibility graphics mode
+  --vnc [ADDR:DISP]    Use VNC display (default: 127.0.0.1:0, TCP port 5900) instead of cocoa/gtk
+  --reset-disk         Delete and recreate existing qcow2 disk (requires --yes-reset-disk)
+  --yes-reset-disk     Explicit confirmation required with --reset-disk
+  --dry-run            Print resolved QEMU profile, devices, and host tool availability
+  --help, -h           Show this help message
 
 Environment configuration:
   NEXUS_RAM_MB=4096            guest memory in MiB
   NEXUS_CPUS=2                 virtual CPU count
-  NEXUS_DISK_SIZE=30G|50G      new qcow2 disk capacity (M, G, or T suffix)
+  NEXUS_DISK_SIZE=40G|30G|50G  new qcow2 disk capacity (M, G, or T suffix)
   NEXUS_QEMU_ACCEL=tcg         QEMU accelerator (tcg or host-supported kvm)
   NEXUS_QEMU_DISPLAY=BACKEND   display backend (defaults to cocoa on macOS, gtk elsewhere)
-  NEXUS_QEMU_VIDEO=virtio|std  guest video device (defaults to virtio)
+  NEXUS_QEMU_VIDEO=virtio|std  guest video device (defaults to virtio; --compat-video sets std)
   NEXUS_QEMU_DEBUG_LOG=PATH    optional QEMU log path (overwritten; guest_errors,unimp)
-  NEXUS_ISO_PATH=PATH          installer ISO; omit the file or pass --disk-only to boot disk
+  NEXUS_QEMU_SERIAL_LOG=PATH   guest serial console log (default: build/qemu/serial.log)
+  NEXUS_QEMU_MONITOR_SOCK=PATH HMP monitor Unix socket (default: build/qemu/monitor.sock)
+  NEXUS_QEMU_QMP_SOCK=PATH     QMP monitor Unix socket (default: build/qemu/qmp.sock)
+  NEXUS_ISO_PATH=PATH          installer ISO; omit or pass --disk-only to boot disk
   NEXUS_DISK_PATH=PATH         guest qcow2 disk location
   OVMF_CODE=PATH               UEFI firmware code image
   OVMF_VARS=PATH               writable UEFI variable template
   QEMU_SYSTEM_X86_64=PATH      QEMU executable
 
-Defaults to software emulation (TCG); it is portable but may be slow. All VM
-state and disposable disks remain under ignored build/ and are never committed.
+Safety:
+  - Existing qcow2 disks are preserved across boots and never overwritten without
+    explicit `--reset-disk --yes-reset-disk`.
+  - OVMF_VARS state is preserved under build/qemu/OVMF_VARS.fd between installation
+    and subsequent `--disk-only` boots.
+  - All VM state and disposable disks remain under ignored build/ and are never committed.
 USAGE
 }
 
@@ -60,12 +86,37 @@ while (($#)); do
   case "$1" in
     --profile) [[ $# -ge 2 ]] || { echo '--profile requires a value (minimum | recommended)' >&2; exit 2; }; PROFILE="$2"; shift 2 ;;
     --edition) [[ $# -ge 2 ]] || { echo '--edition requires a value' >&2; exit 2; }; EDITION="$2"; shift 2 ;;
-    --disk-only) DISK_ONLY=true; shift ;;
+    --installer-first) INSTALLER_FIRST=true; BOOT_MODE="installer"; shift ;;
+    --disk-only|--installed) DISK_ONLY=true; BOOT_MODE="installed"; shift ;;
+    --iso-path) [[ $# -ge 2 ]] || { echo '--iso-path requires a path' >&2; exit 2; }; CUSTOM_ISO_PATH="$2"; shift 2 ;;
+    --disk-path) [[ $# -ge 2 ]] || { echo '--disk-path requires a path' >&2; exit 2; }; CUSTOM_DISK_PATH="$2"; shift 2 ;;
+    --compat-video) COMPAT_VIDEO=true; shift ;;
+    --vnc)
+      if [[ $# -ge 2 && "$2" != --* ]]; then
+        VNC_DISPLAY="$2"
+        shift 2
+      else
+        VNC_DISPLAY="127.0.0.1:0"
+        shift
+      fi
+      ;;
+    --reset-disk) RESET_DISK=true; shift ;;
+    --yes-reset-disk) YES_RESET_DISK=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [[ "$INSTALLER_FIRST" == true && "$DISK_ONLY" == true ]]; then
+  echo 'Cannot combine --installer-first with --disk-only / --installed.' >&2
+  exit 2
+fi
+
+if [[ "$RESET_DISK" == true && "$YES_RESET_DISK" == false ]]; then
+  echo 'SAFETY ABORT: --reset-disk refuses to overwrite an existing virtual disk without explicit --yes-reset-disk.' >&2
+  exit 2
+fi
 
 DEFAULT_RAM_MB="$(conf_value NEXUS_TARGET_RAM_MB 4096)"
 DEFAULT_CPUS=2
@@ -110,15 +161,25 @@ else
   fi
 fi
 
-ISO_PATH="${NEXUS_ISO_PATH:-$DEFAULT_ISO_PATH}"
-DISK_PATH="${NEXUS_DISK_PATH:-$DEFAULT_DISK_PATH}"
+ISO_PATH="${CUSTOM_ISO_PATH:-${NEXUS_ISO_PATH:-$DEFAULT_ISO_PATH}}"
+DISK_PATH="${CUSTOM_DISK_PATH:-${NEXUS_DISK_PATH:-$DEFAULT_DISK_PATH}}"
 RAM_MB="${NEXUS_RAM_MB:-$DEFAULT_RAM_MB}"
 CPUS="${NEXUS_CPUS:-$DEFAULT_CPUS}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-$DEFAULT_DISK_SIZE}"
 ACCEL="${NEXUS_QEMU_ACCEL:-tcg}"
-VIDEO="${NEXUS_QEMU_VIDEO:-virtio}"
+if [[ "$COMPAT_VIDEO" == true ]]; then
+  VIDEO="std"
+else
+  VIDEO="${NEXUS_QEMU_VIDEO:-virtio}"
+fi
 DEBUG_LOG="${NEXUS_QEMU_DEBUG_LOG:-}"
-if [[ -n "${NEXUS_QEMU_DISPLAY:-}" ]]; then
+SERIAL_LOG="${NEXUS_QEMU_SERIAL_LOG:-$VM_STATE_DIR/serial.log}"
+MONITOR_SOCK="${NEXUS_QEMU_MONITOR_SOCK:-$VM_STATE_DIR/monitor.sock}"
+QMP_SOCK="${NEXUS_QEMU_QMP_SOCK:-$VM_STATE_DIR/qmp.sock}"
+
+if [[ -n "$VNC_DISPLAY" ]]; then
+  DISPLAY_BACKEND="vnc=$VNC_DISPLAY"
+elif [[ -n "${NEXUS_QEMU_DISPLAY:-}" ]]; then
   DISPLAY_BACKEND="$NEXUS_QEMU_DISPLAY"
 elif [[ "$(uname -s)" == Darwin ]]; then
   DISPLAY_BACKEND=cocoa
@@ -149,14 +210,19 @@ find_firmware_pair() {
 }
 
 if [[ "$DRY_RUN" == true ]]; then
-  printf 'DRY RUN - NEXUS QEMU profile (%s)\n' "$PROFILE_LABEL"
-  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\nVideo: %s\n' \
-    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL" "$VIDEO"
+  printf 'DRY RUN - NEXUS QEMU profile (%s, boot_mode=%s)\n' "$PROFILE_LABEL" "$BOOT_MODE"
+  printf 'QEMU: %s\nRAM: %s MiB\nCPUs: %s\nDisk size: %s\nDisk path: %s\nAccelerator: %s\nDisplay: %s\nVideo: %s\n' \
+    "$QEMU" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$DISK_PATH" "$ACCEL" "$DISPLAY_BACKEND" "$VIDEO"
+  printf 'Input devices: qemu-xhci + usb-tablet (absolute pointer) + usb-kbd\n'
+  printf 'HMP monitor socket: %s\nQMP monitor socket: %s\nSerial log: %s\n' \
+    "$MONITOR_SOCK" "$QMP_SOCK" "$SERIAL_LOG"
   if [[ -n "$DEBUG_LOG" ]]; then printf 'Debug log: %s (overwritten)\n' "$DEBUG_LOG"; else printf 'Debug log: disabled\n'; fi
   if [[ "$DISK_ONLY" == true ]]; then
     printf 'Boot media: omitted (--disk-only); booting installed virtual disk\n'
   elif [[ -f "$ISO_PATH" ]]; then
     printf 'Boot media: present (%s)\n' "$ISO_PATH"
+  elif [[ "$INSTALLER_FIRST" == true ]]; then
+    printf 'Boot media: MISSING required installer ISO (%s)\n' "$ISO_PATH"
   else
     printf 'Boot media: not present; disk boot (%s)\n' "$ISO_PATH"
   fi
@@ -173,6 +239,18 @@ fi
 command -v "$QEMU" >/dev/null 2>&1 || { printf 'Missing QEMU executable: %s\n' "$QEMU" >&2; exit 1; }
 command -v qemu-img >/dev/null 2>&1 || { echo 'Missing qemu-img (install qemu-utils).' >&2; exit 1; }
 
+if [[ "$INSTALLER_FIRST" == true && ! -r "$ISO_PATH" ]]; then
+  printf 'Installer ISO not found or unreadable: %s\n' "$ISO_PATH" >&2
+  printf 'Run `bash scripts/download-linux-mint.sh` first or omit --installer-first.\n' >&2
+  exit 1
+fi
+
+if [[ "$DISK_ONLY" == true && ! -e "$DISK_PATH" ]]; then
+  printf 'Installed virtual disk not found: %s\n' "$DISK_PATH" >&2
+  printf 'Boot with --installer-first first to install onto the disposable qcow2 disk.\n' >&2
+  exit 1
+fi
+
 if [[ -z "${OVMF_CODE:-}" || -z "${OVMF_VARS:-}" ]]; then
   FIRMWARE_PAIR=()
   while IFS= read -r firmware_path; do FIRMWARE_PAIR+=("$firmware_path"); done < <(find_firmware_pair)
@@ -186,19 +264,28 @@ fi
 [[ -r "$OVMF_CODE" ]] || { printf 'Cannot read OVMF_CODE: %s\n' "$OVMF_CODE" >&2; exit 1; }
 [[ -r "$OVMF_VARS" ]] || { printf 'Cannot read OVMF_VARS template: %s\n' "$OVMF_VARS" >&2; exit 1; }
 
-mkdir -p -- "$(dirname -- "$DISK_PATH")" "$VM_STATE_DIR"
+mkdir -p -- "$(dirname -- "$DISK_PATH")" "$VM_STATE_DIR" "$(dirname -- "$SERIAL_LOG")" "$(dirname -- "$MONITOR_SOCK")" "$(dirname -- "$QMP_SOCK")"
+if [[ "$RESET_DISK" == true && -e "$DISK_PATH" ]]; then
+  echo "Resetting disposable qcow2 guest disk (--yes-reset-disk confirmed): $DISK_PATH"
+  rm -f -- "$DISK_PATH"
+fi
 if [[ ! -e "$DISK_PATH" ]]; then
   echo "Creating disposable qcow2 guest disk ($DISK_SIZE): $DISK_PATH"
   qemu-img create -f qcow2 "$DISK_PATH" "$DISK_SIZE"
+else
+  echo "Preserving existing disposable qcow2 guest disk: $DISK_PATH"
 fi
+
 VARS_PATH="$VM_STATE_DIR/OVMF_VARS.fd"
 TEMPLATE_BYTES="$(wc -c < "$OVMF_VARS")"
-if [[ ! -e "$VARS_PATH" ]]; then
+if [[ ! -e "$VARS_PATH" || "$RESET_DISK" == true ]]; then
   cp -- "$OVMF_VARS" "$VARS_PATH"
 elif [[ "$(wc -c < "$VARS_PATH")" -ne "$TEMPLATE_BYTES" ]]; then
   echo "Warning: cached $VARS_PATH size differs from $OVMF_VARS; refreshing writable UEFI vars." >&2
   cp -- "$OVMF_VARS" "$VARS_PATH"
 fi
+
+rm -f -- "$MONITOR_SOCK" "$QMP_SOCK"
 
 MACHINE_OPT="q35,accel=$ACCEL"
 PFLASH_CODE_OPT="if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE"
@@ -208,20 +295,48 @@ NETDEV_OPT="user,id=n0"
 NET_DEVICE_OPT="virtio-net-pci,netdev=n0"
 DEBUG_FLAGS="guest_errors,unimp"
 
-ARGS=(-machine "$MACHINE_OPT" -cpu max -smp "$CPUS" -m "$RAM_MB"
+ARGS=(
+  -machine "$MACHINE_OPT"
+  -cpu max
+  -smp "$CPUS"
+  -m "$RAM_MB"
   -drive "$PFLASH_CODE_OPT"
   -drive "$PFLASH_VARS_OPT"
-  -drive "$DISK_DRIVE_OPT" -netdev "$NETDEV_OPT" -device "$NET_DEVICE_OPT"
-  -display "$DISPLAY_BACKEND")
+  -drive "$DISK_DRIVE_OPT"
+  -netdev "$NETDEV_OPT"
+  -device "$NET_DEVICE_OPT"
+  -device qemu-xhci,id=xhci
+  -device usb-tablet,bus=xhci.0
+  -device usb-kbd,bus=xhci.0
+  -serial "file:$SERIAL_LOG"
+  -monitor "unix:$MONITOR_SOCK,server,nowait"
+  -qmp "unix:$QMP_SOCK,server,nowait"
+  -display "$DISPLAY_BACKEND"
+)
 if [[ "$VIDEO" == std ]]; then ARGS+=(-vga std); else ARGS+=(-device virtio-vga); fi
 if [[ -n "$DEBUG_LOG" ]]; then
   mkdir -p -- "$(dirname -- "$DEBUG_LOG")"
   ARGS+=(-D "$DEBUG_LOG" -d "$DEBUG_FLAGS")
 fi
 if [[ "$DISK_ONLY" == false && -f "$ISO_PATH" ]]; then
-  ARGS+=(-cdrom "$ISO_PATH" -boot order=d)
+  ARGS+=(-drive "file=$ISO_PATH,media=cdrom,readonly=on,index=0" -boot order=d)
+  ACTUAL_BOOT_MODE="installer-first (ISO attached read-only)"
 else
   ARGS+=(-boot order=c)
+  ACTUAL_BOOT_MODE="installed-disk (ISO detached)"
 fi
-printf 'Starting QEMU (profile=%s, RAM=%s MiB, CPUs=%s, disk=%s, accel=%s)\n' "$PROFILE_LABEL" "$RAM_MB" "$CPUS" "$DISK_SIZE" "$ACCEL"
+
+QEMU_VER=""
+IFS= read -r QEMU_VER < <("$QEMU" --version 2>/dev/null || true)
+QEMU_VER="${QEMU_VER:-unknown}"
+printf 'Starting QEMU (%s)\n' "$QEMU_VER"
+printf '  Profile: %s | Boot mode: %s\n' "$PROFILE_LABEL" "$ACTUAL_BOOT_MODE"
+printf '  RAM: %s MiB | CPUs: %s | Disk: %s (%s) | Video: %s | Display: %s\n' \
+  "$RAM_MB" "$CPUS" "$DISK_PATH" "$DISK_SIZE" "$VIDEO" "$DISPLAY_BACKEND"
+printf '  UEFI CODE: %s | VARS (persistent): %s\n' "$OVMF_CODE" "$VARS_PATH"
+printf '  HMP monitor: socat - UNIX-CONNECT:%s (or nc -U %s)\n' "$MONITOR_SOCK" "$MONITOR_SOCK"
+printf '  QMP monitor: %s | Serial log: %s\n' "$QMP_SOCK" "$SERIAL_LOG"
+if [[ -n "$VNC_DISPLAY" ]]; then
+  printf '  VNC viewer: connect to %s (e.g. vncviewer 127.0.0.1:5900 or macOS Screen Sharing)\n' "$VNC_DISPLAY"
+fi
 exec "$QEMU" "${ARGS[@]}"

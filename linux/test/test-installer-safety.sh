@@ -70,12 +70,19 @@ expect_fail "invalid --timezone rejected" bash "$DISK_INSTALL" --disk /dev/vda -
 bash "$DISK_INSTALL" --disk /dev/vda --edition lite-lxqt --locale en_US.UTF-8 --keymap us --timezone Europe/Madrid --validate-only >/dev/null
 echo "PASS [config-validation] locale, keymap, timezone, and --validate-only checks verified"
 
-# QEMU minimum & recommended profile dry-run checks
+# QEMU minimum & recommended profile dry-run checks + Phase 13.2A interactive safety guards
 q_min_out="$(bash "$REPO_ROOT/scripts/launch-qemu.sh" --profile minimum --edition lite-lxqt --dry-run)"
 printf '%s\n' "$q_min_out" | grep -Fq 'Disk size: 30G'
 q_rec_out="$(bash "$REPO_ROOT/scripts/launch-qemu.sh" --profile recommended --edition xfce --disk-only --dry-run)"
 printf '%s\n' "$q_rec_out" | grep -Fq 'Disk size: 50G'
-echo "PASS [vm-profiles] minimum (2C/4G/30G) and recommended (4C/8G/50G) QEMU profiles verified"
+expect_fail "launch-qemu refuses --reset-disk without --yes-reset-disk" bash "$REPO_ROOT/scripts/launch-qemu.sh" --reset-disk --dry-run
+expect_fail "launch-qemu refuses conflicting --installer-first and --disk-only" bash "$REPO_ROOT/scripts/launch-qemu.sh" --installer-first --disk-only --dry-run
+q_int_out="$(bash "$REPO_ROOT/scripts/launch-qemu.sh" --installer-first --compat-video --vnc --dry-run)"
+printf '%s\n' "$q_int_out" | grep -Fq 'usb-tablet'
+printf '%s\n' "$q_int_out" | grep -Fq 'Video: std'
+printf '%s\n' "$q_int_out" | grep -Fq 'Display: vnc=127.0.0.1:0'
+printf '%s\n' "$q_int_out" | grep -Fq 'HMP monitor socket:'
+echo "PASS [vm-profiles] minimum/recommended profiles & interactive usb-tablet/VNC/monitor/reset guards verified"
 
 # Dry-run coverage across all supported modes
 bash "$DISK_INSTALL" --disk /dev/vda --edition cinnamon --dry-run >/dev/null
