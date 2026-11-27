@@ -84,6 +84,17 @@ printf '%s\n' "$q_int_out" | grep -Fq 'Display: vnc=127.0.0.1:0'
 printf '%s\n' "$q_int_out" | grep -Fq 'HMP monitor socket:'
 echo "PASS [vm-profiles] minimum/recommended profiles & interactive usb-tablet/VNC/monitor/reset guards verified"
 
+# QEMU disk path containment: valid disposable paths pass; outside paths and symlinks fail.
+disk_guard="$REPO_ROOT/scripts/validate-qemu-disk-path.py"
+guard_root="$tmp_dir/nexus-build"
+mkdir -p "$guard_root/images"
+python3 "$disk_guard" "$guard_root" "$guard_root/images/safe.qcow2" >/dev/null
+expect_fail "QEMU disk path outside disposable build directory rejected" python3 "$disk_guard" "$guard_root" "$tmp_dir/outside.qcow2"
+ln -s "$tmp_dir" "$guard_root/escape"
+expect_fail "QEMU disk path through symlink rejected" python3 "$disk_guard" "$guard_root" "$guard_root/escape/unsafe.qcow2"
+expect_fail "QEMU disk path with non-qcow2 extension rejected" python3 "$disk_guard" "$guard_root" "$guard_root/images/disk.raw"
+echo "PASS [qemu-disk-path] build containment, symlink, and extension guards verified"
+
 # Dry-run coverage across all supported modes
 bash "$DISK_INSTALL" --disk /dev/vda --edition cinnamon --dry-run >/dev/null
 bash "$DISK_INSTALL" --disk /dev/vda --edition xfce --dry-run >/dev/null
