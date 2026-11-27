@@ -159,6 +159,7 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/measure-footprint.sh" "$bin_dir/n
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-panel-status.sh" "$bin_dir/nexus-panel-status"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/madoo-qualify-report.sh" "$bin_dir/nexus-qualify-report"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" "$bin_dir/nexus-firstboot"
+run_cmd install -m 0755 "$REPO_ROOT/linux/branding/nexus-launch-app.sh" "$bin_dir/nexus-launch-app"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" "$bin_dir/nexus-store-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" "$bin_dir/nexus-security-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" "$bin_dir/nexus-gaming-cli"
