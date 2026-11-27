@@ -21,14 +21,21 @@ def main() -> int:
     build = build_arg.resolve(strict=False)
     disk = disk_arg if disk_arg.is_absolute() else Path.cwd() / disk_arg
 
-    # Refuse symlinks in the build root itself and every existing path component.
-    cursor = build_arg.absolute()
-    if cursor.is_symlink():
+    # Check only components at or below the repository build directory. Ancestors
+    # such as /tmp may legitimately be symlinks on macOS and are outside our control.
+    build_lexical = build_arg.absolute()
+    disk_lexical = disk.absolute()
+    try:
+        lexical_relative = disk_lexical.relative_to(build_lexical)
+    except ValueError:
+        fail(f"disk must be located inside the disposable build directory ({build})")
+    if build_lexical.is_symlink():
         fail("the build directory must not be a symlink")
-    cursor = disk
-    for component in (cursor, *cursor.parents):
-        if component.exists() and component.is_symlink():
-            fail(f"symlink paths are not permitted: {component}")
+    cursor = build_lexical
+    for part in lexical_relative.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            fail(f"symlink paths are not permitted: {cursor}")
 
     resolved = disk.resolve(strict=False)
     try:
