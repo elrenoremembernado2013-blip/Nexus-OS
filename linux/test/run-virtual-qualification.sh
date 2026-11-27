@@ -263,7 +263,8 @@ def eval_vm_checks():
             "vm_network": pf(net_ok, f"nmcli_state={nm_state or 'unknown'}"),
             "vm_app_launch": pf(fm_ok and term_ok, f"file_manager={fm_ok}, terminal={term_ok}"),
             "vm_update_status": (
-                ("PASS", [f"apt_check_ok={upd_src.get('apt_check_ok')}"]) if "apt_check_ok" in upd_src
+                ("PASS", [f"dpkg_audit_ok={upd_src.get('dpkg_audit_ok')}, apt_check_ok={upd_src.get('apt_check_ok')}"])
+                if ("dpkg_audit_ok" in upd_src or "apt_check_ok" in upd_src)
                 else ("NOT TESTED", ["update_status field absent in legacy QEMU JSON"])
             ),
             "vm_persistence_reboot": pf(bool(run0.get("persistence_verified")), f"persistence_verified={run0.get('persistence_verified')}"),

@@ -249,9 +249,12 @@ if fstab_text is not None:
         spec = fields[0]
         if spec.startswith("UUID=") and shutil.which("blkid"):
             uuid_val = spec.split("=", 1)[1]
-            res = subprocess.run(["blkid", "-U", uuid_val], capture_output=True, text=True)
-            if res.returncode != 0:
-                fstab_issues.append(f"Line {idx}: UUID not currently detected by blkid")
+            try:
+                res = subprocess.run(["blkid", "-U", uuid_val], capture_output=True, text=True, timeout=5)
+                if res.returncode != 0:
+                    fstab_issues.append(f"Line {idx}: UUID not currently detected by blkid")
+            except Exception:
+                pass
 elif not live_session:
     fstab_issues.append("/etc/fstab missing or unreadable")
 

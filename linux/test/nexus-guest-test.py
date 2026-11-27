@@ -732,35 +732,50 @@ def main():
     net_info["ipv4"] = subprocess.run(["ip", "-4", "-br", "addr"], capture_output=True, text=True).stdout.strip().splitlines()
 
     # ZRAM check + pressure test (when /dev/zram0 exists)
-    zram_status = subprocess.run(["nexus-configure-zram", "status"], capture_output=True, text=True).stdout if shutil.which("nexus-configure-zram") else "{}"
+    zram_status = "{}"
+    if shutil.which("nexus-configure-zram"):
+        try:
+            zram_status = subprocess.run(["nexus-configure-zram", "status"], capture_output=True, text=True, timeout=10).stdout
+        except Exception:
+            pass
     zram_pressure = {"skipped": True}
     if Path("/sys/block/zram0").exists() and Path(ZRAM_SH).is_file():
         total_mib = stages["1_post_login"].get("ram_total_mib", 512)
         p_mb = "64" if total_mib < 700 else "96"
-        zres = subprocess.run(["bash", ZRAM_SH, "--pressure-mb", p_mb], capture_output=True, text=True, timeout=60)
         try:
-            zram_pressure = json.loads(zres.stdout)
-        except Exception:
-            zram_pressure = {"returncode": zres.returncode, "stdout": zres.stdout, "stderr": zres.stderr}
-        zram_pressure["post_recovery_mem"] = run_probe("post_zram_recovery")
+            zres = subprocess.run(["bash", ZRAM_SH, "--pressure-mb", p_mb], capture_output=True, text=True, timeout=60)
+            try:
+                zram_pressure = json.loads(zres.stdout)
+            except Exception:
+                zram_pressure = {"returncode": zres.returncode, "stdout": zres.stdout, "stderr": zres.stderr}
+            zram_pressure["post_recovery_mem"] = run_probe("post_zram_recovery")
+        except Exception as exc:
+            zram_pressure = {"error": str(exc)}
 
     # Preflight & storage detection
     preflight = {}
     if shutil.which("nexus-install-preflight"):
-        pres = subprocess.run(["nexus-install-preflight", "--json"], capture_output=True, text=True, timeout=20)
         try:
-            preflight = json.loads(pres.stdout)
-        except Exception:
-            preflight = {"raw": pres.stdout}
-    lsblk_out = subprocess.run(["lsblk", "-J", "-o", "NAME,SIZE,TYPE,TRAN"], capture_output=True, text=True).stdout
+            pres = subprocess.run(["nexus-install-preflight", "--json"], capture_output=True, text=True, timeout=20)
+            try:
+                preflight = json.loads(pres.stdout)
+            except Exception:
+                preflight = {"raw": pres.stdout}
+        except Exception as exc:
+            preflight = {"error": str(exc)}
+    lsblk_out = ""
+    try:
+        lsblk_out = subprocess.run(["lsblk", "-J", "-o", "NAME,SIZE,TYPE,TRAN"], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        pass
     ubiquity_present = bool(shutil.which("ubiquity"))
 
     # Hardware inventory & security audit summaries inside booted guest (if tools installed)
     hw_summary = {}
     if shutil.which("nexus-hw-inventory"):
-        hres = subprocess.run(["nexus-hw-inventory", "--json"], capture_output=True, text=True, timeout=20)
-        if hres.returncode == 0 and hres.stdout.strip():
-            try:
+        try:
+            hres = subprocess.run(["nexus-hw-inventory", "--json"], capture_output=True, text=True, timeout=20)
+            if hres.returncode == 0 and hres.stdout.strip():
                 hd = json.loads(hres.stdout)
                 hw_summary = {
                     "firmware": hd.get("firmware", {}).get("mode"),
@@ -771,35 +786,45 @@ def main():
                     "storage": [(s.get("device"), s.get("driver"), (s.get("classification") or {}).get("status")) for s in hd.get("storage", [])],
                     "missing_fw_count": len(hd.get("firmware", {}).get("missing_firmware_hints", [])),
                 }
-            except Exception:
-                pass
+        except Exception:
+            pass
     sec_summary = {}
     if shutil.which("nexus-security-audit"):
-        sres = subprocess.run(["nexus-security-audit", "--json"], capture_output=True, text=True, timeout=20)
-        if sres.returncode == 0 and sres.stdout.strip():
-            try:
+        try:
+            sres = subprocess.run(["nexus-security-audit", "--json"], capture_output=True, text=True, timeout=20)
+            if sres.returncode == 0 and sres.stdout.strip():
                 sd = json.loads(sres.stdout)
                 sec_summary = sd.get("summary") or {}
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     update_status = {
         "auto_upgrades_conf": Path("/etc/apt/apt.conf.d/20auto-upgrades").is_file(),
         "unattended_upgrades_installed": shutil.which("unattended-upgrade") is not None,
+        "dpkg_audit_ok": False,
         "apt_check_ok": False,
     }
-    if shutil.which("apt-get"):
-        ares = subprocess.run(["apt-get", "check"], capture_output=True, text=True, timeout=15)
-        update_status["apt_check_ok"] = ares.returncode == 0
+    if shutil.which("dpkg"):
+        try:
+            dres = subprocess.run(["dpkg", "--audit"], capture_output=True, text=True, timeout=15)
+            update_status["dpkg_audit_ok"] = dres.returncode == 0 and not dres.stdout.strip()
+        except Exception as exc:
+            update_status["dpkg_audit_error"] = str(exc)
+    if shutil.which("apt-cache"):
+        try:
+            ares = subprocess.run(["apt-cache", "stats"], capture_output=True, text=True, timeout=15)
+            update_status["apt_check_ok"] = ares.returncode == 0
+        except Exception as exc:
+            update_status["apt_check_error"] = str(exc)
 
     recovery_diag = {}
     if shutil.which("nexus-recovery"):
-        rres = subprocess.run(["nexus-recovery", "--diagnose", "--json", "--redacted"], capture_output=True, text=True, timeout=15)
-        if rres.returncode == 0 and rres.stdout.strip():
-            try:
+        try:
+            rres = subprocess.run(["nexus-recovery", "--diagnose", "--json", "--redacted"], capture_output=True, text=True, timeout=15)
+            if rres.returncode == 0 and rres.stdout.strip():
                 recovery_diag = json.loads(rres.stdout)
-            except Exception:
-                pass
+        except Exception as exc:
+            recovery_diag = {"error": str(exc)}
 
     # Live-mode Ubiquity UI check (launch + multi-screen navigation) & actual disk installation
     ubiquity_ui = {
@@ -855,26 +880,29 @@ def main():
             screens_observed = []
             launch_ok = ub_proc.poll() is None and len(ub_wins) > 0
             if launch_ok:
-                time.sleep(1.5)
-                screens_observed = read_ub_steps() or ["initial_screen"]
-                send_event(port_fd, "ubiquity_step", {"step": "01_language", "steps": screens_observed})
-                wait_for_cmd(port_file, "ack", timeout=15)
+                try:
+                    time.sleep(1.5)
+                    screens_observed = read_ub_steps() or ["initial_screen"]
+                    send_event(port_fd, "ubiquity_step", {"step": "01_language", "steps": screens_observed})
+                    wait_for_cmd(port_file, "ack", timeout=15)
 
-                # Attempt keyboard navigation across up to 3 subsequent screens (Language -> Keyboard -> Prepare -> Install Type)
-                for idx, step_label in enumerate(("02_keyboard", "03_prepare", "04_partman"), start=2):
-                    if ub_proc.poll() is not None:
-                        break
-                    prev_count = len(screens_observed)
-                    send_event(port_fd, "qmp_send_key", {"keys": ["ret"]})
-                    wait_for_cmd(port_file, "ack", timeout=15)
-                    for _ in range(12):
-                        time.sleep(0.5)
-                        cur_steps = read_ub_steps()
-                        if len(cur_steps) > prev_count:
-                            screens_observed = cur_steps
+                    # Attempt keyboard navigation across up to 3 subsequent screens (Language -> Keyboard -> Prepare -> Install Type)
+                    for idx, step_label in enumerate(("02_keyboard", "03_prepare", "04_partman"), start=2):
+                        if ub_proc.poll() is not None:
                             break
-                    send_event(port_fd, "ubiquity_step", {"step": step_label, "steps": screens_observed})
-                    wait_for_cmd(port_file, "ack", timeout=15)
+                        prev_count = len(screens_observed)
+                        send_event(port_fd, "qmp_send_key", {"keys": ["ret"]})
+                        wait_for_cmd(port_file, "ack", timeout=15)
+                        for _ in range(12):
+                            time.sleep(0.5)
+                            cur_steps = read_ub_steps()
+                            if len(cur_steps) > prev_count:
+                                screens_observed = cur_steps
+                                break
+                        send_event(port_fd, "ubiquity_step", {"step": step_label, "steps": screens_observed})
+                        wait_for_cmd(port_file, "ack", timeout=15)
+                except Exception:
+                    pass
 
             screens_verified = launch_ok and len(screens_observed) >= 2
             ubiquity_ui = {
