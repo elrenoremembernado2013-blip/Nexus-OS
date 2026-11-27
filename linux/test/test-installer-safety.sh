@@ -95,6 +95,14 @@ expect_fail "QEMU disk path through symlink rejected" python3 "$disk_guard" "$gu
 expect_fail "QEMU disk path with non-qcow2 extension rejected" python3 "$disk_guard" "$guard_root" "$guard_root/images/disk.raw"
 echo "PASS [qemu-disk-path] build containment, symlink, and extension guards verified"
 
+# Existing QEMU images must be standalone qcow2 files, never backing chains.
+image_guard="$REPO_ROOT/scripts/validate-qemu-image.py"
+printf '%s\\n' '{"format":"qcow2","virtual-size":1073741824}' | python3 "$image_guard"
+expect_fail "QEMU image validator rejects non-qcow2 format" bash -c 'printf "%s\\n" "{\"format\":\"raw\"}" | python3 "$1"' _ "$image_guard"
+expect_fail "QEMU image validator rejects backing filename" bash -c 'printf "%s\\n" "{\"format\":\"qcow2\",\"backing-filename\":\"../../host.img\"}" | python3 "$1"' _ "$image_guard"
+expect_fail "QEMU image validator rejects invalid JSON" bash -c 'printf "%s\\n" "not-json" | python3 "$1"' _ "$image_guard"
+echo "PASS [qemu-image-metadata] qcow2 format, standalone-image, and malformed-metadata checks verified"
+
 # Dry-run coverage across all supported modes
 bash "$DISK_INSTALL" --disk /dev/vda --edition cinnamon --dry-run >/dev/null
 bash "$DISK_INSTALL" --disk /dev/vda --edition xfce --dry-run >/dev/null
