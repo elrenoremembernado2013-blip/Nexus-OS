@@ -163,6 +163,10 @@ fi
 
 ISO_PATH="${CUSTOM_ISO_PATH:-${NEXUS_ISO_PATH:-$DEFAULT_ISO_PATH}}"
 DISK_PATH="${CUSTOM_DISK_PATH:-${NEXUS_DISK_PATH:-$DEFAULT_DISK_PATH}}"
+
+# Validate the selected guest disk before any dry-run, directory creation, or reset.
+# The helper resolves parent symlinks and refuses paths outside the disposable build tree.
+DISK_PATH="$(python3 "$ROOT_DIR/scripts/validate-qemu-disk-path.py" "$BUILD_DIR" "$DISK_PATH")" || exit 2
 RAM_MB="${NEXUS_RAM_MB:-$DEFAULT_RAM_MB}"
 CPUS="${NEXUS_CPUS:-$DEFAULT_CPUS}"
 DISK_SIZE="${NEXUS_DISK_SIZE:-$DEFAULT_DISK_SIZE}"
