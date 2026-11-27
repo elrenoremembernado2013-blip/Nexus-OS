@@ -5,6 +5,7 @@
 set -euo pipefail
 
 STORE_CLI="${NEXUS_STORE_CLI:-/usr/local/bin/nexus-store-cli}"
+FIRSTBOOT_CLI="${NEXUS_FIRSTBOOT_CLI:-/usr/local/bin/nexus-firstboot}"
 
 fail() {
   printf 'NEXUS launcher: %s\n' "$1" >&2
@@ -13,6 +14,18 @@ fail() {
 
 has() {
   command -v "$1" >/dev/null 2>&1
+}
+
+run_in_terminal() {
+  local target="$1"
+  shift
+  for app in qterminal lxterminal; do
+    if has "$app"; then exec "$app" -e "$target" "$@"; fi
+  done
+  if has gnome-terminal; then exec gnome-terminal -- "$target" "$@"; fi
+  if has xfce4-terminal; then exec xfce4-terminal -x "$target" "$@"; fi
+  if has x-terminal-emulator; then exec x-terminal-emulator -e "$target" "$@"; fi
+  return 1
 }
 
 case "${1:-}" in
@@ -55,16 +68,15 @@ case "${1:-}" in
     shift
     if has mintinstall; then exec mintinstall "$@"; fi
     [[ -x "$STORE_CLI" ]] || fail "NEXUS Store CLI is not installed at $STORE_CLI"
-    for app in qterminal lxterminal; do
-      if has "$app"; then exec "$app" -e "$STORE_CLI" --help; fi
-    done
-    if has gnome-terminal; then exec gnome-terminal -- "$STORE_CLI" --help; fi
-    if has xfce4-terminal; then exec xfce4-terminal -x "$STORE_CLI" --help; fi
-    if has x-terminal-emulator; then exec x-terminal-emulator -e "$STORE_CLI" --help; fi
-    fail "NEXUS Store CLI or a supported terminal emulator is unavailable"
+    run_in_terminal "$STORE_CLI" --help || fail "no supported terminal emulator is available for NEXUS Store CLI"
+    ;;
+  firstboot)
+    shift
+    [[ -x "$FIRSTBOOT_CLI" ]] || fail "NEXUS First-Boot helper is not installed at $FIRSTBOOT_CLI"
+    run_in_terminal "$FIRSTBOOT_CLI" "$@" || fail "no supported terminal emulator is available for NEXUS First-Boot"
     ;;
   *)
-    printf 'Usage: %s {files|terminal|monitor|settings|store}\n' "$0" >&2
+    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot}\n' "$0" >&2
     exit 2
     ;;
 esac

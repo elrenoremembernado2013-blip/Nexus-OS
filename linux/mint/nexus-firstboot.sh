@@ -134,11 +134,19 @@ if [[ "$SKIP_SETUP" == false ]]; then
     [[ "$DRY_RUN" == true ]] && cin_args+=(--dry-run)
     bash "$CINNAMON_APPLY" "${cin_args[@]}"
   elif [[ -x "$LITE_LXQT_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *LXQt* ]]; then
-    lxqt_args=(--profile "$( [[ "$PROFILE" == "lightweight" ]] && echo lite-512 || echo lite-1g )")
+    lite_prof="lite-1g"
+    if [[ "$PROFILE" == "lightweight" ]]; then
+      lite_prof="lite-512"
+    fi
+    lxqt_args=(--profile "$lite_prof")
     [[ "$DRY_RUN" == true ]] && lxqt_args+=(--dry-run)
     bash "$LITE_LXQT_APPLY" "${lxqt_args[@]}"
   elif [[ -x "$LITE_OPENBOX_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Openbox* ]]; then
-    ob_args=(--profile "$( [[ "$PROFILE" == "lightweight" ]] && echo lite-512 || echo lite-1g )")
+    lite_prof="lite-1g"
+    if [[ "$PROFILE" == "lightweight" ]]; then
+      lite_prof="lite-512"
+    fi
+    ob_args=(--profile "$lite_prof")
     [[ "$DRY_RUN" == true ]] && ob_args+=(--dry-run)
     bash "$LITE_OPENBOX_APPLY" "${ob_args[@]}"
   else

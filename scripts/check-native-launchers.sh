@@ -28,7 +28,7 @@ run_case() {
   local expected="$1"
   shift
   : > "$LOG"
-  PATH="$STUB_DIR" NEXUS_STORE_CLI="$STUB_DIR/nexus-store-cli" /bin/bash "$LAUNCHER" "$@"
+  PATH="$STUB_DIR" NEXUS_STORE_CLI="$STUB_DIR/nexus-store-cli" NEXUS_FIRSTBOOT_CLI="$STUB_DIR/nexus-firstboot" /bin/bash "$LAUNCHER" "$@"
   grep -Fq "$expected" "$LOG" || {
     printf 'Expected launcher output containing %s, got: ' "$expected" >&2
     cat "$LOG" >&2
@@ -37,7 +37,7 @@ run_case() {
 }
 
 expect_fail() {
-  if PATH="$STUB_DIR" NEXUS_STORE_CLI="$STUB_DIR/nexus-store-cli" /bin/bash "$LAUNCHER" "$@" >/dev/null 2>&1; then
+  if PATH="$STUB_DIR" NEXUS_STORE_CLI="$STUB_DIR/nexus-store-cli" NEXUS_FIRSTBOOT_CLI="$STUB_DIR/nexus-firstboot" /bin/bash "$LAUNCHER" "$@" >/dev/null 2>&1; then
     printf 'Expected launcher failure for args: %s\n' "$*" >&2
     exit 1
   fi
@@ -54,6 +54,8 @@ make_stub lxqt-config
 run_case "lxqt-config " settings
 make_stub nexus-store-cli
 run_case "qterminal -e $STUB_DIR/nexus-store-cli --help" store
+make_stub nexus-firstboot
+run_case "qterminal -e $STUB_DIR/nexus-firstboot" firstboot
 clear_stubs
 
 # 2. Lite Openbox edition utilities
