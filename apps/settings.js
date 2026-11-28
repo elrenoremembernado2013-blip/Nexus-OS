@@ -542,11 +542,14 @@
     }
 
     function syncNativePersonalisation(opts) {
-      if (!window.NexusNativeServices?.status("personalisation")?.available) return;
+      if (!window.NexusNativeServices?.status("personalisation")?.available) return Promise.resolve(false);
       try {
-        Promise.resolve(window.NexusNativeServices.call("personalisation", "applyTheme", opts)).catch(() => {});
+        return Promise.resolve(window.NexusNativeServices.call("personalisation", "applyTheme", opts))
+          .then(result => result?.ok === true)
+          .catch(() => false);
       } catch {
-        // Ignore transient native sync errors in preview
+        // Native integration is optional in the browser preview.
+        return Promise.resolve(false);
       }
     }
 
@@ -1004,7 +1007,16 @@
       });
       applyTheme(preset.mode, false);
       if (syncAccent) setAccent(preset.accent, false);
-      syncNativePersonalisation({ theme: presetId, appearance: preset.mode, accent: syncAccent ? preset.accent : undefined });
+      syncNativePersonalisation({
+        theme: presetId,
+        appearance: preset.mode === "light" ? "light" : "dark",
+        accent: syncAccent ? preset.accent : readStorage("nexus-accent") || preset.accent,
+        effectLevel: readStorage("nexus-effect-level") || "balanced",
+        dockPosition: readStorage("nexus-dock-position") || "bottom",
+        panelSize: readStorage("nexus-panel-size") || "medium",
+        panelAutohide: readStorage("nexus-dock-autohide") === "true" ? "true" : "false",
+        workspaces: Number(readStorage("nexus-workspace-count") || "4")
+      });
     }
     $$("[data-theme-preset]").forEach(btn => {
       btn.addEventListener("click", () => applyThemePreset(btn.dataset.themePreset, true));
@@ -1030,6 +1042,7 @@
         blur.value = blurMap[level];
         setBlur();
       }
+      syncNativePersonalisation({ effectLevel: level });
     }
     $$("[data-effect-level]").forEach(btn => {
       btn.addEventListener("click", () => applyEffectLevel(btn.dataset.effectLevel));
@@ -1055,7 +1068,15 @@
       $("#themeStatus").textContent =
         (mode === "system" ? "Following system appearance" : mode.charAt(0).toUpperCase() + mode.slice(1) + " theme") +
         " selected.";
-      if (syncNative) syncNativePersonalisation({ appearance: useLight ? "light" : "dark" });
+      if (syncNative) {
+        const presetId = readStorage("nexus-theme-preset");
+        const nativeTheme = presetId || (useLight ? "arctic" : "midnight");
+        syncNativePersonalisation({
+          theme: nativeTheme,
+          appearance: useLight ? "light" : "dark",
+          accent: readStorage("nexus-accent") || "#ffad7a"
+        });
+      }
     }
 
     $$("[data-theme-choice]").forEach(button => {
@@ -1160,7 +1181,10 @@
     const dockStyle = $("#dockStyleSelect");
     if (dockPos) {
       dockPos.value = readStorage("nexus-dock-position") || "bottom";
-      dockPos.addEventListener("change", () => shell?.setDockPreferences?.({ position: dockPos.value }, true));
+      dockPos.addEventListener("change", () => {
+        shell?.setDockPreferences?.({ position: dockPos.value }, true);
+        syncNativePersonalisation({ dockPosition: dockPos.value });
+      });
     }
     if (dockSize) {
       dockSize.value = readStorage("nexus-dock-size") || "43";
@@ -1175,9 +1199,10 @@
       dockStyle.addEventListener("change", () => shell?.setDockPreferences?.({ style: dockStyle.value }, true));
     }
     if ($("#dockAutoHideToggle")) {
-      bindSwitch($("#dockAutoHideToggle"), readStorage("nexus-dock-autohide") === "true", en =>
-        shell?.setDockPreferences?.({ autoHide: en }, true)
-      );
+      bindSwitch($("#dockAutoHideToggle"), readStorage("nexus-dock-autohide") === "true", en => {
+        shell?.setDockPreferences?.({ autoHide: en }, true);
+        syncNativePersonalisation({ panelAutohide: en ? "true" : "false" });
+      });
     }
     if ($("#dockIndicatorsToggle")) {
       bindSwitch($("#dockIndicatorsToggle"), readStorage("nexus-dock-indicators") !== "false", en =>
@@ -1201,6 +1226,7 @@
         const clamped = Math.min(8, Math.max(1, Number(wsCountInput.value) || 4));
         wsCountInput.value = String(clamped);
         writeStorage("nexus-workspace-count", String(clamped));
+        syncNativePersonalisation({ workspaces: clamped });
       });
     }
     const wsNamesInput = $("#workspaceNamesInput");
@@ -1231,6 +1257,15 @@
         size: profile.dockSize,
         autoHide: Boolean(profile.dockAutoHide)
       }, true);
+      syncNativePersonalisation({
+        theme: profile.themePreset,
+        accent: window.NexusPersonalisationCatalog?.THEME_PRESETS?.[profile.themePreset]?.accent || readStorage("nexus-accent") || "#ffad7a",
+        appearance: window.NexusPersonalisationCatalog?.THEME_PRESETS?.[profile.themePreset]?.mode === "light" ? "light" : "dark",
+        effectLevel: profile.effectLevel,
+        dockPosition: profile.dockPosition,
+        panelAutohide: profile.dockAutoHide ? "true" : "false",
+        workspaces: profile.workspaces
+      });
       if (dockPos) dockPos.value = profile.dockPosition;
       if (dockSize) dockSize.value = String(profile.dockSize);
       if ($("#dockAutoHideToggle")) updateSwitchState($("#dockAutoHideToggle"), Boolean(profile.dockAutoHide));
@@ -1368,6 +1403,24 @@
     const savedWallpaper = readStorage("nexus-wallpaper") || "alpine";
     if (savedWallpaper !== "custom") applyWallpaper(savedWallpaper, false);
     restoreCustomWallpaper();
+
+    // Reconcile browser-saved preferences with the native desktop on each Settings
+    // mount. Native helpers write user-local desktop configuration so it survives
+    // logout/restart; unsupported options are safely ignored by each edition.
+    const savedMode = readStorage("nexus-theme") || "dark";
+    const savedPreset = readStorage("nexus-theme-preset");
+    const savedPresetMeta = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[savedPreset];
+    const nativeAppearance = savedPresetMeta?.mode || (savedMode === "light" ? "light" : "dark");
+    syncNativePersonalisation({
+      theme: savedPreset || (nativeAppearance === "light" ? "arctic" : "midnight"),
+      appearance: nativeAppearance,
+      accent: readStorage("nexus-accent") || "#ffad7a",
+      effectLevel: readStorage("nexus-effect-level") || "balanced",
+      dockPosition: readStorage("nexus-dock-position") || "bottom",
+      panelSize: readStorage("nexus-panel-size") || "medium",
+      panelAutohide: readStorage("nexus-dock-autohide") === "true" ? "true" : "false",
+      workspaces: Number(readStorage("nexus-workspace-count") || "4")
+    });
 
     return () => {
       unmounted = true;
