@@ -270,17 +270,19 @@ function testBashAndConfigFixes() {
     assert(guestProv.includes('NEXUS_EDITION="$detected_de"'), "provision-nexus-guest.sh must write NEXUS_EDITION");
 
     // Quantum launcher fails cleanly when no browser is present
+    const emptyBin = path.join(tmp, "empty-bin");
+    fs.mkdirSync(emptyBin, { recursive: true });
     let quantumFailed = false;
     try {
-      execFileSync("bash", [path.join(ROOT, "linux/branding/nexus-launch-app.sh"), "quantum"], {
-        env: { PATH: "/bin:/usr/bin", NEXUS_OFFLINE_UI: path.join(ROOT, "index.html") },
+      execFileSync("/bin/bash", [path.join(ROOT, "linux/branding/nexus-launch-app.sh"), "quantum"], {
+        env: { PATH: emptyBin, NEXUS_OFFLINE_UI: path.join(ROOT, "index.html") },
         stdio: "pipe",
       });
     } catch (err) {
       quantumFailed = true;
       assert(err.stderr.toString("utf8").includes("no supported web browser"));
     }
-    assert(quantumFailed || fs.existsSync("/usr/bin/firefox") || fs.existsSync("/usr/bin/chromium") || fs.existsSync("/usr/bin/x-www-browser"));
+    assert(quantumFailed, "Quantum launcher must fail cleanly when no browser is in PATH");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
