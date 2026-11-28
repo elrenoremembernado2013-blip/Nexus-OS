@@ -67,7 +67,7 @@
     { key: "nature", label: "Nature" },
     { key: "architecture", label: "Architecture" },
     { key: "abstract", label: "Abstract" },
-    { key: "sci-fi", label: "Sci-Fi" },
+    { key: "sci-fi", label: "Space & Astronomy" },
     { key: "minimal", label: "Minimal" },
     { key: "gaming", label: "Gaming" }
   ];
@@ -77,6 +77,7 @@
   const WALLPAPERS = [
     {
       id: "alpine",
+      mediaType: "real-photograph",
       category: "nature",
       categoryLabel: "Nature",
       label: "Snow Mountain Under Stars",
@@ -95,6 +96,7 @@
     },
     {
       id: "mountain-night",
+      mediaType: "real-photograph",
       category: "nature",
       categoryLabel: "Nature",
       label: "Key Summit Night Peak",
@@ -113,6 +115,7 @@
     },
     {
       id: "forest",
+      mediaType: "real-photograph",
       category: "nature",
       categoryLabel: "Nature",
       label: "Sunlit Forest Canopy",
@@ -131,6 +134,7 @@
     },
     {
       id: "ocean-foam",
+      mediaType: "real-photograph",
       category: "nature",
       categoryLabel: "Nature",
       label: "Ocean Foam Coastline",
@@ -149,6 +153,7 @@
     },
     {
       id: "neon-rain-tokyo",
+      mediaType: "real-photograph",
       category: "cinematic",
       categoryLabel: "Cinematic",
       label: "Rainy Neon Street",
@@ -167,6 +172,7 @@
     },
     {
       id: "raindrops-copenhagen",
+      mediaType: "real-photograph",
       category: "cinematic",
       categoryLabel: "Cinematic",
       label: "Raindrops & Neon Glass",
@@ -185,6 +191,7 @@
     },
     {
       id: "city",
+      mediaType: "real-photograph",
       category: "architecture",
       categoryLabel: "Architecture",
       label: "Tokyo Night Skyline",
@@ -203,6 +210,7 @@
     },
     {
       id: "modern",
+      mediaType: "real-photograph",
       category: "architecture",
       categoryLabel: "Architecture",
       label: "Gran Via Modern Facade",
@@ -221,6 +229,7 @@
     },
     {
       id: "light-trails",
+      mediaType: "real-photograph",
       category: "abstract",
       categoryLabel: "Abstract",
       label: "Long Exposure Light Trails",
@@ -239,6 +248,7 @@
     },
     {
       id: "wave-motion",
+      mediaType: "real-photograph",
       category: "abstract",
       categoryLabel: "Abstract",
       label: "Light on the Waves",
@@ -257,8 +267,9 @@
     },
     {
       id: "cosmos",
+      mediaType: "real-photograph",
       category: "sci-fi",
-      categoryLabel: "Sci-Fi",
+      categoryLabel: "Space & Astronomy",
       label: "Deep Space Nebula",
       aria: "Apply Deep Space Nebula wallpaper",
       thumb: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=520&q=75",
@@ -275,8 +286,9 @@
     },
     {
       id: "carina-nebula",
+      mediaType: "real-photograph",
       category: "sci-fi",
-      categoryLabel: "Sci-Fi",
+      categoryLabel: "Space & Astronomy",
       label: "Carina Nebula Pillar (Hubble)",
       aria: "Apply Carina Nebula Pillar wallpaper",
       thumb: "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Carina_Nebula_in_visible_light_%28captured_by_the_Hubble_Space_Telescope%29.jpg/960px-Carina_Nebula_in_visible_light_%28captured_by_the_Hubble_Space_Telescope%29.jpg",
@@ -293,8 +305,9 @@
     },
     {
       id: "shinjuku-cyber",
+      mediaType: "real-photograph",
       category: "sci-fi",
-      categoryLabel: "Sci-Fi",
+      categoryLabel: "Space & Astronomy",
       label: "Shinjuku Neon Rain",
       aria: "Apply Shinjuku Neon Rain wallpaper",
       thumb: "https://images.unsplash.com/photo-1608874973277-a34ed4aba3f8?auto=format&fit=crop&w=520&q=75",
@@ -311,6 +324,7 @@
     },
     {
       id: "minimal-monolith",
+      mediaType: "real-photograph",
       category: "minimal",
       categoryLabel: "Minimal",
       label: "Monochrome Tower",
@@ -329,6 +343,7 @@
     },
     {
       id: "minimal-line",
+      mediaType: "real-photograph",
       category: "minimal",
       categoryLabel: "Minimal",
       label: "Minimal Line & Sky",
@@ -347,6 +362,7 @@
     },
     {
       id: "minimal-shadow",
+      mediaType: "real-photograph",
       category: "minimal",
       categoryLabel: "Minimal",
       label: "Clean Minimal Wall",
@@ -365,6 +381,7 @@
     },
     {
       id: "gaming-desk",
+      mediaType: "real-photograph",
       category: "gaming",
       categoryLabel: "Gaming",
       label: "Redlit Gaming Setup",
@@ -383,6 +400,7 @@
     },
     {
       id: "esports-rig",
+      mediaType: "real-photograph",
       category: "gaming",
       categoryLabel: "Gaming",
       label: "Esports RGB Rig",
