@@ -88,11 +88,11 @@ if command -v xorriso >/dev/null 2>&1; then
       exit 1
     }
   done
-  if ! printf '%s\n' "$listing" | grep -Eq '/boot/grub/efi\.img|/efi\.img|/EFI/boot/bootx64\.efi'; then
+  if [[ ! "$listing" =~ /boot/grub/efi\.img|/efi\.img|/EFI/boot/bootx64\.efi ]]; then
     echo 'Missing UEFI boot image (/boot/grub/efi.img or /EFI/boot/bootx64.efi) in ISO' >&2
     exit 1
   fi
-  if ! printf '%s\n' "$listing" | grep -Eq '/isolinux/isolinux\.bin|/boot/grub/i386-pc/eltorito\.img'; then
+  if [[ ! "$listing" =~ /isolinux/isolinux\.bin|/boot/grub/i386-pc/eltorito\.img ]]; then
     echo 'Missing BIOS El Torito boot image in ISO' >&2
     exit 1
   fi
