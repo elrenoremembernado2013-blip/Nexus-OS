@@ -11,7 +11,6 @@ STORE_CLI="$SCRIPT_DIR/nexus-store-cli.sh"
 PREFIX_BASE="${XDG_DATA_HOME:-$HOME/.local/share}/nexus-os/wine-prefixes"
 
 DRY_RUN=false
-JSON_OUT=false
 CONFIRM_ACTION=false
 FORCE_LOW_RAM=false
 
@@ -44,7 +43,7 @@ USAGE
 
 while (($#)); do
   case "$1" in
-    --json) JSON_OUT=true; shift ;;
+    --json) shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --confirm) CONFIRM_ACTION=true; shift ;;
     --force-low-ram) FORCE_LOW_RAM=true; shift ;;
