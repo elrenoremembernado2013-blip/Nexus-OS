@@ -66,9 +66,9 @@ GPG_HOME="$(mktemp -d "${TMPDIR:-/tmp}/nexus-mint-gpg.XXXXXX")"
 STATUS_FILE="$GPG_HOME/verification.status"
 trap 'rm -rf -- "$GPG_HOME"' EXIT
 
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "$BASE_URL/sha256sum.txt" -o "$CHECKSUMS.part"
+curl --http1.1 --proto '=https' --tlsv1.2 --fail --location --silent --show-error --connect-timeout 30 --retry 8 --retry-delay 5 --retry-all-errors "$BASE_URL/sha256sum.txt" -o "$CHECKSUMS.part"
 mv -- "$CHECKSUMS.part" "$CHECKSUMS"
-curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "$BASE_URL/sha256sum.txt.gpg" -o "$SIGNATURE.part"
+curl --http1.1 --proto '=https' --tlsv1.2 --fail --location --silent --show-error --connect-timeout 30 --retry 8 --retry-delay 5 --retry-all-errors "$BASE_URL/sha256sum.txt.gpg" -o "$SIGNATURE.part"
 mv -- "$SIGNATURE.part" "$SIGNATURE"
 if [[ -n "$KEYRING_PATH" ]]; then
   [[ -r "$KEYRING_PATH" ]] || { printf 'Mint signing keyring not readable: %s\n' "$KEYRING_PATH" >&2; exit 1; }
@@ -93,7 +93,7 @@ echo 'Verified Linux Mint checksum-manifest signature.'
 
 if [[ ! -s "$ISO_PATH" ]]; then
   echo "Downloading $ISO_NAME (large file)…"
-  curl --proto '=https' --tlsv1.2 --fail --location --show-error --retry 5 --retry-delay 5 --retry-all-errors "$BASE_URL/$ISO_NAME" -o "$ISO_PATH.part"
+  curl --http1.1 --proto '=https' --tlsv1.2 --fail --location --show-error --connect-timeout 30 --retry 8 --retry-delay 5 --retry-all-errors --continue-at - "$BASE_URL/$ISO_NAME" -o "$ISO_PATH.part"
   mv -- "$ISO_PATH.part" "$ISO_PATH"
 fi
 
@@ -108,6 +108,7 @@ ACTUAL_NORMALIZED="$(printf '%s' "$ACTUAL" | tr '[:upper:]' '[:lower:]')"
 EXPECTED_NORMALIZED="$(printf '%s' "$EXPECTED" | tr '[:upper:]' '[:lower:]')"
 if [[ "$ACTUAL_NORMALIZED" != "$EXPECTED_NORMALIZED" ]]; then
   printf 'SHA-256 mismatch for %s\nExpected: %s\nActual:   %s\n' "$ISO_NAME" "$EXPECTED" "$ACTUAL" >&2
+  rm -f -- "$ISO_PATH"
   exit 1
 fi
 printf 'Verified: %s\nSHA-256: %s\n' "$ISO_PATH" "$ACTUAL"
