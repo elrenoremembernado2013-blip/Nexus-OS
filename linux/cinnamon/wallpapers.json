@@ -1,12 +1,12 @@
 {
   "version": 3,
-  "attributionPolicy": "Genuine real-world photographs and NASA/ESA space imagery with verified photographer/agency attribution, original source URLs, and free licenses; no AI-generated imagery.",
+  "attributionPolicy": "Real-world photographs and original NASA/ESA astronomical imagery only. No AI-generated images, CGI, 3D renders, digital paintings, or synthetic wallpaper artwork. Every entry must include its photographer/agency, original source page, and licence.",
   "categories": [
     "Cinematic",
     "Nature",
     "Architecture",
     "Abstract",
-    "Sci-Fi",
+    "Space & Astronomy",
     "Minimal",
     "Gaming"
   ],
@@ -22,6 +22,7 @@
   "wallpapers": [
     {
       "id": "alpine",
+      "mediaType": "real-photograph",
       "title": "Snow Mountain Under Stars",
       "category": "Nature",
       "categoryKey": "nature",
@@ -38,6 +39,7 @@
     },
     {
       "id": "mountain-night",
+      "mediaType": "real-photograph",
       "title": "Key Summit Night Peak",
       "category": "Nature",
       "categoryKey": "nature",
@@ -54,6 +56,7 @@
     },
     {
       "id": "forest",
+      "mediaType": "real-photograph",
       "title": "Sunlit Forest Canopy",
       "category": "Nature",
       "categoryKey": "nature",
@@ -70,6 +73,7 @@
     },
     {
       "id": "ocean-foam",
+      "mediaType": "real-photograph",
       "title": "Ocean Foam Coastline",
       "category": "Nature",
       "categoryKey": "nature",
@@ -86,6 +90,7 @@
     },
     {
       "id": "neon-rain-tokyo",
+      "mediaType": "real-photograph",
       "title": "Rainy Neon Street",
       "category": "Cinematic",
       "categoryKey": "cinematic",
@@ -102,6 +107,7 @@
     },
     {
       "id": "raindrops-copenhagen",
+      "mediaType": "real-photograph",
       "title": "Raindrops & Neon Glass",
       "category": "Cinematic",
       "categoryKey": "cinematic",
@@ -118,6 +124,7 @@
     },
     {
       "id": "city",
+      "mediaType": "real-photograph",
       "title": "Tokyo Night Skyline",
       "category": "Architecture",
       "categoryKey": "architecture",
@@ -134,6 +141,7 @@
     },
     {
       "id": "modern",
+      "mediaType": "real-photograph",
       "title": "Gran Via Modern Facade",
       "category": "Architecture",
       "categoryKey": "architecture",
@@ -150,6 +158,7 @@
     },
     {
       "id": "light-trails",
+      "mediaType": "real-photograph",
       "title": "Long Exposure Light Trails",
       "category": "Abstract",
       "categoryKey": "abstract",
@@ -166,6 +175,7 @@
     },
     {
       "id": "wave-motion",
+      "mediaType": "real-photograph",
       "title": "Light on the Waves",
       "category": "Abstract",
       "categoryKey": "abstract",
@@ -182,8 +192,9 @@
     },
     {
       "id": "cosmos",
+      "mediaType": "real-photograph",
       "title": "Deep Space Nebula",
-      "category": "Sci-Fi",
+      "category": "Space & Astronomy",
       "categoryKey": "sci-fi",
       "photographer": "NASA",
       "sourceName": "Unsplash / NASA",
@@ -198,8 +209,9 @@
     },
     {
       "id": "carina-nebula",
+      "mediaType": "real-photograph",
       "title": "Carina Nebula Pillar (Hubble)",
-      "category": "Sci-Fi",
+      "category": "Space & Astronomy",
       "categoryKey": "sci-fi",
       "photographer": "NASA, ESA and the Hubble SM4 ERO Team",
       "sourceName": "Wikimedia Commons",
@@ -214,8 +226,9 @@
     },
     {
       "id": "shinjuku-cyber",
+      "mediaType": "real-photograph",
       "title": "Shinjuku Neon Rain",
-      "category": "Sci-Fi",
+      "category": "Space & Astronomy",
       "categoryKey": "sci-fi",
       "photographer": "Marek Okon",
       "sourceName": "Unsplash",
@@ -230,6 +243,7 @@
     },
     {
       "id": "minimal-monolith",
+      "mediaType": "real-photograph",
       "title": "Monochrome Tower",
       "category": "Minimal",
       "categoryKey": "minimal",
@@ -246,6 +260,7 @@
     },
     {
       "id": "minimal-line",
+      "mediaType": "real-photograph",
       "title": "Minimal Line & Sky",
       "category": "Minimal",
       "categoryKey": "minimal",
@@ -262,6 +277,7 @@
     },
     {
       "id": "minimal-shadow",
+      "mediaType": "real-photograph",
       "title": "Clean Minimal Wall",
       "category": "Minimal",
       "categoryKey": "minimal",
@@ -278,6 +294,7 @@
     },
     {
       "id": "gaming-desk",
+      "mediaType": "real-photograph",
       "title": "Redlit Gaming Setup",
       "category": "Gaming",
       "categoryKey": "gaming",
@@ -294,6 +311,7 @@
     },
     {
       "id": "esports-rig",
+      "mediaType": "real-photograph",
       "title": "Esports RGB Rig",
       "category": "Gaming",
       "categoryKey": "gaming",
