@@ -696,7 +696,7 @@ PY
         if [[ "$DRY_RUN" == true ]]; then
           printf '{"ok":true,"dryRun":true,"name":"%s","path":"%s"}\n' "$slug" "$target"
         else
-          mkdir -p -m 0700 "$target"
+          mkdir -p "$target" && chmod 0700 "$target"
           printf '{"ok":true,"name":"%s","path":"%s"}\n' "$slug" "$target"
         fi
         ;;
@@ -753,7 +753,7 @@ PY
         printf '{"ok":true,"dryRun":true,"runtime":"wine","prefix":"%s","file":"%s"}\n' "$prefix_dir" "$TARGET_FILE"
         exit 0
       fi
-      mkdir -p -m 0700 "$prefix_dir"
+      mkdir -p "$prefix_dir" && chmod 0700 "$prefix_dir"
       export WINEPREFIX="$prefix_dir"
       if [[ "$lower" == *.msi ]]; then
         exec wine msiexec /i "$TARGET_FILE"
