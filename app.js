@@ -262,14 +262,19 @@
   const controlState = { ...controlDefaults };
   const controlListeners = new Set();
 
-  function applyControlToggle(button, enabled) {
+  function applyControlToggle(button, enabled, syncNative = true) {
     const key = button.dataset.toggle;
     controlState[key] = enabled;
     button.classList.toggle("active", enabled);
     button.setAttribute("aria-pressed", String(enabled));
-    button.querySelector("small").textContent = (enabled ? "On" : "Off") + " · preview";
+    const isNativeDnd = key === "dnd" && Boolean(window.NexusNativeServices?.status("control-centre")?.available);
+    button.querySelector("small").textContent = (enabled ? "On" : "Off") + (isNativeDnd ? " · native" : " · preview");
     writeStorage("nexus-control-" + key, String(enabled));
     if (key === "power") desktop.classList.toggle("lightweight", enabled);
+    if (syncNative && isNativeDnd) {
+      Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "dnd", enabled ? "on" : "off"))
+        .catch(err => notify(err?.message || "Could not update Do Not Disturb"));
+    }
     controlListeners.forEach(listener => {
       try {
         listener({ ...controlState });
@@ -281,36 +286,36 @@
 
   function setControlPreference(key, enabled) {
     const button = $(`[data-toggle="${key}"]`);
-    if (button) applyControlToggle(button, enabled);
+    if (button) applyControlToggle(button, enabled, false);
   }
 
   $$("[data-toggle]").forEach(button => {
     const key = button.dataset.toggle;
     const saved = readStorage("nexus-control-" + key);
-    applyControlToggle(button, saved === null ? controlDefaults[key] : saved === "true");
-    button.addEventListener("click", () => applyControlToggle(button, !controlState[key]));
+    applyControlToggle(button, saved === null ? controlDefaults[key] : saved === "true", false);
+    button.addEventListener("click", () => applyControlToggle(button, !controlState[key], true));
   });
 
   const brightness = $("#brightness");
   const savedBrightness = readStorage("nexus-brightness");
   if (savedBrightness !== null) brightness.value = savedBrightness;
+  let brightnessTimer = null;
 
-  function updateBrightness() {
+  function updateBrightness(syncNative = false) {
     const output = $("#brightnessValue");
     output.value = brightness.value + "%";
     output.textContent = brightness.value + "%";
     writeStorage("nexus-brightness", brightness.value);
     desktop.style.filter = "brightness(" + Number(brightness.value) / 100 + ")";
-    if (window.NexusNativeServices?.status("control-centre")?.available && brightness.dataset.nativeBacklight === "true") {
-      try {
+    if (syncNative && window.NexusNativeServices?.status("control-centre")?.available && brightness.dataset.nativeBacklight === "true") {
+      window.clearTimeout(brightnessTimer);
+      brightnessTimer = window.setTimeout(() => {
         Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "brightness", Number(brightness.value))).catch(() => {});
-      } catch {
-        // Ignore transient native backlight errors
-      }
+      }, 120);
     }
   }
-  brightness.addEventListener("input", updateBrightness);
-  updateBrightness();
+  brightness.addEventListener("input", () => updateBrightness(true));
+  updateBrightness(false);
 
   let lastControlCentreStatus = null;
 
@@ -415,7 +420,14 @@
       if (status.updates?.apt_available || status.updates?.available || updCount != null) {
         pills.push(`<span class="cc-pill">${updCount ?? 0} updates</span>`);
       }
+      if (status.security?.firewall) {
+        pills.push(`<span class="cc-pill">UFW: ${status.security.firewall}</span>`);
+      }
       strip.innerHTML = pills.join("");
+    }
+    const dndTile = $('[data-toggle="dnd"]');
+    if (dndTile && typeof status.notifications?.dnd === "boolean") {
+      applyControlToggle(dndTile, status.notifications.dnd, false);
     }
     if (foot) {
       foot.textContent = "Connected to Linux system services. Unavailable hardware controls stay disabled.";
@@ -465,12 +477,16 @@
     }
   });
 
+  let volumeTimer = null;
   $("#volume")?.addEventListener("input", () => {
     const volumeValue = $("#volumeValue");
     if (volumeValue) volumeValue.textContent = `${$("#volume").value}%`;
     if (window.NexusNativeServices?.status("control-centre")?.available) {
-      Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "volume", Number($("#volume").value)))
-        .catch(() => {});
+      window.clearTimeout(volumeTimer);
+      volumeTimer = window.setTimeout(() => {
+        Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "volume", Number($("#volume").value)))
+          .catch(() => {});
+      }, 120);
     }
   });
 

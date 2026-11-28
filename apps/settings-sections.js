@@ -35,14 +35,42 @@
     overviewCard.append(heading);
 
     let snapshot = null;
+    let pendingSnapshot = null;
     let errorMsg = null;
     if (available) {
       try {
-        snapshot = window.NexusNativeServices.call("privacy-security", "overview");
+        const res = window.NexusNativeServices.call("privacy-security", "overview");
+        if (res && typeof res.then === "function") {
+          pendingSnapshot = res;
+        } else {
+          snapshot = res;
+        }
       } catch (err) {
         errorMsg = err?.message || "Could not read native security overview.";
       }
     }
+
+    const list = document.createElement("dl");
+    list.className = "store-detail-metadata";
+    const ddByLabel = new Map();
+    const rowLabels = [
+      "Firewall (UFW)",
+      "Security updates",
+      "Disk encryption",
+      "UEFI Secure Boot",
+      "App permissions",
+      "Camera / Mic / Location",
+      "Startup apps"
+    ];
+    rowLabels.forEach(label => {
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      dd.textContent = pendingSnapshot ? "Checking…" : "Unavailable";
+      ddByLabel.set(label, dd);
+      list.append(dt, dd);
+    });
+    overviewCard.append(list);
 
     if (errorMsg) {
       const errEl = document.createElement("p");
@@ -51,57 +79,81 @@
       overviewCard.append(errEl);
     }
 
-    const rows = [
-      ["Firewall (UFW)", snapshot?.firewall?.status],
-      ["Security updates", snapshot?.security_updates?.status],
-      ["Disk encryption", snapshot?.disk_encryption?.status],
-      ["UEFI Secure Boot", snapshot?.secure_boot?.status],
-      ["App permissions", snapshot ? "Flatpak portals · APT unsandboxed" : null],
-      ["Camera / Mic / Location", snapshot?.devices?.status],
-      ["Startup apps", snapshot?.startup_apps ? `${snapshot.startup_apps.length} entries` : null]
-    ];
-
-    const list = document.createElement("dl");
-    list.className = "store-detail-metadata";
-    rows.forEach(([label, rawStatus]) => {
-      const dt = document.createElement("dt");
-      dt.textContent = label;
-      const dd = document.createElement("dd");
-      dd.textContent = label === "App permissions" || label === "Startup apps"
-        ? (rawStatus || "Unavailable")
-        : formatStatusLabel(rawStatus);
-      list.append(dt, dd);
-    });
-    overviewCard.append(list);
-
-    if (snapshot?.warnings?.length) {
-      const warnTitle = document.createElement("strong");
-      warnTitle.textContent = "Security notices";
-      overviewCard.append(warnTitle);
-      snapshot.warnings.forEach(w => {
-        const p = document.createElement("p");
-        p.className = "settings-hint";
-        p.textContent = String(w);
-        overviewCard.append(p);
-      });
-    }
-
     const boundaryNote = document.createElement("p");
     boundaryNote.className = "settings-hint";
     boundaryNote.textContent = "No synthetic security score is shown. Traditional APT packages run unsandboxed as your user; Flatpak apps expose portal permissions.";
     overviewCard.append(boundaryNote);
     page.append(overviewCard);
 
+    let actionsMsg = null;
+    let fwBtn = null;
+    let fwEnabled = false;
+    let startupMount = null;
+
+    const applySnapshot = data => {
+      snapshot = data;
+      const rawByLabel = new Map([
+        ["Firewall (UFW)", formatStatusLabel(data?.firewall?.status)],
+        ["Security updates", formatStatusLabel(data?.security_updates?.status)],
+        ["Disk encryption", formatStatusLabel(data?.disk_encryption?.status)],
+        ["UEFI Secure Boot", formatStatusLabel(data?.secure_boot?.status)],
+        ["App permissions", data ? "Flatpak portals · APT unsandboxed" : "Unavailable"],
+        ["Camera / Mic / Location", formatStatusLabel(data?.devices?.status)],
+        ["Startup apps", data?.startup_apps ? `${data.startup_apps.length} entries` : "Unavailable"]
+      ]);
+      rawByLabel.forEach((val, key) => {
+        const dd = ddByLabel.get(key);
+        if (dd) dd.textContent = val;
+      });
+      if (data?.warnings?.length) {
+        const warnTitle = document.createElement("strong");
+        warnTitle.textContent = "Security notices";
+        overviewCard.append(warnTitle);
+        data.warnings.forEach(w => {
+          const p = document.createElement("p");
+          p.className = "settings-hint";
+          p.textContent = String(w);
+          overviewCard.append(p);
+        });
+      }
+      if (actionsMsg && data?.services) {
+        actionsMsg.textContent = `Services — Bridge: ${data.services["nexus-system-bridge"] || "unknown"} · UFW: ${data.services.ufw || "unknown"} · Ports: ${data.listening_ports?.loopback ?? 0} loopback, ${data.listening_ports?.external ?? 0} external`;
+      }
+      fwEnabled = data?.firewall?.status === "enabled";
+      if (fwBtn) {
+        fwBtn.textContent = fwEnabled ? "Disable UFW firewall" : "Enable UFW firewall";
+      }
+      if (startupMount && data?.startup_apps?.length) {
+        if (typeof startupMount.replaceChildren === "function") {
+          startupMount.replaceChildren();
+        } else if (Array.isArray(startupMount.children)) {
+          startupMount.children.length = 0;
+        }
+        const stTitle = document.createElement("strong");
+        if (stTitle.style) {
+          stTitle.style.display = "block";
+          stTitle.style.marginTop = "12px";
+        }
+        stTitle.textContent = "Detected autostart entries";
+        const ul = document.createElement("ul");
+        ul.className = "settings-hint";
+        data.startup_apps.slice(0, 8).forEach(entry => {
+          const li = document.createElement("li");
+          li.textContent = `${entry.name} (${entry.scope} · ${entry.enabled ? "enabled" : "disabled"})`;
+          ul.append(li);
+        });
+        startupMount.append(stTitle, ul);
+      }
+    };
+
     if (available) {
       const actionsCard = document.createElement("div");
       actionsCard.className = "settings-card integration-card";
       const actionsTitle = document.createElement("h3");
-      actionsTitle.textContent = "Firewall & live system checks";
-      const actionsMsg = document.createElement("p");
+      actionsTitle.textContent = "Firewall, Flatpak permissions & live checks";
+      actionsMsg = document.createElement("p");
       actionsMsg.className = "settings-hint";
-      actionsMsg.textContent = snapshot?.services
-        ? `Services — Bridge: ${snapshot.services["nexus-system-bridge"] || "unknown"} · UFW: ${snapshot.services.ufw || "unknown"} · Ports: ${snapshot.listening_ports?.loopback ?? 0} loopback, ${snapshot.listening_ports?.external ?? 0} external`
-        : "Firewall changes invoke PolicyKit (pkexec) authentication.";
+      actionsMsg.textContent = "Firewall changes invoke PolicyKit (pkexec) authentication.";
 
       const row = document.createElement("div");
       row.className = "settings-actions-row";
@@ -111,40 +163,111 @@
         row.style.flexWrap = "wrap";
       }
 
-      const fwEnabled = snapshot?.firewall?.status === "enabled";
-      const fwBtn = document.createElement("button");
+      fwBtn = document.createElement("button");
       fwBtn.type = "button";
       fwBtn.className = "action-button";
-      fwBtn.textContent = fwEnabled ? "Disable UFW firewall" : "Enable UFW firewall";
+      fwBtn.textContent = "Enable UFW firewall";
       fwBtn.addEventListener("click", async () => {
         try {
           const res = await window.NexusNativeServices.call("privacy-security", "setFirewall", !fwEnabled);
           actionsMsg.textContent = res?.message || "Updated firewall state.";
+          fwEnabled = res?.status === "enabled" ? true : (res?.status === "disabled" ? false : !fwEnabled);
+          fwBtn.textContent = fwEnabled ? "Disable UFW firewall" : "Enable UFW firewall";
         } catch (err) {
           actionsMsg.textContent = err?.message || "Firewall action unavailable.";
         }
       });
       row.append(fwBtn);
-      actionsCard.append(actionsTitle, actionsMsg, row);
 
-      if (snapshot?.startup_apps?.length) {
-        const stTitle = document.createElement("strong");
-        if (stTitle.style) {
-          stTitle.style.display = "block";
-          stTitle.style.marginTop = "12px";
-        }
-        stTitle.textContent = "Detected autostart entries";
-        const ul = document.createElement("ul");
-        ul.className = "settings-hint";
-        snapshot.startup_apps.slice(0, 8).forEach(entry => {
-          const li = document.createElement("li");
-          li.textContent = `${entry.name} (${entry.scope} · ${entry.enabled ? "enabled" : "disabled"})`;
-          ul.append(li);
-        });
-        actionsCard.append(stTitle, ul);
+      const fpRow = document.createElement("div");
+      if (fpRow.style) {
+        fpRow.style.display = "flex";
+        fpRow.style.gap = "8px";
+        fpRow.style.flexWrap = "wrap";
+        fpRow.style.marginTop = "10px";
       }
+      const fpInput = document.createElement("input");
+      fpInput.type = "text";
+      fpInput.placeholder = "Flatpak App ID (e.g. com.discordapp.Discord)";
+      fpInput.setAttribute("aria-label", "Flatpak App ID");
+      if (fpInput.style) {
+        fpInput.style.flex = "1 1 210px";
+        fpInput.style.minWidth = "160px";
+        fpInput.style.padding = "7px 9px";
+        fpInput.style.borderRadius = "9px";
+      }
+      const fpInspectBtn = document.createElement("button");
+      fpInspectBtn.type = "button";
+      fpInspectBtn.className = "action-button";
+      fpInspectBtn.textContent = "Inspect Flatpak";
+      const fpRevokeNetBtn = document.createElement("button");
+      fpRevokeNetBtn.type = "button";
+      fpRevokeNetBtn.className = "action-button";
+      fpRevokeNetBtn.textContent = "Revoke network";
+      const fpResetBtn = document.createElement("button");
+      fpResetBtn.type = "button";
+      fpResetBtn.className = "action-button";
+      fpResetBtn.textContent = "Reset overrides";
+      const fpOut = document.createElement("p");
+      fpOut.className = "settings-hint";
 
+      fpInspectBtn.addEventListener("click", async () => {
+        const appId = (fpInput.value || "").trim();
+        if (!appId) {
+          fpOut.textContent = "Enter a reverse-DNS Flatpak App ID to inspect permissions.";
+          return;
+        }
+        try {
+          const res = await window.NexusNativeServices.call("privacy-security", "permissions", appId);
+          fpOut.textContent = res?.permissions || res?.message || "No Flatpak permissions reported.";
+        } catch (err) {
+          fpOut.textContent = err?.message || "Flatpak permission inspection unavailable.";
+        }
+      });
+      fpRevokeNetBtn.addEventListener("click", async () => {
+        const appId = (fpInput.value || "").trim();
+        if (!appId) {
+          fpOut.textContent = "Enter a Flatpak App ID first.";
+          return;
+        }
+        try {
+          const res = await window.NexusNativeServices.call("privacy-security", "revokePermission", appId, "--unshare=network");
+          fpOut.textContent = res?.message || `Applied --unshare=network override to ${appId}.`;
+        } catch (err) {
+          fpOut.textContent = err?.message || "Could not update Flatpak permission.";
+        }
+      });
+      fpResetBtn.addEventListener("click", async () => {
+        const appId = (fpInput.value || "").trim();
+        if (!appId) {
+          fpOut.textContent = "Enter a Flatpak App ID first.";
+          return;
+        }
+        try {
+          const res = await window.NexusNativeServices.call("privacy-security", "resetPermissions", appId);
+          fpOut.textContent = res?.message || `Reset Flatpak permission overrides for ${appId}.`;
+        } catch (err) {
+          fpOut.textContent = err?.message || "Could not reset Flatpak overrides.";
+        }
+      });
+      fpRow.append(fpInput, fpInspectBtn, fpRevokeNetBtn, fpResetBtn);
+
+      startupMount = document.createElement("div");
+      actionsCard.append(actionsTitle, actionsMsg, row, fpRow, fpOut, startupMount);
       page.append(actionsCard);
+    }
+
+    if (snapshot) {
+      applySnapshot(snapshot);
+    } else if (pendingSnapshot) {
+      pendingSnapshot
+        .then(applySnapshot)
+        .catch(err => {
+          const errEl = document.createElement("p");
+          errEl.className = "settings-hint";
+          errEl.textContent = err?.message || "Could not read native security overview.";
+          overviewCard.append(errEl);
+        });
     }
   }
 

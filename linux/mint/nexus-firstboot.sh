@@ -138,7 +138,7 @@ if [[ "$SKIP_SETUP" == false ]]; then
     if [[ "$PROFILE" == "lightweight" ]]; then
       lite_prof="lite-512"
     fi
-    lxqt_args=(--profile "$lite_prof")
+    lxqt_args=(--profile "$lite_prof" --theme "$THEME_PRESET" --appearance "$THEME")
     [[ "$DRY_RUN" == true ]] && lxqt_args+=(--dry-run)
     bash "$LITE_LXQT_APPLY" "${lxqt_args[@]}"
   elif [[ -x "$LITE_OPENBOX_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Openbox* ]]; then
@@ -146,11 +146,11 @@ if [[ "$SKIP_SETUP" == false ]]; then
     if [[ "$PROFILE" == "lightweight" ]]; then
       lite_prof="lite-512"
     fi
-    ob_args=(--profile "$lite_prof")
+    ob_args=(--profile "$lite_prof" --theme "$THEME_PRESET" --appearance "$THEME")
     [[ "$DRY_RUN" == true ]] && ob_args+=(--dry-run)
     bash "$LITE_OPENBOX_APPLY" "${ob_args[@]}"
   else
-    apply_args=()
+    apply_args=(--theme "$THEME_PRESET" --appearance "$THEME")
     [[ "$DRY_RUN" == true ]] && apply_args+=(--dry-run)
     [[ "$PROFILE" == "lightweight" || "$PROFILE" == "performance" ]] && apply_args+=(--lightweight)
     if [[ -x "$APPLY_SCRIPT" ]]; then
@@ -177,12 +177,14 @@ elif command -v xfconf-query >/dev/null 2>&1 && [[ -n "${DISPLAY:-}${WAYLAND_DIS
 fi
 
 if [[ "$CHECK_UPDATES" == true ]]; then
-  echo '--- Security & Update Guidance ---'
+  echo '--- Security, Apps & Recovery Guidance ---'
   if command -v apt >/dev/null 2>&1; then
     echo 'Run "sudo apt update && sudo apt upgrade" or open Mint Update Manager (mintupdate) for signed security updates.'
+    echo 'Recommended optional apps (via NEXUS Store / APT / Flatpak): gamemode, mangohud, libreoffice, net.lutris.Lutris.'
   else
     echo 'APT is unavailable on this host; run updates on an installed Linux Mint system.'
   fi
+  echo 'Boot / system diagnostics: run "nexus-recovery --diagnose" anytime.'
 fi
 
 if [[ "$GAMING_STATUS" == true ]]; then

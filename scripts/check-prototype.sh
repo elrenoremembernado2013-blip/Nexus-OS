@@ -37,6 +37,7 @@ node scripts/check-installer.js
 node scripts/check-system-monitor.js
 node scripts/check-terminal-preview.js
 node scripts/check-desktop-integration.js
+node scripts/check-phase18-integration.js
 bash scripts/check-native-launchers.sh
 
 python3 - <<'PY'

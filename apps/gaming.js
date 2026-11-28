@@ -8,12 +8,15 @@
   }
 
   function readGamingStatus() {
-    if (!gamingAvailable()) return { available: false, data: null, error: null };
+    if (!gamingAvailable()) return { available: false, data: null, error: null, pending: null };
     try {
-      const data = window.NexusNativeServices.call("gaming", "status");
-      return { available: true, data: data && typeof data === "object" ? data : {}, error: null };
+      const res = window.NexusNativeServices.call("gaming", "status");
+      if (res && typeof res.then === "function") {
+        return { available: true, data: null, error: null, pending: res };
+      }
+      return { available: true, data: res && typeof res === "object" ? res : {}, error: null, pending: null };
     } catch (err) {
-      return { available: false, data: null, error: err?.message || "Gaming service unavailable." };
+      return { available: false, data: null, error: err?.message || "Gaming service unavailable.", pending: null };
     }
   }
 
@@ -214,8 +217,9 @@
       panel.append(grid);
     };
 
-    const draw = () => {
-      const state = readGamingStatus();
+    let cachedState = null;
+
+    const renderState = (state) => {
       panel.replaceChildren();
       tabs.forEach(tab => {
         const selected = tab.dataset.gamingTab === activeTab;
@@ -233,11 +237,35 @@
       else drawControllers(state);
     };
 
+    const draw = (forceRefresh = false) => {
+      if (cachedState && !forceRefresh) {
+        renderState(cachedState);
+        return;
+      }
+      const state = readGamingStatus();
+      if (state.pending) {
+        setStatus("Querying Linux Mint gaming capabilities…");
+        renderState({ available: true, data: cachedState?.data || {}, error: null });
+        state.pending
+          .then(data => {
+            cachedState = { available: true, data: data && typeof data === "object" ? data : {}, error: null };
+            setStatus("");
+            renderState(cachedState);
+          })
+          .catch(err => {
+            setStatus(err?.message || "Gaming telemetry unavailable.", true);
+          });
+        return;
+      }
+      cachedState = state;
+      renderState(state);
+    };
+
     const onClick = event => {
       const tabBtn = event.target.closest("[data-gaming-tab]");
       if (tabBtn) {
         activeTab = tabBtn.dataset.gamingTab;
-        draw();
+        draw(false);
         return;
       }
       const actionBtn = event.target.closest("[data-gaming-action]");
@@ -247,17 +275,30 @@
         context.launchApp?.("software");
         return;
       }
+      const handleAsync = (promiseOrVal, fallbackMsg, refreshAfter = false) => {
+        if (promiseOrVal && typeof promiseOrVal.then === "function") {
+          promiseOrVal
+            .then(res => {
+              setStatus(res?.message || fallbackMsg, res?.ok === false);
+              if (refreshAfter) draw(true);
+            })
+            .catch(err => setStatus(err?.message || "Gaming action failed.", true));
+        } else {
+          setStatus(promiseOrVal?.message || fallbackMsg, promiseOrVal?.ok === false);
+          if (refreshAfter) draw(true);
+        }
+      };
       try {
         if (action === "launch-steam") {
-          const res = window.NexusNativeServices.call("gaming", "launchSteam");
-          setStatus(res?.message || "Launched Steam.");
+          handleAsync(window.NexusNativeServices.call("gaming", "launchSteam"), "Launched Steam.");
         } else if (action === "install-steam") {
-          const res = window.NexusNativeServices.call("gaming", "installSteam");
-          setStatus(res?.message || "Steam installation requested.");
+          handleAsync(window.NexusNativeServices.call("gaming", "installSteam"), "Steam installation requested.", true);
         } else if (action === "mode-enable" || action === "mode-disable") {
-          const res = window.NexusNativeServices.call("gaming", "setGamingMode", action === "mode-enable");
-          setStatus(res?.message || "Updated Gaming Mode.");
-          draw();
+          handleAsync(
+            window.NexusNativeServices.call("gaming", "setGamingMode", action === "mode-enable"),
+            "Updated Gaming Mode.",
+            true
+          );
         }
       } catch (err) {
         setStatus(err?.message || "Gaming action failed.", true);
@@ -265,7 +306,7 @@
     };
 
     root.addEventListener("click", onClick);
-    draw();
+    draw(true);
     return () => root.removeEventListener("click", onClick);
   }
 

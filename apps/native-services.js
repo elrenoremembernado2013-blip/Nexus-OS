@@ -90,22 +90,86 @@
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Bridge error (${res.status})`);
+      if (!res.ok) throw new Error(data.error || data.message || `Bridge error (${res.status})`);
       return data;
     };
 
-    try {
-      window.NexusNativeServices.register("control-centre", {
-        status: () => req("/api/control-centre"),
-        action: (type, value) => req("/api/control-centre/action", "POST", { type, value }),
+    const registerSafe = (id, adapter) => {
+      try {
+        if (!window.NexusNativeServices.status(id).available) {
+          window.NexusNativeServices.register(id, adapter);
+        }
+      } catch (err) {
+        console.warn(`NEXUS bridge registration skipped for ${id}:`, err);
+      }
+    };
+
+    registerSafe("control-centre", {
+      status: () => req("/api/control-centre"),
+      action: (type, value) => req("/api/control-centre/action", "POST", { type, value }),
+    });
+    registerSafe("personalisation", {
+      listWallpapers: () => req("/api/wallpapers"),
+      applyWallpaper: opts => req("/api/wallpapers/apply", "POST", opts),
+      applyTheme: opts => req("/api/personalisation/apply", "POST", opts),
+    });
+    registerSafe("packages", {
+      sources: () => req("/api/store/sources"),
+      installed: () => req("/api/store/installed"),
+      info: (source, pkg) => req(`/api/store/info?source=${encodeURIComponent(source)}&pkg=${encodeURIComponent(pkg)}`),
+      checkUpdates: async () => {
+        const res = await req("/api/store/updates");
+        const apt = (res.apt || []).map(u => ({ id: u.id, name: u.id, source: "apt", currentVersion: "installed", newVersion: u.detail || "latest" }));
+        const fp = (res.flatpak || []).map(u => ({ id: u.id, name: u.id, source: "flatpak", currentVersion: "installed", newVersion: u.version || "latest" }));
+        return [...apt, ...fp];
+      },
+      search: async query => {
+        const res = await req(`/api/store/search?q=${encodeURIComponent(query)}`);
+        return (res.results || []).map(r => ({
+          id: r.id,
+          name: r.name || r.id,
+          description: r.summary || r.id,
+          source: r.source || "apt",
+          installed: Boolean(r.installed),
+          protected: false,
+        }));
+      },
+      install: (source, pkg) => req("/api/store/install", "POST", { source, pkg }),
+      remove: (source, pkg) => req("/api/store/remove", "POST", { source, pkg }),
+    });
+    registerSafe("privacy-security", {
+      overview: () => req("/api/security/status"),
+      openControl: () => req("/api/tools/launch", "POST", { category: "privacy-security" }),
+      setFirewall: enable => req("/api/security/firewall", "POST", { action: enable ? "enable" : "disable" }),
+      permissions: appId => req(`/api/security/permissions?appId=${encodeURIComponent(appId)}`),
+      revokePermission: (appId, flag) => req("/api/security/flatpak-revoke", "POST", { appId, flag }),
+      resetPermissions: appId => req("/api/security/flatpak-reset", "POST", { appId }),
+    });
+    registerSafe("gaming", {
+      status: () => req("/api/gaming/status"),
+      setGamingMode: enable => req("/api/gaming/mode", "POST", { action: enable ? "enable" : "disable" }),
+      launchSteam: () => req("/api/tools/launch", "POST", { category: "gaming" }),
+      installSteam: () => req("/api/store/install", "POST", { source: "apt", pkg: "steam-installer" }),
+    });
+    registerSafe("installer", {
+      preflight: () => req("/api/installer/preflight"),
+      launch: () => req("/api/tools/launch", "POST", { category: "installer" }),
+    });
+    registerSafe("telemetry", {
+      snapshot: () => req("/api/telemetry"),
+    });
+    registerSafe("terminal", {
+      openSession: opts => req("/api/terminal/open", "POST", opts || {}),
+      read: sessionId => req(`/api/terminal/read?sessionId=${encodeURIComponent(sessionId)}`),
+      write: (sessionId, data) => req("/api/terminal/write", "POST", { sessionId, data }),
+      resize: (sessionId, cols, rows) => req("/api/terminal/resize", "POST", { sessionId, cols, rows }),
+      interrupt: sessionId => req("/api/terminal/interrupt", "POST", { sessionId }),
+      closeSession: sessionId => req("/api/terminal/close", "POST", { sessionId }),
+    });
+    for (const cat of ["display", "sound", "network", "bluetooth", "power", "accounts", "files"]) {
+      registerSafe(cat, {
+        openControl: () => req("/api/tools/launch", "POST", { category: cat }),
       });
-      window.NexusNativeServices.register("personalisation", {
-        listWallpapers: () => req("/api/wallpapers"),
-        applyWallpaper: (opts) => req("/api/wallpapers/apply", "POST", opts),
-        applyTheme: (opts) => req("/api/personalisation/apply", "POST", opts),
-      });
-    } catch (err) {
-      console.warn("NEXUS bridge registration skipped:", err);
     }
   }
 })();

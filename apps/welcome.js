@@ -125,26 +125,33 @@
       );
 
       if (step.id === "theme") {
+        const currentTheme = readStorage("nexus-theme-preset") || "midnight";
         const presets = Object.values(window.NexusPersonalisationCatalog?.THEME_PRESETS || {});
         const row = node("div", "theme-preset-grid");
         presets.forEach(p => {
-          const btn = node("button", "theme-preset-btn", p.label);
+          const selected = p.id === currentTheme;
+          const btn = node("button", `theme-preset-btn${selected ? " selected" : ""}`, p.label);
           btn.type = "button";
           btn.dataset.welcomeTheme = p.id;
+          btn.setAttribute("aria-pressed", String(selected));
           row.append(btn);
         });
         card.append(row);
       } else if (step.id === "wallpaper") {
+        const currentWp = readStorage("nexus-wallpaper") || "alpine-ridge";
         const wps = (window.NexusPersonalisationCatalog?.WALLPAPERS || []).slice(0, 4);
         const row = node("div", "theme-preset-grid");
         wps.forEach(w => {
-          const btn = node("button", "theme-preset-btn", `${w.label} (${w.photographer})`);
+          const selected = w.id === currentWp;
+          const btn = node("button", `theme-preset-btn${selected ? " selected" : ""}`, `${w.label} (${w.photographer})`);
           btn.type = "button";
           btn.dataset.welcomeWallpaper = w.id;
+          btn.setAttribute("aria-pressed", String(selected));
           row.append(btn);
         });
         card.append(row);
       } else if (step.id === "apps") {
+        card.append(node("p", "settings-hint", "Recommended optional apps: Firefox, LibreOffice, VLC, GameMode, and Lutris (all explicitly installed via APT or Flathub)."));
         const btn = node("button", "action-button secondary-button", "Open NEXUS Store");
         btn.type = "button";
         btn.dataset.welcomeLaunch = "software";
@@ -155,6 +162,7 @@
         btn.dataset.welcomeLaunch = "gaming";
         card.append(btn);
       } else if (step.id === "security") {
+        card.append(node("p", "settings-hint", "Recovery & diagnostics: run `nexus-recovery --diagnose` in Terminal or consult docs/RECOVERY_AND_BOOT.md."));
         const btn = node("button", "action-button secondary-button", "Open Settings & Security Overview");
         btn.type = "button";
         btn.dataset.welcomeLaunch = "settings";
@@ -283,12 +291,22 @@
       const themeBtn = event.target.closest("[data-welcome-theme]");
       if (themeBtn) {
         context.desktopShell?.setThemePreset?.(themeBtn.dataset.welcomeTheme, true);
+        root.querySelectorAll("[data-welcome-theme]").forEach(b => {
+          const isSel = b === themeBtn;
+          b.classList.toggle("selected", isSel);
+          b.setAttribute("aria-pressed", String(isSel));
+        });
         setStatus(`Selected theme preset: ${themeBtn.dataset.welcomeTheme}`);
         return;
       }
       const wpBtn = event.target.closest("[data-welcome-wallpaper]");
       if (wpBtn) {
         context.desktopShell?.setDesktopWallpaper?.(wpBtn.dataset.welcomeWallpaper, true);
+        root.querySelectorAll("[data-welcome-wallpaper]").forEach(b => {
+          const isSel = b === wpBtn;
+          b.classList.toggle("selected", isSel);
+          b.setAttribute("aria-pressed", String(isSel));
+        });
         setStatus(`Applied wallpaper: ${wpBtn.dataset.welcomeWallpaper}`);
         return;
       }

@@ -505,8 +505,7 @@
 
       intro.append(node("h3", "", "Updates"), node("p", "", "Updates queried from the connected Linux Mint package service (APT / Flatpak)."));
       wrapper.append(intro);
-      try {
-        const rawUpdates = window.NexusNativeServices.call("packages", "checkUpdates");
+      const renderUpdateRows = rawUpdates => {
         if (rawUpdates !== undefined && rawUpdates !== null && !Array.isArray(rawUpdates)) {
           throw new Error("Native package service returned an unexpected updates format.");
         }
@@ -515,28 +514,46 @@
           const empty = node("aside", "store-trust-note");
           empty.append(node("strong", "", "No pending updates reported."), node("p", "", "APT and Flatpak reported no upgradable packages."));
           wrapper.append(empty);
+          return;
+        }
+        const list = node("div", "store-operation-list");
+        updates.forEach(item => {
+          const row = node("article", "store-operation-row");
+          const copy = node("div", "store-operation-copy");
+          copy.append(
+            node("strong", "", `${item.name || item.id} (${String(item.source || "apt").toUpperCase()})`),
+            node("small", "", `${item.currentVersion || "installed"} → ${item.newVersion || "latest"}`)
+          );
+          const btn = node("button", "action-button primary", "Update");
+          btn.type = "button";
+          if (item.id) {
+            btn.dataset.storeAction = "native-install";
+            btn.dataset.pkgId = item.id;
+            btn.dataset.pkgSource = item.source || "apt";
+          } else {
+            btn.disabled = true;
+          }
+          row.append(copy, btn);
+          list.append(row);
+        });
+        wrapper.append(list);
+      };
+      try {
+        const rawUpdates = window.NexusNativeServices.call("packages", "checkUpdates");
+        if (rawUpdates && typeof rawUpdates.then === "function") {
+          const loading = node("p", "store-message", "Checking APT and Flatpak updates…");
+          wrapper.append(loading);
+          rawUpdates
+            .then(resolved => {
+              loading.remove();
+              renderUpdateRows(resolved);
+            })
+            .catch(err => {
+              loading.remove();
+              wrapper.append(node("p", "store-error", `Could not check updates: ${err.message}`));
+            });
         } else {
-          const list = node("div", "store-operation-list");
-          updates.forEach(item => {
-            const row = node("article", "store-operation-row");
-            const copy = node("div", "store-operation-copy");
-            copy.append(
-              node("strong", "", `${item.name || item.id} (${String(item.source || "apt").toUpperCase()})`),
-              node("small", "", `${item.currentVersion || "installed"} → ${item.newVersion || "latest"}`)
-            );
-            const btn = node("button", "action-button primary", "Update");
-            btn.type = "button";
-            if (item.id) {
-              btn.dataset.storeAction = "native-install";
-              btn.dataset.pkgId = item.id;
-              btn.dataset.pkgSource = item.source || "apt";
-            } else {
-              btn.disabled = true;
-            }
-            row.append(copy, btn);
-            list.append(row);
-          });
-          wrapper.append(list);
+          renderUpdateRows(rawUpdates);
         }
       } catch (error) {
         wrapper.append(node("p", "store-error", `Could not check updates: ${error.message}`));
@@ -675,36 +692,49 @@
           const localMatches = catalog.getAll().filter(application => matchesSearch(application, term));
           renderAppListing(localMatches, `Results for “${query.trim()}”`, "Matches include app names, descriptions, developers, categories and tags.", false);
           if (packagesAvailable() && term) {
+            const appendNativeResults = nativeMatches => {
+              if (!nativeMatches || !nativeMatches.length) return;
+              const section = node("section", "store-section");
+              const heading = node("div", "store-section-heading");
+              const copy = node("div");
+              copy.append(node("h3", "", "Linux Mint packages (APT / Flatpak)"), node("p", "", "Results queried from the connected native package service."));
+              heading.append(copy);
+              const list = node("div", "store-operation-list");
+              nativeMatches.forEach(pkg => {
+                const row = node("article", "store-operation-row");
+                const copyBox = node("div", "store-operation-copy");
+                copyBox.append(
+                  node("strong", "", `${pkg.name || pkg.id} · ${String(pkg.source || "apt").toUpperCase()}`),
+                  node("small", "", pkg.description || pkg.id)
+                );
+                const infoBtn = node("button", "store-text-button", "Info");
+                infoBtn.type = "button";
+                infoBtn.dataset.storeAction = "native-info";
+                infoBtn.dataset.pkgId = pkg.id;
+                infoBtn.dataset.pkgSource = pkg.source || "apt";
+                const btn = node("button", pkg.installed ? "store-text-button" : "action-button primary", pkg.installed ? "Remove" : "Install");
+                btn.type = "button";
+                btn.dataset.storeAction = pkg.installed ? "native-remove" : "native-install";
+                btn.dataset.pkgId = pkg.id;
+                btn.dataset.pkgSource = pkg.source || "apt";
+                if (pkg.installed && pkg.protected) {
+                  btn.disabled = true;
+                  btn.title = "Protected system package cannot be removed.";
+                }
+                row.append(copyBox, infoBtn, btn);
+                list.append(row);
+              });
+              section.append(heading, list);
+              page.querySelector(".store-page")?.append(section);
+            };
             try {
-              const nativeMatches = window.NexusNativeServices.call("packages", "search", query.trim()) || [];
-              if (nativeMatches.length) {
-                const section = node("section", "store-section");
-                const heading = node("div", "store-section-heading");
-                const copy = node("div");
-                copy.append(node("h3", "", "Linux Mint packages (APT / Flatpak)"), node("p", "", "Results queried from the connected native package service."));
-                heading.append(copy);
-                const list = node("div", "store-operation-list");
-                nativeMatches.forEach(pkg => {
-                  const row = node("article", "store-operation-row");
-                  const copyBox = node("div", "store-operation-copy");
-                  copyBox.append(
-                    node("strong", "", `${pkg.name || pkg.id} · ${String(pkg.source || "apt").toUpperCase()}`),
-                    node("small", "", pkg.description || pkg.id)
-                  );
-                  const btn = node("button", pkg.installed ? "store-text-button" : "action-button primary", pkg.installed ? "Remove" : "Install");
-                  btn.type = "button";
-                  btn.dataset.storeAction = pkg.installed ? "native-remove" : "native-install";
-                  btn.dataset.pkgId = pkg.id;
-                  btn.dataset.pkgSource = pkg.source || "apt";
-                  if (pkg.installed && pkg.protected) {
-                    btn.disabled = true;
-                    btn.title = "Protected system package cannot be removed.";
-                  }
-                  row.append(copyBox, btn);
-                  list.append(row);
-                });
-                section.append(heading, list);
-                page.querySelector(".store-page")?.append(section);
+              const rawMatches = window.NexusNativeServices.call("packages", "search", query.trim()) || [];
+              if (rawMatches && typeof rawMatches.then === "function") {
+                rawMatches
+                  .then(appendNativeResults)
+                  .catch(err => page.querySelector(".store-page")?.append(node("p", "store-error", `Native package search failed: ${err.message}`)));
+              } else {
+                appendNativeResults(rawMatches);
               }
             } catch (error) {
               page.querySelector(".store-page")?.append(node("p", "store-error", `Native package search failed: ${error.message}`));
@@ -760,17 +790,53 @@
         setMessage("Native package service unavailable.", true);
         return;
       }
+      if (action === "native-info") {
+        try {
+          const infoRes = window.NexusNativeServices.call("packages", "info", pkgSource, pkgId);
+          const formatInfo = info => {
+            if (!info || info.error) {
+              setMessage(info?.error || `No metadata found for ${pkgId}.`, true);
+              return;
+            }
+            const deps = Array.isArray(info.dependencies) && info.dependencies.length
+              ? ` · Deps: ${info.dependencies.slice(0, 6).join(", ")}`
+              : "";
+            const size = info.installed_size_kb ? ` · ~${Math.round(info.installed_size_kb / 1024 * 10) / 10} MiB` : "";
+            setMessage(`${info.id} (${String(info.source || pkgSource).toUpperCase()}) ${info.version || ""}${size}${deps}`);
+          };
+          if (infoRes && typeof infoRes.then === "function") {
+            setMessage(`Inspecting ${pkgId} (${pkgSource})…`);
+            infoRes.then(formatInfo).catch(err => setMessage(err.message, true));
+          } else {
+            formatInfo(infoRes);
+          }
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+        return;
+      }
       if (action === "native-remove" && !window.confirm(`Remove ${pkgId} (${pkgSource}) via Linux Mint package management?`)) {
         return;
       }
       try {
         const method = action === "native-remove" ? "remove" : "install";
         const result = window.NexusNativeServices.call("packages", method, pkgSource, pkgId);
-        if (result && result.ok === false) {
-          setMessage(result.message || `Package operation failed for ${pkgId}.`, true);
-          return;
+        const applyResult = res => {
+          if (res && res.ok === false) {
+            const msg = res.errorKind === "polkit_cancelled"
+              ? "Authentication cancelled — no packages were changed."
+              : (res.message || `Package operation failed for ${pkgId}.`);
+            setMessage(msg, true);
+            return;
+          }
+          setMessage(res?.message || `${method === "install" ? "Installed" : "Removed"} ${pkgId} via ${pkgSource}.`);
+        };
+        if (result && typeof result.then === "function") {
+          setMessage(`${method === "install" ? "Installing" : "Removing"} ${pkgId} (${pkgSource})…`);
+          result.then(applyResult).catch(err => setMessage(err.message, true));
+        } else {
+          applyResult(result);
         }
-        setMessage(result?.message || `${method === "install" ? "Installed" : "Removed"} ${pkgId} via ${pkgSource}.`);
       } catch (error) {
         setMessage(error.message, true);
       }
@@ -781,7 +847,7 @@
       else if (action === "install") installApplication(id);
       else if (action === "remove") removeApplication(id);
       else if (action === "open") openApplication(id);
-      else if (action === "native-install" || action === "native-remove") {
+      else if (action === "native-install" || action === "native-remove" || action === "native-info") {
         handleNativePackageAction(action, dataset.pkgId, dataset.pkgSource || "apt");
       } else if (action === "wishlist") {
         try {
@@ -791,7 +857,7 @@
           setMessage(error.message, true);
         }
       }
-      if (action !== "open" && action !== "details") renderPage({ preserveMessage: true });
+      if (action !== "open" && action !== "details" && action !== "native-info") renderPage({ preserveMessage: true });
     }
 
     root.addEventListener("click", event => {
