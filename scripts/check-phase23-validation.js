@@ -59,7 +59,8 @@ assert(
 // Guard against grep -q + pipefail false negatives when checking captured ISO listings.
 assert(
   verifyIsoSh.includes('[[ "$sq_list" != *"$req_sq"* ]]') &&
-    !verifyIsoSh.includes('grep -Fq "$req_sq"'),
+    !verifyIsoSh.includes('grep -Fq "$req_sq"') &&
+    !verifyIsoSh.includes('| grep -q'),
   "Squashfs required-file checks must not use grep -q on a piped listing"
 );
 assert(
