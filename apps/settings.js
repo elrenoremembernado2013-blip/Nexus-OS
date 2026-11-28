@@ -552,6 +552,7 @@
         accent: opts.accent || readStorage("nexus-accent") || "#ffad7a",
         effectLevel: opts.effectLevel || readStorage("nexus-effect-level") || "balanced",
         dockPosition: opts.dockPosition || readStorage("nexus-dock-position") || "bottom",
+        panelSize: opts.panelSize || readStorage("nexus-panel-size") || "medium",
         panelAutohide: opts.panelAutohide || (readStorage("nexus-dock-autohide") === "true" ? "true" : "false"),
         workspaces: opts.workspaces ?? Number(readStorage("nexus-workspace-count") || "4")
       };
