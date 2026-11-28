@@ -573,6 +573,27 @@
       }
     }
 
+    async function syncCustomWallpaperToNative(file) {
+      if (!window.NexusNativeServices?.status("personalisation")?.available) return "browser-only";
+      if (!file || !allowedImageTypes.includes(file.type) || file.size > 8 * 1024 * 1024) {
+        return "browser-only";
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+      }
+      const fitMap = { cover: "zoom", contain: "scaled", fill: "stretched", center: "centered" };
+      const fit = fitMap[readStorage("nexus-wallpaper-fit") || "cover"] || "zoom";
+      const result = await window.NexusNativeServices.call("personalisation", "importWallpaper", {
+        mime: file.type,
+        data: btoa(binary),
+        fit
+      });
+      return result?.ok === true ? "native" : "browser-only";
+    }
+
     function setCustomWallpaper(url) {
       shell?.setCustomDesktopWallpaper(url, true);
       $$("[data-wallpaper]").forEach(item => {
@@ -917,6 +938,15 @@
           await saveCustomWallpaper(customFile);
           pendingCustomUrl = null;
           setCustomWallpaper(customUrl);
+          try {
+            const nativeResult = await syncCustomWallpaperToNative(customFile);
+            $("#customWallpaperStatus").textContent = nativeResult === "native"
+              ? "Saved on this device and applied to the native desktop."
+              : "Saved on this device. Native desktop integration is unavailable in this preview.";
+          } catch (error) {
+            console.warn("NEXUS native custom wallpaper sync failed:", error);
+            $("#customWallpaperStatus").textContent = "Saved in NEXUS. Native desktop could not be updated: " + (error?.message || "service unavailable");
+          }
           $("#applyWallpaperPreview").textContent = "Apply wallpaper";
         } catch (error) {
           $("#customWallpaperStatus").textContent = error.message;
