@@ -13,6 +13,8 @@ Runs strictly as the logged-in non-root desktop user.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import fcntl
 import json
 import os
@@ -1053,8 +1055,8 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                 raise ValueError("Invalid Content-Length header") from err
             if length <= 0:
                 return {}
-            if length > 65536:
-                raise ValueError("Request body exceeds 64 KiB limit")
+            if length > 12 * 1024 * 1024:
+                raise ValueError("Request body exceeds 12 MiB limit")
             parsed = json.loads(self.rfile.read(length).decode("utf-8"))
             if not isinstance(parsed, dict):
                 raise ValueError("JSON body must be an object")
@@ -1356,6 +1358,51 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     return
                 except subprocess.TimeoutExpired:
                     self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Control centre action timed out"})
+                    return
+                self._send_json(HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST, payload)
+            elif self.path == "/api/wallpapers/import":
+                encoded = body.get("data")
+                mime = str(body.get("mime") or "").strip().lower()
+                extensions = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+                if mime not in extensions or not isinstance(encoded, str) or len(encoded) > 11_200_000:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Provide a JPEG, PNG, or WebP image up to 8 MiB."})
+                    return
+                try:
+                    image_bytes = base64.b64decode(encoded, validate=True)
+                except (binascii.Error, ValueError):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Wallpaper image data is not valid base64."})
+                    return
+                if not image_bytes or len(image_bytes) > 8 * 1024 * 1024:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Wallpaper image must be between 1 byte and 8 MiB."})
+                    return
+                is_jpeg = image_bytes.startswith(b"\\xff\\xd8\\xff")
+                is_png = image_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+                is_webp = image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
+                if not ((mime == "image/jpeg" and is_jpeg) or (mime == "image/png" and is_png) or (mime == "image/webp" and is_webp)):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Image content does not match its declared JPEG/PNG/WebP type."})
+                    return
+                fit = str(body.get("fit") or "zoom").strip()
+                if fit not in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
+                    fit = "zoom"
+                try:
+                    target_dir = Path.home() / ".local" / "share" / "nexus-os" / "wallpapers"
+                    target_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    target = target_dir / ("custom" + extensions[mime])
+                    temp_target = target.with_name(target.name + ".part")
+                    temp_target.write_bytes(image_bytes)
+                    os.chmod(temp_target, 0o600)
+                    os.replace(temp_target, target)
+                    cmd = resolve_helper("linux/mint/nexus-wallpaper-cli.sh", "nexus-wallpaper") + ["apply", "--file", str(target), "--fit", fit]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15.0)
+                    payload = json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()}
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Custom wallpaper apply timed out"})
+                    return
+                except OSError as err:
+                    self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"Could not save custom wallpaper: {err}"})
                     return
                 self._send_json(HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST, payload)
             elif self.path == "/api/wallpapers/apply":
