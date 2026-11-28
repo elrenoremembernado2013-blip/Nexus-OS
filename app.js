@@ -301,23 +301,194 @@
     output.textContent = brightness.value + "%";
     writeStorage("nexus-brightness", brightness.value);
     desktop.style.filter = "brightness(" + Number(brightness.value) / 100 + ")";
+    if (window.NexusNativeServices?.status("control-centre")?.available && brightness.dataset.nativeBacklight === "true") {
+      try {
+        Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "brightness", Number(brightness.value))).catch(() => {});
+      } catch {
+        // Ignore transient native backlight errors
+      }
+    }
   }
   brightness.addEventListener("input", updateBrightness);
   updateBrightness();
 
+  let lastControlCentreStatus = null;
+
+  function applyControlCentreStatus(status) {
+    lastControlCentreStatus = status || null;
+    const wifiTile = $("#ccWifiTile");
+    const btTile = $("#ccBluetoothTile");
+    const volumeInput = $("#volume");
+    const volumeValue = $("#volumeValue");
+    const volumeRow = $("#volumeRow");
+    const muteBtn = $("#volumeMuteBtn");
+    const strip = $("#ccStatusStrip");
+    const subtitle = $("#controlPanelSubtitle");
+    const foot = $("#controlPanelFoot");
+    const brightnessLabel = $("#brightnessLabel");
+
+    if (!status) {
+      if (wifiTile) {
+        const netAvail = Boolean(window.NexusNativeServices?.status("network")?.available);
+        wifiTile.disabled = !netAvail;
+        wifiTile.classList.remove("active");
+        wifiTile.querySelector("small").textContent = netAvail ? "Connected" : "Native service unavailable";
+      }
+      if (btTile) {
+        const btAvail = Boolean(window.NexusNativeServices?.status("bluetooth")?.available);
+        btTile.disabled = !btAvail;
+        btTile.classList.remove("active");
+        btTile.querySelector("small").textContent = btAvail ? "Connected" : "Native service unavailable";
+      }
+      const soundAvailable = Boolean(window.NexusNativeServices?.status("sound")?.available);
+      if (volumeValue) volumeValue.textContent = soundAvailable ? "Connected" : "Unavailable";
+      if (volumeInput) volumeInput.disabled = !soundAvailable;
+      if (volumeRow) volumeRow.classList.toggle("audio-unavailable", !soundAvailable);
+      if (muteBtn) muteBtn.classList.add("hidden");
+      if (brightnessLabel) brightnessLabel.textContent = "Preview brightness";
+      delete brightness.dataset.nativeBacklight;
+      if (subtitle) subtitle.textContent = "Quick settings";
+      if (strip) strip.innerHTML = '<span class="cc-pill">Browser Preview · Local UI controls</span>';
+      if (foot) foot.textContent = "Brightness changes this desktop preview. Wi-Fi, Bluetooth, audio and system power need native services.";
+      return;
+    }
+
+    if (subtitle) subtitle.textContent = `Quick settings · ${String(status.edition || "Linux").toUpperCase()}`;
+    if (wifiTile) {
+      const net = status.network || {};
+      const wifiAvail = Boolean(net.wifi_available);
+      wifiTile.disabled = !wifiAvail;
+      wifiTile.classList.toggle("active", Boolean(net.wifi_enabled && net.connected));
+      wifiTile.setAttribute("aria-pressed", String(Boolean(net.wifi_enabled)));
+      if (wifiAvail) {
+        wifiTile.querySelector("small").textContent = net.wifi_enabled ? (net.ssid || net.status_text || "Wi-Fi on") : "Wi-Fi off";
+      } else {
+        wifiTile.querySelector("small").textContent = net.connected ? (net.status_text || "Wired connected") : "No Wi-Fi hardware";
+      }
+    }
+    if (btTile) {
+      const bt = status.bluetooth || {};
+      const btAvail = Boolean(bt.supported ?? bt.available);
+      btTile.disabled = !btAvail;
+      btTile.classList.toggle("active", Boolean(btAvail && bt.powered));
+      btTile.setAttribute("aria-pressed", String(Boolean(btAvail && bt.powered)));
+      btTile.querySelector("small").textContent = btAvail ? (bt.powered ? "On" : "Off") : (bt.status_text || "No Bluetooth adapter");
+    }
+    if (volumeInput && volumeValue) {
+      const audio = status.sound || status.audio || {};
+      const audioAvail = Boolean(audio.supported ?? audio.available);
+      volumeInput.disabled = !audioAvail;
+      if (volumeRow) volumeRow.classList.toggle("audio-unavailable", !audioAvail);
+      if (audioAvail) {
+        if (typeof audio.volume_percent === "number") volumeInput.value = String(audio.volume_percent);
+        volumeValue.textContent = audio.muted ? "Muted" : `${volumeInput.value}%`;
+        if (muteBtn) {
+          muteBtn.classList.remove("hidden");
+          muteBtn.textContent = audio.muted ? "🔇" : "🔊";
+          muteBtn.setAttribute("aria-pressed", String(Boolean(audio.muted)));
+        }
+      } else {
+        volumeValue.textContent = "Unavailable";
+        if (muteBtn) muteBtn.classList.add("hidden");
+      }
+    }
+    if (brightnessLabel) {
+      const brightAvail = Boolean(status.brightness?.supported ?? status.brightness?.available);
+      brightness.dataset.nativeBacklight = brightAvail ? "true" : "false";
+      brightnessLabel.textContent = brightAvail ? "Screen brightness" : "Preview brightness";
+      if (brightAvail && typeof status.brightness.percent === "number") {
+        brightness.value = String(status.brightness.percent);
+        $("#brightnessValue").textContent = `${status.brightness.percent}%`;
+      }
+    }
+    if (strip) {
+      const pills = [];
+      if (status.battery?.supported ?? status.battery?.available) {
+        pills.push(`<span class="cc-pill">Battery ${status.battery.percent ?? "?"}% (${status.battery.status || "unknown"})</span>`);
+      } else {
+        pills.push('<span class="cc-pill muted">AC / No battery</span>');
+      }
+      if (status.network?.connected) {
+        pills.push(`<span class="cc-pill">${status.network.status_text || status.network.detail || "Online"}</span>`);
+      }
+      const updCount = status.updates?.upgradable_count ?? status.updates?.upgradable_apt;
+      if (status.updates?.apt_available || status.updates?.available || updCount != null) {
+        pills.push(`<span class="cc-pill">${updCount ?? 0} updates</span>`);
+      }
+      strip.innerHTML = pills.join("");
+    }
+    if (foot) {
+      foot.textContent = "Connected to Linux system services. Unavailable hardware controls stay disabled.";
+    }
+  }
+
   function syncNativeControlBoundary() {
     const services = window.NexusNativeServices;
-    const soundAvailable = Boolean(services?.status("sound")?.available);
-    $("#volumeValue").textContent = soundAvailable ? "Connected" : "Unavailable";
-    $("#volume").disabled = !soundAvailable;
-
-    const networkAvailable = Boolean(services?.status("network")?.available);
-    const bluetoothAvailable = Boolean(services?.status("bluetooth")?.available);
-    const tiles = control.querySelectorAll(".tile[disabled]");
-    if (tiles[0]) tiles[0].querySelector("small").textContent = networkAvailable ? "Connected" : "Native service unavailable";
-    if (tiles[1]) tiles[1].querySelector("small").textContent = bluetoothAvailable ? "Connected" : "Native service unavailable";
+    if (services?.status("control-centre")?.available) {
+      try {
+        const res = services.call("control-centre", "status");
+        if (res && typeof res.then === "function") {
+          res.then(status => applyControlCentreStatus(status)).catch(() => applyControlCentreStatus(null));
+        } else {
+          applyControlCentreStatus(res);
+        }
+        return;
+      } catch {
+        applyControlCentreStatus(null);
+        return;
+      }
+    }
+    applyControlCentreStatus(null);
   }
   syncNativeControlBoundary();
+  window.NexusNativeServices?.subscribe?.(() => syncNativeControlBoundary());
+
+  $("#ccWifiTile")?.addEventListener("click", async () => {
+    if (!window.NexusNativeServices?.status("control-centre")?.available) return;
+    const next = !(lastControlCentreStatus?.network?.wifi_enabled);
+    try {
+      await window.NexusNativeServices.call("control-centre", "action", "wifi", next ? "on" : "off");
+      syncNativeControlBoundary();
+    } catch (err) {
+      notify(err.message || "Could not toggle Wi-Fi");
+    }
+  });
+
+  $("#ccBluetoothTile")?.addEventListener("click", async () => {
+    if (!window.NexusNativeServices?.status("control-centre")?.available) return;
+    const next = !(lastControlCentreStatus?.bluetooth?.powered);
+    try {
+      await window.NexusNativeServices.call("control-centre", "action", "bluetooth", next ? "on" : "off");
+      syncNativeControlBoundary();
+    } catch (err) {
+      notify(err.message || "Could not toggle Bluetooth");
+    }
+  });
+
+  $("#volume")?.addEventListener("input", () => {
+    const volumeValue = $("#volumeValue");
+    if (volumeValue) volumeValue.textContent = `${$("#volume").value}%`;
+    if (window.NexusNativeServices?.status("control-centre")?.available) {
+      Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "volume", Number($("#volume").value)))
+        .catch(() => {});
+    }
+  });
+
+  $("#volumeMuteBtn")?.addEventListener("click", async () => {
+    if (!window.NexusNativeServices?.status("control-centre")?.available) return;
+    try {
+      await window.NexusNativeServices.call("control-centre", "action", "mute", "toggle");
+      syncNativeControlBoundary();
+    } catch (err) {
+      notify(err.message || "Could not toggle mute");
+    }
+  });
+
+  $$("[data-cc-open]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      openApp(btn.dataset.ccOpen);
+    });
+  });
 
   function setThemePreset(presetId, persist = true) {
     const preset = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[presetId];
@@ -406,6 +577,7 @@
       brightness.value = "100";
       updateBrightness();
     },
+    syncNativeControlBoundary,
     openApp: appId => openApp(appId),
     notify
   });

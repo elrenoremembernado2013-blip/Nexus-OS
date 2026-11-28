@@ -524,6 +524,13 @@ body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after
 }
 .slider-row.audio-unavailable{color:var(--muted)}
 .slider-row.audio-unavailable output{min-width:82px;color:var(--muted);font-size:10px}
+.cc-status-strip{display:flex;flex-wrap:wrap;gap:6px;margin:-6px 0 12px}
+.cc-pill{font-size:10px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--text)}
+.cc-pill.muted{color:var(--muted)}
+.cc-mute-btn{border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);border-radius:8px;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px}
+.cc-quick-links{display:flex;gap:8px;margin-top:10px}
+.cc-link-btn{flex:1;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);border-radius:10px;padding:7px 8px;font-size:11px;cursor:pointer}
+.cc-link-btn:hover{background:color-mix(in srgb,var(--accent) 20%,rgba(255,255,255,.08))}
 .files-open-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .files-open-label{display:inline-flex;align-items:center;min-height:34px}
 .file-manager,.software-centre,.system-monitor{min-width:0}

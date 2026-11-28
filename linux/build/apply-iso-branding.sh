@@ -68,12 +68,14 @@ done
 
 install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/docs" "$SQUASH_ROOT/usr/local/share/nexus-os/branding"
 install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" "$SQUASH_ROOT/usr/local/share/nexus-os/branding/nexus-logo.svg"
+install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" "$SQUASH_ROOT/usr/local/share/nexus-os/wallpapers.json"
 install -m 0644 "$REPO_ROOT/LICENSE" "$SQUASH_ROOT/usr/local/share/nexus-os/LICENSE"
 install -m 0644 "$REPO_ROOT/docs/RECOVERY_AND_BOOT.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/RECOVERY_AND_BOOT.md"
 
 if [[ "$EDITION" == "lite" ]]; then
   install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite"
   cp -a "$REPO_ROOT/linux/lite/openbox" "$SQUASH_ROOT/usr/local/share/nexus-os/lite/"
+  install -m 0644 "$REPO_ROOT/linux/lite/openbox/wallpaper.png" "$SQUASH_ROOT/usr/local/share/nexus-os/lite/wallpaper.png"
   install -m 0644 "$REPO_ROOT/docs/NEXUS_LITE.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/NEXUS_LITE.md"
 elif [[ "$EDITION" == "lite-lxqt" ]]; then
   install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite-lxqt"

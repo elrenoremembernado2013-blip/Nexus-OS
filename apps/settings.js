@@ -5,88 +5,42 @@
   const presetWallpapers = window.NexusPersonalisationCatalog?.WALLPAPERS || [
     {
       id: "mountain-night",
-      category: "space",
-      categoryLabel: "Space & Galaxies",
+      category: "cinematic",
+      categoryLabel: "Cinematic",
       label: "Mountain Night Sky",
       aria: "Apply mountain night wallpaper",
-      thumb: "https://images.unsplash.com/photo-1725663656850-7bc515816fcd?auto=format&fit=crop&w=520&q=75",
-      alt: "Starry sky above a mountain range",
+      thumb: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=520&q=75",
+      alt: "Starry sky above a snow-covered mountain peak",
       photographer: "Benjamin Voros",
       sourceName: "Unsplash",
-      sourceUrl: "https://unsplash.com/photos/phIFdC6lA4E",
+      sourceUrl: "https://unsplash.com/photos/snow-mountain-under-stars-phIFdC6lA4E",
       license: "Unsplash License",
       recommendedTheme: "midnight"
     },
     {
       id: "alpine",
-      category: "mountains",
-      categoryLabel: "Mountains",
-      label: "Alpine Ridge",
+      category: "nature",
+      categoryLabel: "Nature",
+      label: "Alpine Horizon",
       aria: "Apply alpine landscape wallpaper",
-      thumb: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=520&q=75",
-      alt: "Dramatic alpine mountain peaks",
-      photographer: "Benjamin Voros",
+      thumb: "https://images.unsplash.com/photo-1508402476522-c77c2fa4479d?auto=format&fit=crop&w=520&q=75",
+      alt: "Mountain peak silhouette under twilight stars",
+      photographer: "Phil Botha",
       sourceName: "Unsplash",
-      sourceUrl: "https://unsplash.com/photos/phIFdC6lA4E",
+      sourceUrl: "https://unsplash.com/photos/silhouette-of-mountain-peak-at-nighttime-a0TJ3hy-UD8",
       license: "Unsplash License",
       recommendedTheme: "arctic"
-    },
-    {
-      id: "forest",
-      category: "forests",
-      categoryLabel: "Forests & Nature",
-      label: "Sunlit Forest",
-      aria: "Apply forest wallpaper",
-      thumb: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=520&q=75",
-      alt: "Sunlight through a green forest",
-      photographer: "Lukasz Szmigiel",
-      sourceName: "Unsplash",
-      sourceUrl: "https://unsplash.com/photos/jFCViYFYcus",
-      license: "Unsplash License",
-      recommendedTheme: "emerald"
-    },
-    {
-      id: "cosmos",
-      category: "space",
-      categoryLabel: "Space & Galaxies",
-      label: "Deep Nebula",
-      aria: "Apply cosmos wallpaper",
-      thumb: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=520&q=75",
-      alt: "Colourful deep space nebula",
-      photographer: "NASA",
-      sourceName: "Unsplash / NASA",
-      sourceUrl: "https://unsplash.com/photos/rTZW4f02zY8",
-      license: "Public Domain (NASA) / Unsplash",
-      recommendedTheme: "nebula"
-    },
-    {
-      id: "city",
-      category: "cities",
-      categoryLabel: "Cities",
-      label: "Dusk Skyline",
-      aria: "Apply city wallpaper",
-      thumb: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=520&q=75",
-      alt: "City skyline at dusk",
-      photographer: "Andre Benz",
-      sourceName: "Unsplash",
-      sourceUrl: "https://unsplash.com/photos/cXU6tNxhub0",
-      license: "Unsplash License",
-      recommendedTheme: "solar"
-    },
-    {
-      id: "modern",
-      category: "architecture",
-      categoryLabel: "Architecture",
-      label: "Minimalist Geometry",
-      aria: "Apply architecture wallpaper",
-      thumb: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=520&q=75",
-      alt: "Modern architectural structure",
-      photographer: "Joel Filipe",
-      sourceName: "Unsplash",
-      sourceUrl: "https://unsplash.com/photos/RFDP7_80v5A",
-      license: "Unsplash License",
-      recommendedTheme: "midnight"
     }
+  ];
+
+  const wallpaperCategories = window.NexusPersonalisationCatalog?.WALLPAPER_CATEGORIES || [
+    { id: "cinematic", label: "Cinematic" },
+    { id: "nature", label: "Nature" },
+    { id: "architecture", label: "Architecture" },
+    { id: "abstract", label: "Abstract" },
+    { id: "sci-fi", label: "Sci-Fi" },
+    { id: "minimal", label: "Minimal" },
+    { id: "gaming", label: "Gaming" }
   ];
 
   function openWallpaperDatabase() {
@@ -240,6 +194,9 @@
         <small>${p.summary}</small>
       </button>
     `).join("");
+    const wallpaperFilterButtons = wallpaperCategories.map(cat => `
+      <button class="wallpaper-filter" data-wallpaper-filter="${cat.id}" type="button">${cat.label}</button>
+    `).join("");
     const wallpaperButtons = presetWallpapers.map(wp => `
       <button class="wallpaper-option" type="button" data-wallpaper="${wp.id}" data-category="${wp.category}" data-title="${wp.label.toLowerCase()}" aria-label="${wp.aria}">
         <span class="wallpaper-fav-btn" data-wallpaper-fav="${wp.id}" role="button" tabindex="0" aria-label="Favourite ${wp.label}">☆</span>
@@ -326,14 +283,7 @@
               <div class="wallpaper-filters" role="group" aria-label="Wallpaper categories">
                 <button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button>
                 <button class="wallpaper-filter" data-wallpaper-filter="favorites" type="button">Favourites</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="mountains" type="button">Mountains</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="space" type="button">Space & Galaxies</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="forests" type="button">Forests & Nature</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="oceans" type="button">Oceans</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="cities" type="button">Cities</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="architecture" type="button">Architecture</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="abstract" type="button">Abstract</button>
-                <button class="wallpaper-filter" data-wallpaper-filter="gaming" type="button">Gaming</button>
+                ${wallpaperFilterButtons}
               </div>
               <div class="wallpaper-grid" id="wallpaperGrid">
                 ${wallpaperButtons}
@@ -590,6 +540,15 @@
       }
     }
 
+    function syncNativePersonalisation(opts) {
+      if (!window.NexusNativeServices?.status("personalisation")?.available) return;
+      try {
+        Promise.resolve(window.NexusNativeServices.call("personalisation", "applyTheme", opts)).catch(() => {});
+      } catch {
+        // Ignore transient native sync errors in preview
+      }
+    }
+
     function applyWallpaper(id, persist = true) {
       if (!shell?.setDesktopWallpaper(id, persist)) return;
       $$("[data-wallpaper]").forEach(item => {
@@ -597,8 +556,21 @@
         item.classList.toggle("selected", selected);
         item.setAttribute("aria-pressed", String(selected));
       });
+      const wpMeta = presetWallpapers.find(w => w.id === id);
       const label = $(`#wallpaperGrid [data-wallpaper="${id}"] span`)?.textContent || id;
-      $("#wallpaperStatus").textContent = "Applied: " + label;
+      $("#wallpaperStatus").textContent = wpMeta
+        ? `Applied: ${label} · Photo by ${wpMeta.photographer} (${wpMeta.sourceName})`
+        : "Applied: " + label;
+      const attrLink = $("#wallpaperAttributionLink");
+      if (attrLink && wpMeta?.sourceUrl) {
+        attrLink.href = wpMeta.sourceUrl;
+        attrLink.textContent = `${wpMeta.photographer} · ${wpMeta.sourceName} (${wpMeta.license})`;
+      }
+      if (persist && window.NexusNativeServices?.status("personalisation")?.available) {
+        const fitMap = { cover: "zoom", contain: "scaled", fill: "stretched", center: "centered" };
+        const fit = fitMap[readStorage("nexus-wallpaper-fit") || "cover"] || "zoom";
+        Promise.resolve(window.NexusNativeServices.call("personalisation", "applyWallpaper", { id, fit })).catch(() => {});
+      }
     }
 
     function setCustomWallpaper(url) {
@@ -965,7 +937,7 @@
       });
     });
 
-    function setAccent(value) {
+    function setAccent(value, syncNative = true) {
       document.documentElement.style.setProperty("--accent", value);
       writeStorage("nexus-accent", value);
       const picker = $("#customAccentPicker");
@@ -981,13 +953,14 @@
         button.setAttribute("aria-pressed", String(selected));
       });
       $("#accentStatus").textContent = "Accent colour updated (" + value + ").";
+      if (syncNative) syncNativePersonalisation({ accent: value });
     }
 
     $("#customAccentPicker")?.addEventListener("input", event => setAccent(event.target.value));
     $$("[data-accent]").forEach(swatch => {
       swatch.addEventListener("click", () => setAccent(swatch.dataset.accent));
     });
-    setAccent(readStorage("nexus-accent") || "#ffad7a");
+    setAccent(readStorage("nexus-accent") || "#ffad7a", false);
 
     function applyThemePreset(presetId, syncAccent = true) {
       const preset = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[presetId];
@@ -998,8 +971,9 @@
         btn.classList.toggle("selected", selected);
         btn.setAttribute("aria-pressed", String(selected));
       });
-      applyTheme(preset.mode);
-      if (syncAccent) setAccent(preset.accent);
+      applyTheme(preset.mode, false);
+      if (syncAccent) setAccent(preset.accent, false);
+      syncNativePersonalisation({ theme: presetId, appearance: preset.mode, accent: syncAccent ? preset.accent : undefined });
     }
     $$("[data-theme-preset]").forEach(btn => {
       btn.addEventListener("click", () => applyThemePreset(btn.dataset.themePreset, true));
@@ -1036,7 +1010,7 @@
       btn.setAttribute("aria-pressed", String(selected));
     });
 
-    function applyTheme(mode) {
+    function applyTheme(mode, syncNative = false) {
       const useLight =
         mode === "light" ||
         (mode === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
@@ -1050,12 +1024,13 @@
       $("#themeStatus").textContent =
         (mode === "system" ? "Following system appearance" : mode.charAt(0).toUpperCase() + mode.slice(1) + " theme") +
         " selected.";
+      if (syncNative) syncNativePersonalisation({ appearance: useLight ? "light" : "dark" });
     }
 
     $$("[data-theme-choice]").forEach(button => {
-      button.addEventListener("click", () => applyTheme(button.dataset.themeChoice));
+      button.addEventListener("click", () => applyTheme(button.dataset.themeChoice, true));
     });
-    applyTheme(readStorage("nexus-theme") || "dark");
+    applyTheme(readStorage("nexus-theme") || "dark", false);
 
     const themeMedia = window.matchMedia?.("(prefers-color-scheme: light)");
     const onThemeMediaChange = () => {

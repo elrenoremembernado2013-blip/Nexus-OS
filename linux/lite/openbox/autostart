@@ -1,12 +1,21 @@
 #!/usr/bin/env sh
 # NEXUS Lite minimal Openbox autostart (strictly no compositor/browser/Steam)
 tint2 &
-if command -v feh >/dev/null 2>&1 && [ -r /usr/local/share/nexus-os/lite/wallpaper.jpg ]; then
+WP_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/wallpaper.conf"
+WP_PATH=""
+if [ -r "$WP_CONF" ]; then
+  WP_PATH="$(grep -E '^WALLPAPER_PATH=' "$WP_CONF" | head -n1 | cut -d= -f2-)"
+fi
+if [ -n "$WP_PATH" ] && [ -r "$WP_PATH" ] && command -v feh >/dev/null 2>&1; then
+  feh --no-fehbg --bg-fill "$WP_PATH" &
+elif command -v feh >/dev/null 2>&1 && [ -r /usr/local/share/nexus-os/lite/wallpaper.jpg ]; then
   feh --no-fehbg --bg-scale /usr/local/share/nexus-os/lite/wallpaper.jpg &
+elif command -v feh >/dev/null 2>&1 && [ -r /usr/local/share/nexus-os/lite/wallpaper.png ]; then
+  feh --no-fehbg --bg-fill /usr/local/share/nexus-os/lite/wallpaper.png &
 elif command -v xsetroot >/dev/null 2>&1; then
   xsetroot -solid "#0d1424" &
 fi
-if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile" ] && grep -qx 'profile=lite-1g' "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile"; then
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile" ] && grep -Eq 'profile=lite-(1g|2g|4g)' "${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/lite-profile"; then
   if command -v nm-applet >/dev/null 2>&1; then
     nm-applet &
   fi

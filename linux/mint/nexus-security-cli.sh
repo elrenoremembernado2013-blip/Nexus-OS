@@ -183,18 +183,76 @@ case "$CMD" in
     fi
     startup_json="$(list_startup_entries)"
     python3 - "$fw" "$sb" "$enc" "$upd" "$is_root" "$current_user" "$has_sudo" "$startup_json" <<'PY'
-import json, sys
+import json, shutil, subprocess, sys
 fw, sb, enc, upd, is_root, user, has_sudo, startup_raw = sys.argv[1:]
 warnings = []
 if is_root == "true":
     warnings.append("Running desktop session as root is discouraged; use a standard user account.")
 if fw == "disabled":
     warnings.append("UFW firewall is disabled; incoming connections are not filtered by UFW.")
+
+# Pending updates summary (safe read-only dry-run)
+apt_updates = None
+if shutil.which("apt-get"):
+    try:
+        r = subprocess.run(["apt-get", "-s", "-q", "upgrade"], capture_output=True, text=True, timeout=6)
+        if r.returncode == 0:
+            apt_updates = sum(1 for line in r.stdout.splitlines() if line.startswith("Inst "))
+    except Exception:
+        pass
+flatpak_updates = None
+if shutil.which("flatpak"):
+    try:
+        r = subprocess.run(["flatpak", "remote-ls", "--updates", "--columns=application"], capture_output=True, text=True, timeout=6)
+        if r.returncode == 0:
+            flatpak_updates = len([l for l in r.stdout.splitlines() if l.strip()])
+    except Exception:
+        pass
+
+# Listening ports summary (ss -tuln)
+loopback_ports = 0
+wildcard_ports = 0
+if shutil.which("ss"):
+    try:
+        r = subprocess.run(["ss", "-tulnH"], capture_output=True, text=True, timeout=3)
+        for line in r.stdout.splitlines():
+            cols = line.split()
+            if len(cols) >= 5:
+                local = cols[4]
+                if local.startswith(("127.", "[::1]", "::1:")):
+                    loopback_ports += 1
+                else:
+                    wildcard_ports += 1
+    except Exception:
+        pass
+
+# Core service liveness
+services = {}
+if shutil.which("systemctl"):
+    for svc in ("NetworkManager", "ufw", "zramswap"):
+        try:
+            r = subprocess.run(["systemctl", "is-active", svc], capture_output=True, text=True, timeout=2)
+            services[svc] = r.stdout.strip() or "inactive"
+        except Exception:
+            services[svc] = "unknown"
+    try:
+        r = subprocess.run(["systemctl", "--user", "is-active", "nexus-system-bridge.service"], capture_output=True, text=True, timeout=2)
+        services["nexus-system-bridge"] = r.stdout.strip() or "inactive"
+    except Exception:
+        services["nexus-system-bridge"] = "unknown"
+
 payload = {
     "firewall": {"status": fw, "tool": "ufw"},
     "secure_boot": {"status": sb},
     "disk_encryption": {"status": enc},
-    "security_updates": {"status": upd, "note": "Traditional APT packages run unsandboxed; Flatpak apps use portal sandboxes."},
+    "security_updates": {
+        "status": upd,
+        "apt_upgradable": apt_updates,
+        "flatpak_updates": flatpak_updates,
+        "note": "Traditional APT packages run unsandboxed; Flatpak apps use portal sandboxes.",
+    },
+    "listening_ports": {"loopback": loopback_ports, "external": wildcard_ports},
+    "services": services,
     "account": {"user": user, "is_root": is_root == "true", "in_admin_group": has_sudo == "true"},
     "startup_apps": json.loads(startup_raw),
     "warnings": warnings,

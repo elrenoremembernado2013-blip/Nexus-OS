@@ -95,15 +95,41 @@ def main() -> None:
         api("/api/terminal/close", {"sessionId": sid})
 
         sec_status = api("/api/security/status")
-        for key in ("firewall", "secure_boot", "disk_encryption", "security_updates", "account", "startup_apps"):
+        for key in ("firewall", "secure_boot", "disk_encryption", "security_updates", "listening_ports", "services", "account", "startup_apps"):
             assert key in sec_status, f"Missing security status key: {key}"
 
         gaming_status = api("/api/gaming/status")
         for key in ("steam", "graphics", "hardware", "controllers", "performance"):
             assert key in gaming_status, f"Missing gaming status key: {key}"
+        assert "compatibility_caveat" in gaming_status["steam"]
+        assert "software_rendering" in gaming_status["graphics"]
+
+        cc_status = api("/api/control-centre")
+        for key in ("edition", "network", "bluetooth", "sound", "brightness", "battery", "updates"):
+            assert key in cc_status, f"Missing control-centre key: {key}"
+
+        wp_list = api("/api/wallpapers")
+        assert wp_list.get("version") == 3 and len(wp_list.get("categories", [])) == 7 and len(wp_list.get("wallpapers", [])) == 18
+
+        store_sources = api("/api/store/sources")
+        assert "apt" in store_sources and "flatpak" in store_sources
+        store_inst = api("/api/store/installed")
+        assert "apt" in store_inst and "flatpak" in store_inst
+        upd_status = api("/api/updates/status")
+        assert "total" in upd_status
 
         pers_res = api("/api/personalisation/apply", {"dryRun": True, "presetProfile": "gaming", "accent": "#ffad7a"})
         assert pers_res.get("ok") is True and "NEXUS-Solar" in pers_res.get("output", ""), pers_res
+        for ed in ("xfce", "lite-lxqt", "lite"):
+            ed_res = api("/api/personalisation/apply", {
+                "dryRun": True,
+                "edition": ed,
+                "theme": "midnight",
+                "accent": "#66a3ff",
+                "appearance": "dark",
+                "workspaces": 4,
+            })
+            assert ed_res.get("ok") is True, f"Personalisation dryRun failed for {ed}: {ed_res}"
 
         preflight = api("/api/installer/preflight")
         for key in ("arch", "firmware", "ubiquity_available", "hardware", "requirements", "warnings"):

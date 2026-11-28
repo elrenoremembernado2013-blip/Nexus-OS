@@ -126,14 +126,21 @@
         node("p", "", "Native Linux games run directly on Linux Mint libraries. Windows games run through Valve's Proton translation layer (Vulkan/DXVK). Not every Windows title works—kernel-level anti-cheat and specific DRM remain incompatible unless supported by the developer.")
       );
       const versions = state.data?.steam?.proton_versions || [];
+      const wineOk = Boolean(state.data?.steam?.wine_installed);
       if (!state.available) {
-        card.append(node("p", "settings-hint", "Detected Proton installations: Unavailable in browser preview."));
-      } else if (!versions.length) {
-        card.append(node("p", "settings-hint", "No Proton versions detected yet. Enable Steam Play for all titles inside Steam Settings -> Compatibility."));
+        card.append(node("p", "settings-hint", "Detected Proton / Wine installations: Unavailable in browser preview."));
       } else {
-        const list = node("ul", "store-requirements");
-        versions.forEach(v => list.append(node("li", "", v)));
-        card.append(list);
+        card.append(node("p", "settings-hint", `Wine runtime: ${wineOk ? "installed" : "not detected"}`));
+        if (!versions.length) {
+          card.append(node("p", "settings-hint", "No Proton versions detected yet. Enable Steam Play for all titles inside Steam Settings -> Compatibility."));
+        } else {
+          const list = node("ul", "store-requirements");
+          versions.forEach(v => list.append(node("li", "", v)));
+          card.append(list);
+        }
+        if (state.data?.steam?.compatibility_caveat) {
+          card.append(node("p", "settings-hint", state.data.steam.compatibility_caveat));
+        }
       }
       panel.append(card);
     };
@@ -145,20 +152,26 @@
       const gfx = state.data?.graphics;
       const dl = node("dl", "store-detail-metadata");
       const gpuSummary = gfx?.gpus?.length
-        ? gfx.gpus.map(g => `${g.vendor}:${g.device} (${g.driver})`).join(", ")
+        ? gfx.gpus.map(g => `${g.vendor_name || g.vendor}:${g.device} (${g.driver})`).join(", ")
         : (state.available ? "None detected" : "Unavailable");
       [
         ["CPU", hw?.cpu || "Unavailable"],
         ["RAM", hw?.ram_total_mib ? `${hw.ram_available_mib} / ${hw.ram_total_mib} MiB available` : "Unavailable"],
         ["Free storage", hw?.storage_available_gib != null ? `${hw.storage_available_gib} GiB free on /` : "Unavailable"],
         ["GPU / Kernel driver", gpuSummary],
-        ["Vulkan", gfx?.vulkan || "Unavailable"],
+        ["Vulkan", gfx?.vulkan_devices?.length ? `${gfx.vulkan} (${gfx.vulkan_devices.join(", ")})` : (gfx?.vulkan || "Unavailable")],
         ["OpenGL renderer", gfx?.opengl_renderer || "Unavailable"]
       ].forEach(([k, v]) => {
         dl.append(node("dt", "", k), node("dd", "", v));
       });
+      card.append(dl);
+      if (gfx?.software_rendering) {
+        card.append(node("p", "settings-hint", "Software OpenGL renderer (llvmpipe) detected: 3D gaming requires native hardware GPU drivers."));
+      }
+      (gfx?.gpus || []).forEach(g => {
+        if (g.compatibility_note) card.append(node("p", "settings-hint", g.compatibility_note));
+      });
       card.append(
-        dl,
         node("p", "settings-hint", "AMD and Intel GPUs use Linux Mint Mesa drivers; NVIDIA GPUs should be configured via Linux Mint Driver Manager. No synthetic FPS benchmarks are shown.")
       );
       panel.append(card);

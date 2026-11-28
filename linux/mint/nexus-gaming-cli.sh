@@ -12,6 +12,10 @@ XFCE_APPLY="$SCRIPT_DIR/apply-nexus-xfce.sh"
 [[ -x "$XFCE_APPLY" ]] || XFCE_APPLY="$(command -v nexus-apply-xfce || true)"
 CINNAMON_APPLY="$REPO_ROOT/linux/cinnamon/apply-nexus-cinnamon.sh"
 [[ -x "$CINNAMON_APPLY" ]] || CINNAMON_APPLY="$(command -v nexus-apply-cinnamon || true)"
+LXQT_APPLY="$REPO_ROOT/linux/lite/scripts/apply-nexus-lite-lxqt.sh"
+[[ -x "$LXQT_APPLY" ]] || LXQT_APPLY="$(command -v nexus-apply-lite-lxqt || true)"
+LITE_APPLY="$REPO_ROOT/linux/lite/apply-nexus-lite.sh"
+[[ -x "$LITE_APPLY" ]] || LITE_APPLY="$(command -v nexus-apply-lite || true)"
 STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os"
 GAMING_STATE_FILE="$STATE_DIR/gaming-mode.state"
 
@@ -112,24 +116,57 @@ try:
 except OSError:
     pass
 
-# GPUs via sysfs + optional lspci
+# GPUs via sysfs + human-readable vendor/driver compatibility mapping
+VENDOR_NAMES = {
+    "0x1002": "AMD / ATI",
+    "0x8086": "Intel",
+    "0x10de": "NVIDIA",
+    "0x1234": "QEMU / Bochs Virtual GPU",
+    "0x1af4": "VirtIO GPU",
+    "0x15ad": "VMware SVGA",
+    "0x80ee": "VirtualBox GPU",
+}
 gpus = []
 for dev in sorted(Path("/sys/bus/pci/devices").glob("*")):
     cls = read_text(dev / "class") or ""
     if not cls.startswith("0x03"):
         continue
-    vendor = read_text(dev / "vendor") or "unknown"
-    device = read_text(dev / "device") or "unknown"
+    vendor = (read_text(dev / "vendor") or "unknown").lower()
+    device = (read_text(dev / "device") or "unknown").lower()
     driver_link = dev / "driver"
     driver = driver_link.resolve().name if driver_link.is_symlink() else "none"
-    gpus.append({"slot": dev.name, "vendor": vendor, "device": device, "driver": driver})
+    vendor_name = VENDOR_NAMES.get(vendor, vendor)
+    if vendor in ("0x1234", "0x1af4", "0x15ad", "0x80ee"):
+        compat_note = "Virtual machine GPU (2D/basic 3D; native hardware GPU recommended for modern 3D games)."
+    elif vendor == "0x10de" and driver == "nouveau":
+        compat_note = "Open-source nouveau driver active; proprietary NVIDIA driver recommended for Vulkan & Proton."
+    elif vendor == "0x10de" and driver == "nvidia":
+        compat_note = "NVIDIA proprietary driver detected (Vulkan/DXVK compatible)."
+    elif vendor == "0x1002" and driver == "amdgpu":
+        compat_note = "AMDGPU + Mesa RADV driver stack detected (strong Vulkan/Proton support)."
+    elif vendor == "0x8086" and driver in ("i915", "xe"):
+        compat_note = "Intel Mesa Vulkan/ANV driver stack detected (lightweight/indie & compatible 3D titles)."
+    else:
+        compat_note = "Check Mesa/Vulkan ICD availability for this GPU."
+    gpus.append({
+        "slot": dev.name,
+        "vendor": vendor,
+        "vendor_name": vendor_name,
+        "device": device,
+        "driver": driver,
+        "compatibility_note": compat_note,
+    })
 
 vulkan_summary = "unavailable"
+vulkan_devices = []
 if shutil.which("vulkaninfo"):
     try:
         res = subprocess.run(["vulkaninfo", "--summary"], capture_output=True, text=True, timeout=3)
         if res.returncode == 0 and res.stdout.strip():
             vulkan_summary = "available"
+            for line in res.stdout.splitlines():
+                if "deviceName" in line:
+                    vulkan_devices.append(line.split("=", 1)[-1].strip())
         else:
             vulkan_summary = "unavailable"
     except Exception:
@@ -145,6 +182,7 @@ if shutil.which("glxinfo"):
                 break
     except Exception:
         pass
+software_rendering = "llvmpipe" in opengl_renderer.lower() or "softpipe" in opengl_renderer.lower()
 
 # Steam & Proton (real local files only; never fabricated)
 steam_bin = shutil.which("steam")
@@ -201,6 +239,7 @@ heroic_bin = shutil.which("heroic")
 heroic_flatpak = flatpak_app_installed("com.heroicgameslauncher.hgl")
 steam_flatpak = flatpak_app_installed("com.valvesoftware.Steam")
 steam_installed = bool(steam_bin or steam_dir or steam_flatpak)
+wine_installed = shutil.which("wine") is not None
 gamemode_ok = shutil.which("gamemoded") is not None
 mangohud_ok = shutil.which("mangohud") is not None
 apt_ok = shutil.which("apt-get") is not None
@@ -217,6 +256,8 @@ if shutil.which("powerprofilesctl"):
         pass
 
 guidance = []
+if software_rendering:
+    guidance.append("Software OpenGL renderer (llvmpipe) detected: 3D gaming requires native hardware GPU drivers.")
 if not steam_installed:
     guidance.append("Steam missing: install optional steam-installer via NEXUS Store (sudo apt install steam-installer) or Flatpak com.valvesoftware.Steam.")
 if vulkan_summary != "available":
@@ -238,6 +279,8 @@ payload = {
         "steamapps_found": steam_dir is not None,
         "installed_games": installed_games,
         "proton_versions": sorted(proton_versions),
+        "wine_installed": wine_installed,
+        "compatibility_caveat": "Proton/Wine compatibility varies by title (kernel anti-cheat and third-party DRM may block some Windows games); no guarantee is made that every Windows game works.",
     },
     "launchers": {
         "lutris": {
@@ -256,7 +299,9 @@ payload = {
     "graphics": {
         "gpus": gpus,
         "vulkan": vulkan_summary,
+        "vulkan_devices": vulkan_devices,
         "opengl_renderer": opengl_renderer,
+        "software_rendering": software_rendering,
     },
     "hardware": {
         "cpu": cpu_model,
@@ -308,6 +353,10 @@ PY
             bash "$XFCE_APPLY" --lightweight >/dev/null || true
           elif [[ -x "$CINNAMON_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Cinnamon* ]]; then
             bash "$CINNAMON_APPLY" --profile performance >/dev/null || true
+          elif [[ -x "$LXQT_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *LXQt* ]]; then
+            bash "$LXQT_APPLY" --profile lite-1g >/dev/null || true
+          elif [[ -x "$LITE_APPLY" && ( "${XDG_CURRENT_DESKTOP:-}" == *Openbox* || "${XDG_CURRENT_DESKTOP:-}" == *NEXUS-Lite* ) ]]; then
+            bash "$LITE_APPLY" --profile lite-512 >/dev/null || true
           fi
           echo 'Gaming Mode enabled. Use "gamemoderun %command%" in Steam launch options when GameMode is installed.'
         fi
@@ -331,6 +380,10 @@ PY
             bash "$XFCE_APPLY" >/dev/null || true
           elif [[ -x "$CINNAMON_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Cinnamon* ]]; then
             bash "$CINNAMON_APPLY" --profile balanced >/dev/null || true
+          elif [[ -x "$LXQT_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *LXQt* ]]; then
+            bash "$LXQT_APPLY" --profile lite-1g >/dev/null || true
+          elif [[ -x "$LITE_APPLY" && ( "${XDG_CURRENT_DESKTOP:-}" == *Openbox* || "${XDG_CURRENT_DESKTOP:-}" == *NEXUS-Lite* ) ]]; then
+            bash "$LITE_APPLY" --profile lite-1g >/dev/null || true
           fi
           echo 'Gaming Mode disabled; balanced desktop defaults restored.'
         fi

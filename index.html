@@ -40,20 +40,26 @@
       <button class="dock-app" data-app="settings" title="Settings" aria-label="Settings"><img class="dock-icon-image" src="assets/icons/settings.svg" alt=""></button>
     </nav></div>
     <div class="panel control-panel hidden" id="controlPanel">
-      <div class="panel-heading"><div><h2>Control Centre</h2><p>Quick settings</p></div><button class="close-btn" data-close="controlPanel">×</button></div>
+      <div class="panel-heading"><div><h2>Control Centre</h2><p id="controlPanelSubtitle">Quick settings</p></div><button class="close-btn" data-close="controlPanel">×</button></div>
+      <div class="cc-status-strip" id="ccStatusStrip"><span class="cc-pill">Browser Preview · Local UI controls</span></div>
       <div class="toggle-grid">
-        <button class="tile" type="button" disabled title="Network integration requires a native system service"><span>⌁</span><b>Wi-Fi</b><small>Native service unavailable</small></button>
-        <button class="tile" type="button" disabled title="Bluetooth integration requires a native system service"><span>ᛒ</span><b>Bluetooth</b><small>Native service unavailable</small></button>
+        <button class="tile" id="ccWifiTile" type="button" data-cc-action="wifi" disabled title="Network integration requires a native system service"><span>⌁</span><b>Wi-Fi</b><small>Native service unavailable</small></button>
+        <button class="tile" id="ccBluetoothTile" type="button" data-cc-action="bluetooth" disabled title="Bluetooth integration requires a native system service"><span>ᛒ</span><b>Bluetooth</b><small>Native service unavailable</small></button>
         <button class="tile" data-toggle="dnd" aria-pressed="false"><span>◐</span><b>Do Not Disturb</b><small>Off · preview</small></button>
         <button class="tile" data-toggle="power" aria-pressed="false"><span>ϟ</span><b>Power Saver</b><small>Off · preview</small></button>
       </div>
-      <div class="slider-row"><label for="brightness">Preview brightness</label><div class="slider-control"><input id="brightness" type="range" min="35" max="100" value="100"><output id="brightnessValue" for="brightness">100%</output></div></div>
-      <div class="slider-row audio-unavailable"><label for="volume">System volume</label><div class="slider-control"><input id="volume" type="range" min="0" max="100" value="65" disabled aria-describedby="volumeUnavailable"><output id="volumeValue" for="volume">Unavailable</output></div><span id="volumeUnavailable" class="visually-hidden">Audio integration requires a native system service.</span></div>
+      <div class="slider-row"><label for="brightness" id="brightnessLabel">Preview brightness</label><div class="slider-control"><input id="brightness" type="range" min="35" max="100" value="100"><output id="brightnessValue" for="brightness">100%</output></div></div>
+      <div class="slider-row audio-unavailable" id="volumeRow"><label for="volume">System volume</label><div class="slider-control"><button type="button" class="cc-mute-btn hidden" id="volumeMuteBtn" title="Mute/unmute system audio" aria-pressed="false">🔊</button><input id="volume" type="range" min="0" max="100" value="65" disabled aria-describedby="volumeUnavailable"><output id="volumeValue" for="volume">Unavailable</output></div><span id="volumeUnavailable" class="visually-hidden">Audio integration requires a native system service.</span></div>
+      <div class="cc-quick-links">
+        <button type="button" class="cc-link-btn" data-cc-open="settings">Settings</button>
+        <button type="button" class="cc-link-btn" data-cc-open="software">Store</button>
+        <button type="button" class="cc-link-btn" data-cc-open="gaming">Gaming</button>
+      </div>
       <section class="notification-section" id="controlNotifications" aria-labelledby="notificationHeading">
         <div class="notification-heading"><h3 id="notificationHeading">Notifications</h3><button class="clear-notifications" id="clearNotifications" type="button">Clear</button></div>
         <div id="notificationList" aria-live="polite"><div class="notification-empty"><p>You're all caught up.</p><small>Notifications will appear here.</small></div></div>
       </section>
-      <div class="panel-foot">Brightness changes this desktop preview. Wi-Fi, Bluetooth, audio and system power need native services.</div>
+      <div class="panel-foot" id="controlPanelFoot">Brightness changes this desktop preview. Wi-Fi, Bluetooth, audio and system power need native services.</div>
     </div>
     <section class="launcher hidden" id="launcher">
       <div class="launcher-search"><span>⌕</span><input id="appSearch" type="search" placeholder="Search applications…" aria-label="Search applications"></div>

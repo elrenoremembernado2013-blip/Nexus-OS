@@ -145,6 +145,7 @@ bin_dir="$PREFIX_DIR/bin"
 
 run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$share_dir/hardware" "$bin_dir" /usr/local/share/applications
 run_cmd install -m 0644 "$REPO_ROOT/linux/xfce/nexus-dark.css" "$share_dir/xfce/nexus-dark.css"
+run_cmd install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" "$share_dir/wallpapers.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/themes.json" "$share_dir/cinnamon/themes.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/wallpapers.json" "$share_dir/cinnamon/wallpapers.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/cinnamon-base.css" "$share_dir/cinnamon/cinnamon-base.css"
@@ -157,6 +158,8 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/apply-nexus-xfce.sh" "$bin_dir/ne
 run_cmd ln -sf "$share_dir/cinnamon/apply-nexus-cinnamon.sh" "$bin_dir/nexus-apply-cinnamon"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/measure-footprint.sh" "$bin_dir/nexus-measure-footprint"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-panel-status.sh" "$bin_dir/nexus-panel-status"
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-control-centre-cli.sh" "$bin_dir/nexus-control-centre"
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-wallpaper-cli.sh" "$bin_dir/nexus-wallpaper"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/madoo-qualify-report.sh" "$bin_dir/nexus-qualify-report"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" "$bin_dir/nexus-firstboot"
 run_cmd install -m 0755 "$REPO_ROOT/linux/branding/nexus-launch-app.sh" "$bin_dir/nexus-launch-app"

@@ -136,12 +136,15 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" /usr/local/bi
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" /usr/local/bin/nexus-store-cli
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" /usr/local/bin/nexus-security-cli
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" /usr/local/bin/nexus-gaming-cli
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-control-centre-cli.sh" /usr/local/bin/nexus-control-centre
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-wallpaper-cli.sh" /usr/local/bin/nexus-wallpaper
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" /usr/local/bin/nexus-system-bridge
 run_cmd install -m 0644 "$REPO_ROOT/linux/mint/nexus-system-bridge.service" /etc/systemd/user/nexus-system-bridge.service
 run_cmd ln -sf ../nexus-system-bridge.service /etc/systemd/user/default.target.wants/nexus-system-bridge.service
 run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" /usr/local/share/nexus-os/hardware/hw-compatibility-db.json
 run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" /usr/local/share/nexus-os/hardware/nexus-browser-bench.py
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
+run_cmd install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" /usr/local/share/nexus-os/wallpapers.json
 run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.svg" /usr/local/share/nexus-os/lite/wallpaper-nexus-obsidian.svg
 run_cmd install -m 0644 "$LXQT_DIR/theme/nexus-dark/lxqt-panel.qss" /usr/local/share/lxqt/themes/nexus-dark/lxqt-panel.qss
 run_cmd cp -a "$LXQT_DIR" /usr/local/share/nexus-os/lite-lxqt/

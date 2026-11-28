@@ -91,6 +91,93 @@
     boundaryNote.textContent = "No synthetic security score is shown. Traditional APT packages run unsandboxed as your user; Flatpak apps expose portal permissions.";
     overviewCard.append(boundaryNote);
     page.append(overviewCard);
+
+    if (available) {
+      const actionsCard = document.createElement("div");
+      actionsCard.className = "settings-card integration-card";
+      const actionsTitle = document.createElement("h3");
+      actionsTitle.textContent = "Firewall & live system checks";
+      const actionsMsg = document.createElement("p");
+      actionsMsg.className = "settings-hint";
+      actionsMsg.textContent = snapshot?.services
+        ? `Services — Bridge: ${snapshot.services["nexus-system-bridge"] || "unknown"} · UFW: ${snapshot.services.ufw || "unknown"} · Ports: ${snapshot.listening_ports?.loopback ?? 0} loopback, ${snapshot.listening_ports?.external ?? 0} external`
+        : "Firewall changes invoke PolicyKit (pkexec) authentication.";
+
+      const row = document.createElement("div");
+      row.className = "settings-actions-row";
+      if (row.style) {
+        row.style.display = "flex";
+        row.style.gap = "8px";
+        row.style.flexWrap = "wrap";
+      }
+
+      const fwEnabled = snapshot?.firewall?.status === "enabled";
+      const fwBtn = document.createElement("button");
+      fwBtn.type = "button";
+      fwBtn.className = "action-button";
+      fwBtn.textContent = fwEnabled ? "Disable UFW firewall" : "Enable UFW firewall";
+      fwBtn.addEventListener("click", async () => {
+        try {
+          const res = await window.NexusNativeServices.call("privacy-security", "setFirewall", !fwEnabled);
+          actionsMsg.textContent = res?.message || "Updated firewall state.";
+        } catch (err) {
+          actionsMsg.textContent = err?.message || "Firewall action unavailable.";
+        }
+      });
+      row.append(fwBtn);
+      actionsCard.append(actionsTitle, actionsMsg, row);
+
+      if (snapshot?.startup_apps?.length) {
+        const stTitle = document.createElement("strong");
+        if (stTitle.style) {
+          stTitle.style.display = "block";
+          stTitle.style.marginTop = "12px";
+        }
+        stTitle.textContent = "Detected autostart entries";
+        const ul = document.createElement("ul");
+        ul.className = "settings-hint";
+        snapshot.startup_apps.slice(0, 8).forEach(entry => {
+          const li = document.createElement("li");
+          li.textContent = `${entry.name} (${entry.scope} · ${entry.enabled ? "enabled" : "disabled"})`;
+          ul.append(li);
+        });
+        actionsCard.append(stTitle, ul);
+      }
+
+      page.append(actionsCard);
+    }
+  }
+
+  function appendUpdatesOverview(page, available) {
+    const card = document.createElement("div");
+    card.className = "settings-card integration-card";
+    const h3 = document.createElement("h3");
+    h3.textContent = "System & application updates";
+    const summary = document.createElement("p");
+    summary.className = "settings-hint";
+    summary.textContent = available
+      ? "Check real APT and Flatpak updates without leaving Settings."
+      : "Connect to the native Linux Mint package service to query real APT & Flatpak updates.";
+    card.append(h3, summary);
+    if (available) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "action-button";
+      btn.textContent = "Check APT & Flatpak updates";
+      btn.addEventListener("click", async () => {
+        try {
+          const res = await window.NexusNativeServices.call("packages", "checkUpdates");
+          const count = Array.isArray(res) ? res.length : (res?.total ?? 0);
+          summary.textContent = count > 0
+            ? `${count} update(s) available. Open NEXUS Store or Update Manager to install.`
+            : "Your APT and Flatpak packages are up to date.";
+        } catch (err) {
+          summary.textContent = err?.message || "Update check failed.";
+        }
+      });
+      card.append(btn);
+    }
+    page.append(card);
   }
 
   function makeSection(section) {
@@ -155,6 +242,8 @@
     page.append(heading, summary, card);
     if (section.id === "privacy") {
       appendPrivacyOverview(page, available);
+    } else if (section.id === "updates") {
+      appendUpdatesOverview(page, available);
     }
     return { nav, page };
   }

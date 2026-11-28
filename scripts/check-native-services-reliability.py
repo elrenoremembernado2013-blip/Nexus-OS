@@ -346,8 +346,11 @@ def test_phase15_four_edition_service_parity(bridge) -> None:
         "/usr/local/bin/nexus-store-cli",
         "/usr/local/bin/nexus-security-cli",
         "/usr/local/bin/nexus-gaming-cli",
+        "/usr/local/bin/nexus-control-centre",
+        "/usr/local/bin/nexus-wallpaper",
         "/usr/local/bin/nexus-firstboot",
         "/usr/local/bin/nexus-launch-app",
+        "/usr/local/share/nexus-os/wallpapers.json",
         "/etc/systemd/user/nexus-system-bridge.service",
         "/etc/systemd/user/default.target.wants/nexus-system-bridge.service",
     )
@@ -415,11 +418,47 @@ def test_phase15_four_edition_service_parity(bridge) -> None:
             proc.wait(timeout=5)
         assert not rt_file.exists(), "Bridge must remove runtime token file on SIGTERM shutdown"
 
-    # 4. Edition-aware personalisation helper selection
-    assert "apply-nexus-cinnamon.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "cinnamon", "dryRun": True}))
-    assert "apply-nexus-xfce.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "xfce", "dryRun": True}))
-    assert "apply-nexus-lite.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "lite", "dryRun": True}))
-    assert "apply-nexus-lite-lxqt.sh" in " ".join(bridge.resolve_personalisation_cmd({"edition": "lite-lxqt", "dryRun": True}))
+    # 4. Edition-aware personalisation helper selection (all 4 editions receive theme/accent/wallpaper/workspaces)
+    for ed, expected_script in (
+        ("cinnamon", "apply-nexus-cinnamon.sh"),
+        ("xfce", "apply-nexus-xfce.sh"),
+        ("lite", "apply-nexus-lite.sh"),
+        ("lite-lxqt", "apply-nexus-lite-lxqt.sh"),
+    ):
+        cmd_str = " ".join(bridge.resolve_personalisation_cmd({
+            "edition": ed,
+            "dryRun": True,
+            "theme": "midnight",
+            "accent": "#66a3ff",
+            "appearance": "dark",
+            "wallpaperUrl": "https://images.unsplash.com/photo-1519681393784-d120267933ba",
+            "workspaces": 4,
+        }))
+        assert expected_script in cmd_str, f"Expected {expected_script} in {cmd_str}"
+        assert "--theme midnight" in cmd_str and "--accent #66a3ff" in cmd_str and "--workspaces 4" in cmd_str
+
+    # 4b. Control Centre & Wallpaper CLI boundary checks
+    cc_res = subprocess.run(
+        ["bash", str(REPO_ROOT / "linux" / "mint" / "nexus-control-centre-cli.sh"), "status", "--json"],
+        capture_output=True, text=True, check=True,
+    )
+    cc_json = json.loads(cc_res.stdout)
+    assert "edition" in cc_json and "network" in cc_json and "bluetooth" in cc_json and "sound" in cc_json
+    cc_bad = subprocess.run(
+        ["bash", str(REPO_ROOT / "linux" / "mint" / "nexus-control-centre-cli.sh"), "action", "--type", "invalid"],
+        capture_output=True, text=True,
+    )
+    assert cc_bad.returncode == 2
+    wp_res = subprocess.run(
+        ["bash", str(REPO_ROOT / "linux" / "mint" / "nexus-wallpaper-cli.sh"), "apply", "--dry-run", "--id", "alpine"],
+        capture_output=True, text=True, check=True,
+    )
+    assert "images.unsplash.com" in wp_res.stdout
+    wp_bad = subprocess.run(
+        ["bash", str(REPO_ROOT / "linux" / "mint" / "nexus-wallpaper-cli.sh"), "apply", "--url", "http://insecure.example/a.jpg"],
+        capture_output=True, text=True,
+    )
+    assert wp_bad.returncode == 2
 
     # 5. Mocked 4-edition desktop utility detection & Gaming Hub full tool detection
     with tempfile.TemporaryDirectory() as td:

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NEXUS Gaming Hub
+GenericName=Gaming Readiness
+Comment=Check Steam, Proton, Vulkan, GPU compatibility, and Gaming Mode
+Exec=/usr/local/bin/nexus-launch-app gaming
+Icon=applications-games
+Terminal=false
+Categories=Game;Utility;
+StartupNotify=true

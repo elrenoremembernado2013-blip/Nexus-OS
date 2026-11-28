@@ -968,7 +968,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
 {
   const desktopDir = path.join(rootDir, "linux", "branding", "applications");
   const files = fs.readdirSync(desktopDir).filter(f => f.endsWith(".desktop")).sort();
-  assert.equal(files.length, 11, "Expected 11 .desktop launcher files");
+  assert.equal(files.length, 12, "Expected 12 .desktop launcher files");
   const contents = new Map();
   for (const file of files) {
     const text = fs.readFileSync(path.join(desktopDir, file), "utf8");
@@ -995,12 +995,13 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
     "nexus-terminal.desktop": "terminal",
     "nexus-system-monitor.desktop": "monitor",
     "nexus-settings.desktop": "settings",
-    "nexus-store.desktop": "store"
+    "nexus-store.desktop": "store",
+    "nexus-gaming.desktop": "gaming"
   };
   for (const [file, target] of Object.entries(expectedTargets)) {
     const suffix = target === "browser" ? " %u" : "";
     assert.match(contents.get(file), new RegExp("^Exec=/usr/local/bin/nexus-launch-app " + target + suffix + "$", "m"), `${file} must call the shared launcher dispatcher`);
-    for (const command of expectedCommands[target]) {
+    for (const command of expectedCommands[target] || []) {
       assert.ok(launcher.includes(command), `Native launcher dispatcher missing ${command} for ${target}`);
     }
   }
@@ -1041,7 +1042,29 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
   throwError = false;
   monWinEl.querySelector("#monitorRefresh").click();
   assert.ok(monWinEl.querySelector("#monitorBoundary").textContent.includes("Native telemetry active"), "System Monitor boundary must clear stale error banner after successful refresh");
-  console.log("PASS Native Settings failure honesty and System Monitor boundary recovery");
+
+  // 7. Control Centre live vs unavailable hardware boundary
+  win.NexusNativeServices.register("control-centre", {
+    status() {
+      return {
+        edition: "lite-lxqt",
+        network: { supported: true, wifi_available: false, wifi_enabled: false, connected: true, status_text: "Connected (eth0)" },
+        bluetooth: { supported: false, powered: false, status_text: "No Bluetooth adapter" },
+        sound: { supported: true, volume_percent: 42, muted: false },
+        brightness: { supported: false },
+        battery: { supported: false },
+        updates: { apt_available: true, upgradable_count: 3 }
+      };
+    }
+  });
+  assert.equal(doc.getElementById("ccBluetoothTile").disabled, true, "Bluetooth must remain disabled when adapter is unavailable");
+  assert.equal(doc.getElementById("ccWifiTile").disabled, true, "Wi-Fi tile must remain disabled when only wired eth0 is present");
+  assert.equal(doc.getElementById("volume").disabled, false, "Volume slider should enable when native audio is available");
+  assert.equal(doc.getElementById("volumeValue").textContent, "42%");
+  assert.ok(doc.getElementById("ccStatusStrip").textContent.includes("3 updates"));
+  win.NexusNativeServices.unregister("control-centre");
+  assert.equal(doc.getElementById("volume").disabled, true, "Volume slider must disable cleanly when native control-centre unregisters");
+  console.log("PASS Native Settings failure honesty, Control Centre boundary, and System Monitor recovery");
 }
 })().catch(error => {
   console.error(error);

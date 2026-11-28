@@ -140,6 +140,16 @@
     function appAction(application) {
       if (catalog.isInstalled(application)) return { label: "Open", action: "open", disabled: !application.launchTarget };
       if (application.installMode === "internal") return { label: "Add to launcher", action: "install", disabled: false };
+      if (packagesAvailable() && application.linuxPackage?.id) {
+        const src = String(application.linuxPackage.source || "apt").toUpperCase();
+        return {
+          label: `Install (${src})`,
+          action: "native-install",
+          pkgId: application.linuxPackage.id,
+          pkgSource: application.linuxPackage.source || "apt",
+          disabled: false,
+        };
+      }
       return { label: "Unavailable", action: "unavailable", disabled: true };
     }
 
@@ -163,8 +173,13 @@
       header.append(icon, identity, favorite);
       const description = node("p", "store-app-description", application.description);
       const metadata = node("div", "store-app-meta");
+      const sourceLabel = application.installMode === "internal"
+        ? "Bundled App"
+        : application.linuxPackage?.id
+          ? `Native ${String(application.linuxPackage.source || "apt").toUpperCase()}`
+          : application.type;
       metadata.append(
-        makeTag(application.type, "subtle"),
+        makeTag(sourceLabel, "subtle"),
         makeTag(application.capability === "planned" ? "Planned" : application.capability === "preview" ? "Preview" : application.capability === "unavailable" ? "Unavailable" : "Works in prototype")
       );
       const action = appAction(application);
@@ -177,6 +192,10 @@
       primary.type = "button";
       primary.dataset.storeAction = action.action;
       primary.dataset.appId = application.id;
+      if (action.pkgId) {
+        primary.dataset.pkgId = action.pkgId;
+        primary.dataset.pkgSource = action.pkgSource;
+      }
       primary.disabled = action.disabled;
       if (action.disabled) primary.title = application.installMode === "unavailable"
         ? "This app has no compatible installer or launcher integration yet."

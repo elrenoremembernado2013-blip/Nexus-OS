@@ -42,6 +42,7 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "browser": [["firefox"], ["chromium"], ["chromium-browser"], ["falkon"], ["x-www-browser"]],
     "terminal": [["qterminal"], ["lxterminal"], ["gnome-terminal"], ["xfce4-terminal"], ["x-terminal-emulator"]],
     "monitor": [["gnome-system-monitor"], ["qps"], ["lxtask"], ["xfce4-taskmanager"], ["mate-system-monitor"]],
+    "settings": [["cinnamon-settings"], ["xfce4-settings-manager"], ["lxqt-config"], ["obconf"]],
     "display": [["cinnamon-settings", "display"], ["xfce4-display-settings"], ["lxqt-config-monitor"], ["lxrandr"], ["arandr"]],
     "sound": [["cinnamon-settings", "sound"], ["pavucontrol-qt"], ["pavucontrol"]],
     "network": [["cinnamon-settings", "network"], ["nm-connection-editor"]],
@@ -49,7 +50,9 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "power": [["cinnamon-settings", "power"], ["xfce4-power-manager-settings"], ["lxqt-config-power"]],
     "accounts": [["cinnamon-settings", "users"], ["users-admin"], ["lxqt-admin-user"]],
     "privacy-security": [["cinnamon-settings", "privacy"], ["gufw"]],
-    "packages": [["mintinstall"], ["mintupdate"]],
+    "packages": [["mintinstall"], ["mintupdate"], ["synaptic"]],
+    "updates": [["mintupdate"]],
+    "wallpaper": [["cinnamon-settings", "backgrounds"], ["xfdesktop-settings"], ["pcmanfm-qt", "--desktop-pref"], ["nitrogen"]],
     "gaming": [["steam"]],
     "installer": [["nexus-installer-launcher"], ["ubiquity"]],
 }
@@ -59,6 +62,7 @@ TOOL_INSTALL_HINTS: dict[str, str] = {
     "browser": "install firefox or falkon via NEXUS Store",
     "terminal": "install qterminal, lxterminal, gnome-terminal, or xfce4-terminal",
     "monitor": "install gnome-system-monitor, xfce4-taskmanager, lxtask, or qps",
+    "settings": "install xfce4-settings, lxqt-config, or obconf",
     "display": "install arandr, lxrandr, or lxqt-config",
     "sound": "install pavucontrol or pavucontrol-qt",
     "network": "install network-manager-gnome (nm-connection-editor)",
@@ -67,6 +71,8 @@ TOOL_INSTALL_HINTS: dict[str, str] = {
     "accounts": "install gnome-system-tools (users-admin) or lxqt-admin",
     "privacy-security": "install gufw for graphical firewall management",
     "packages": "use nexus-store-cli in a terminal or install mintinstall",
+    "updates": "install mintupdate or run apt-get upgrade in terminal",
+    "wallpaper": "install xfdesktop4, pcmanfm-qt, or nitrogen",
     "gaming": "install steam-installer via NEXUS Store",
     "installer": "install ubiquity or run nexus-installer-launcher",
 }
@@ -351,6 +357,30 @@ def detect_desktop_edition() -> str:
     return "cinnamon"
 
 
+def _append_common_personalisation_flags(
+    cmd: list[str],
+    body: dict[str, object],
+    *,
+    allow_panel_autohide: bool = False,
+    allow_appearance: bool = False,
+) -> None:
+    if body.get("theme") in ("midnight", "nebula", "arctic", "emerald", "solar"):
+        cmd.extend(["--theme", str(body["theme"])])
+    if isinstance(body.get("accent"), str) and re.fullmatch(r"#[0-9a-fA-F]{6}", body["accent"]):
+        cmd.extend(["--accent", body["accent"]])
+    if allow_appearance and body.get("appearance") in ("dark", "light"):
+        cmd.extend(["--appearance", str(body["appearance"])])
+    wp_url = body.get("wallpaperUrl")
+    if isinstance(wp_url, str) and wp_url.startswith("https://") and len(wp_url) <= 512 and not any(c.isspace() for c in wp_url):
+        cmd.extend(["--wallpaper-url", wp_url])
+    if body.get("wallpaperFit") in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
+        cmd.extend(["--wallpaper-fit", str(body["wallpaperFit"])])
+    if isinstance(body.get("workspaces"), int) and 1 <= body["workspaces"] <= 8:
+        cmd.extend(["--workspaces", str(body["workspaces"])])
+    if allow_panel_autohide and body.get("panelAutohide") in ("false", "true", "intel"):
+        cmd.extend(["--panel-autohide", str(body["panelAutohide"])])
+
+
 def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
     edition = str(body.get("edition") or "").strip().lower() or detect_desktop_edition()
     if edition == "xfce":
@@ -359,8 +389,10 @@ def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
             cmd.append("--dry-run")
         if body.get("revert"):
             cmd.append("--revert")
-        elif body.get("effectLevel") == "off" or body.get("presetProfile") in ("minimal", "lightweight", "gaming"):
-            cmd.append("--lightweight")
+        else:
+            if body.get("effectLevel") == "off" or body.get("presetProfile") in ("minimal", "lightweight", "gaming"):
+                cmd.append("--lightweight")
+            _append_common_personalisation_flags(cmd, body, allow_panel_autohide=True, allow_appearance=True)
         return cmd
     if edition == "lite-lxqt":
         cmd = resolve_helper("linux/lite/scripts/apply-nexus-lite-lxqt.sh", "nexus-apply-lite-lxqt")
@@ -372,6 +404,7 @@ def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
             profile = str(body.get("liteProfile") or "lite-1g")
             if profile in ("lite-512", "lite-768", "lite-1g", "lite-2g", "lite-4g"):
                 cmd.extend(["--profile", profile])
+            _append_common_personalisation_flags(cmd, body, allow_appearance=True)
         return cmd
     if edition == "lite":
         cmd = resolve_helper("linux/lite/apply-nexus-lite.sh", "nexus-apply-lite")
@@ -383,6 +416,7 @@ def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
             profile = str(body.get("liteProfile") or "lite-1g")
             if profile in ("lite-512", "lite-1g", "standard-2g"):
                 cmd.extend(["--profile", profile])
+            _append_common_personalisation_flags(cmd, body, allow_appearance=True)
         return cmd
 
     cmd = resolve_helper("linux/cinnamon/apply-nexus-cinnamon.sh", "nexus-apply-cinnamon")
@@ -391,22 +425,13 @@ def resolve_personalisation_cmd(body: dict[str, object]) -> list[str]:
     if body.get("revert"):
         cmd.append("--revert")
     else:
-        if body.get("theme") in ("midnight", "nebula", "arctic", "emerald", "solar"):
-            cmd.extend(["--theme", str(body["theme"])])
-        if isinstance(body.get("accent"), str) and re.fullmatch(r"#[0-9a-fA-F]{6}", body["accent"]):
-            cmd.extend(["--accent", body["accent"]])
+        _append_common_personalisation_flags(cmd, body, allow_panel_autohide=True, allow_appearance=False)
         if body.get("effectLevel") in ("off", "subtle", "balanced", "enhanced"):
             cmd.extend(["--effect-level", str(body["effectLevel"])])
         if body.get("dockPosition") in ("bottom", "left", "right"):
             cmd.extend(["--dock-position", str(body["dockPosition"])])
         if body.get("panelSize") in ("small", "medium", "large"):
             cmd.extend(["--panel-size", str(body["panelSize"])])
-        if body.get("panelAutohide") in ("false", "true", "intel"):
-            cmd.extend(["--panel-autohide", str(body["panelAutohide"])])
-        if body.get("wallpaperFit") in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
-            cmd.extend(["--wallpaper-fit", str(body["wallpaperFit"])])
-        if isinstance(body.get("workspaces"), int) and 1 <= body["workspaces"] <= 8:
-            cmd.extend(["--workspaces", str(body["workspaces"])])
         if body.get("presetProfile") in ("default", "minimal", "gaming", "productivity", "cinematic", "lightweight"):
             cmd.extend(["--preset-profile", str(body["presetProfile"])])
     return cmd
@@ -795,6 +820,66 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                 return
             if parsed.path == "/api/telemetry":
                 self._send_json(HTTPStatus.OK, collect_telemetry_snapshot())
+            elif parsed.path == "/api/control-centre":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-control-centre-cli.sh", "nexus-control-centre") + ["status", "--json"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=6.0)
+            elif parsed.path == "/api/wallpapers":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-wallpaper-cli.sh", "nexus-wallpaper") + ["list", "--json"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=6.0)
+            elif parsed.path == "/api/store/sources":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-store-cli.sh", "nexus-store-cli") + ["sources"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=6.0)
+            elif parsed.path == "/api/store/search":
+                qs = urllib.parse.parse_qs(parsed.query)
+                query = (qs.get("q") or [""])[0].strip()
+                if not query or len(query) > 80:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Search query must be 1-80 characters"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-store-cli.sh", "nexus-store-cli") + ["--json", "search", query]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=12.0)
+            elif parsed.path == "/api/store/installed":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-store-cli.sh", "nexus-store-cli") + ["--json", "installed"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=10.0)
+            elif parsed.path in ("/api/store/updates", "/api/updates/status"):
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-store-cli.sh", "nexus-store-cli") + ["--json", "updates"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=12.0)
+            elif parsed.path == "/api/store/info":
+                qs = urllib.parse.parse_qs(parsed.query)
+                source = (qs.get("source") or [""])[0].strip()
+                pkg = (qs.get("pkg") or [""])[0].strip()
+                if source not in ("apt", "flatpak") or not pkg:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid package source or id"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-store-cli.sh", "nexus-store-cli") + ["--json", "info", source, pkg]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=10.0)
             elif parsed.path == "/api/security/status":
                 try:
                     cmd = resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["status"]
@@ -802,6 +887,25 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
                     return
                 self._run_cli_json(cmd)
+            elif parsed.path == "/api/security/permissions":
+                qs = urllib.parse.parse_qs(parsed.query)
+                app_id = (qs.get("appId") or [""])[0].strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{3,128}", app_id) or "." not in app_id:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Flatpak application ID"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["permissions", app_id]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Permissions query timed out"})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "appId": app_id, "permissions": proc.stdout.strip() or proc.stderr.strip()},
+                )
             elif parsed.path == "/api/gaming/status":
                 try:
                     cmd = resolve_helper("linux/mint/nexus-gaming-cli.sh", "nexus-gaming-cli") + ["status"]
@@ -883,6 +987,116 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
             elif self.path == "/api/tools/launch":
                 res = launch_allowlisted_tool(str(body.get("category", "")))
                 self._send_json(HTTPStatus.OK if res["ok"] else HTTPStatus.BAD_REQUEST, res)
+            elif self.path == "/api/control-centre/action":
+                action_type = str(body.get("type", "")).strip()
+                if action_type not in ("volume", "mute", "brightness", "wifi", "bluetooth", "dnd"):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Unsupported control-centre action"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-control-centre-cli.sh", "nexus-control-centre") + ["action", "--type", action_type]
+                    val = body.get("value")
+                    if val is not None and str(val).strip() != "":
+                        cmd.extend(["--value", str(val).strip()])
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=6.0)
+                    payload = json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()}
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Control centre action timed out"})
+                    return
+                self._send_json(HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST, payload)
+            elif self.path == "/api/wallpapers/apply":
+                wp_id = str(body.get("id") or "").strip()
+                wp_url = str(body.get("url") or "").strip()
+                fit = str(body.get("fit") or "zoom").strip()
+                if fit not in ("zoom", "scaled", "stretched", "centered", "wallpaper"):
+                    fit = "zoom"
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-wallpaper-cli.sh", "nexus-wallpaper") + ["apply", "--fit", fit]
+                    if wp_id and re.fullmatch(r"[a-z0-9-]{1,64}", wp_id):
+                        cmd.extend(["--id", wp_id])
+                    elif wp_url.startswith("https://") and len(wp_url) <= 512 and not any(c.isspace() for c in wp_url):
+                        cmd.extend(["--url", wp_url])
+                    else:
+                        self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Provide a valid wallpaper id or https:// url"})
+                        return
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=20.0)
+                    payload = json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()}
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Wallpaper apply timed out"})
+                    return
+                self._send_json(HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST, payload)
+            elif self.path in ("/api/store/install", "/api/store/remove"):
+                action = "install" if self.path.endswith("/install") else "remove"
+                source = str(body.get("source") or "").strip()
+                pkg = str(body.get("pkg") or "").strip()
+                if source not in ("apt", "flatpak") or not pkg:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid package source or id"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-store-cli.sh", "nexus-store-cli") + ["--json", action, source, pkg]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180.0)
+                    payload = json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()}
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": f"Package {action} timed out"})
+                    return
+                self._send_json(HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST, payload)
+            elif self.path == "/api/security/firewall":
+                fw_action = str(body.get("action") or "").strip()
+                if fw_action not in ("enable", "disable"):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid firewall action"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["firewall", fw_action]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Firewall action timed out"})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
+                )
+            elif self.path == "/api/security/flatpak-revoke":
+                app_id = str(body.get("appId") or "").strip()
+                flag = str(body.get("flag") or "").strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{3,128}", app_id) or "." not in app_id:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Flatpak appId"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["flatpak-revoke", app_id, flag]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
+                )
+            elif self.path == "/api/security/flatpak-reset":
+                app_id = str(body.get("appId") or "").strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{3,128}", app_id) or "." not in app_id:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Flatpak appId"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-security-cli.sh", "nexus-security-cli") + ["flatpak-reset", app_id]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
+                )
             elif self.path == "/api/gaming/mode":
                 mode_action = str(body.get("action", ""))
                 if mode_action not in ("enable", "disable"):

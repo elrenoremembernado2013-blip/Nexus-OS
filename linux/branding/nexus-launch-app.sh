@@ -6,6 +6,9 @@ set -euo pipefail
 
 STORE_CLI="${NEXUS_STORE_CLI:-/usr/local/bin/nexus-store-cli}"
 FIRSTBOOT_CLI="${NEXUS_FIRSTBOOT_CLI:-/usr/local/bin/nexus-firstboot}"
+GAMING_CLI="${NEXUS_GAMING_CLI:-/usr/local/bin/nexus-gaming-cli}"
+SECURITY_CLI="${NEXUS_SECURITY_CLI:-/usr/local/bin/nexus-security-cli}"
+WALLPAPER_CLI="${NEXUS_WALLPAPER_CLI:-/usr/local/bin/nexus-wallpaper}"
 
 fail() {
   printf 'NEXUS launcher: %s\n' "$1" >&2
@@ -75,8 +78,23 @@ case "${1:-}" in
     [[ -x "$FIRSTBOOT_CLI" ]] || fail "NEXUS First-Boot helper is not installed at $FIRSTBOOT_CLI"
     run_in_terminal "$FIRSTBOOT_CLI" "$@" || fail "no supported terminal emulator is available for NEXUS First-Boot"
     ;;
+  gaming)
+    shift
+    [[ -x "$GAMING_CLI" ]] || fail "NEXUS Gaming CLI is not installed at $GAMING_CLI"
+    run_in_terminal "$GAMING_CLI" status || fail "no supported terminal emulator is available for NEXUS Gaming Hub"
+    ;;
+  security)
+    shift
+    [[ -x "$SECURITY_CLI" ]] || fail "NEXUS Security CLI is not installed at $SECURITY_CLI"
+    run_in_terminal "$SECURITY_CLI" status || fail "no supported terminal emulator is available for NEXUS Security"
+    ;;
+  wallpaper)
+    shift
+    [[ -x "$WALLPAPER_CLI" ]] || fail "NEXUS Wallpaper CLI is not installed at $WALLPAPER_CLI"
+    run_in_terminal "$WALLPAPER_CLI" list || fail "no supported terminal emulator is available for NEXUS Wallpaper"
+    ;;
   *)
-    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot}\n' "$0" >&2
+    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot|gaming|security|wallpaper}\n' "$0" >&2
     exit 2
     ;;
 esac

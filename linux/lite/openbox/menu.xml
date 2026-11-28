@@ -1,22 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openbox_menu xmlns="http://openbox.org/3.4/menu">
-  <menu id="root-menu" label="NEXUS Lite">
-    <item label="Terminal (LXTerminal)">
-      <action name="Execute"><command>lxterminal</command></action>
+  <menu id="root-menu" label="NEXUS OS Lite">
+    <item label="NEXUS Files">
+      <action name="Execute"><command>/usr/local/bin/nexus-launch-app files</command></action>
     </item>
-    <item label="Files (PCManFM)">
-      <action name="Execute"><command>pcmanfm</command></action>
+    <item label="NEXUS Terminal">
+      <action name="Execute"><command>/usr/local/bin/nexus-launch-app terminal</command></action>
     </item>
-    <item label="Task Manager (LXTask)">
-      <action name="Execute"><command>lxtask</command></action>
+    <item label="NEXUS Browser">
+      <action name="Execute"><command>/usr/local/bin/nexus-launch-app browser</command></action>
+    </item>
+    <item label="NEXUS Store">
+      <action name="Execute"><command>/usr/local/bin/nexus-launch-app store</command></action>
+    </item>
+    <item label="NEXUS Settings">
+      <action name="Execute"><command>/usr/local/bin/nexus-launch-app settings</command></action>
+    </item>
+    <item label="NEXUS System Monitor">
+      <action name="Execute"><command>/usr/local/bin/nexus-launch-app monitor</command></action>
     </item>
     <item label="Text Editor (Mousepad)">
       <action name="Execute"><command>mousepad</command></action>
     </item>
     <separator/>
-    <item label="Memory &amp; ZRAM Audit">
-      <action name="Execute"><command>lxterminal -e sh -c 'nexus-memory-audit; echo; nexus-configure-zram status; read -r _'</command></action>
-    </item>
+    <menu id="nexus-tools-menu" label="System &amp; Readiness">
+      <item label="Control Centre Summary">
+        <action name="Execute"><command>lxterminal -e sh -c 'nexus-control-centre --plain; printf "\nPress Enter to close..."; read -r _'</command></action>
+      </item>
+      <item label="NEXUS Gaming Hub">
+        <action name="Execute"><command>lxterminal -e sh -c 'nexus-gaming-cli status; printf "\nPress Enter to close..."; read -r _'</command></action>
+      </item>
+      <item label="Hardware Diagnostics">
+        <action name="Execute"><command>lxterminal -e sh -c 'nexus-hw-diagnostics; printf "\nPress Enter to close..."; read -r _'</command></action>
+      </item>
+      <item label="Security &amp; Firewall Audit">
+        <action name="Execute"><command>lxterminal -e sh -c 'nexus-security-cli status; echo; nexus-security-audit; printf "\nPress Enter to close..."; read -r _'</command></action>
+      </item>
+      <item label="Memory &amp; ZRAM Audit">
+        <action name="Execute"><command>lxterminal -e sh -c 'nexus-memory-audit; echo; nexus-configure-zram status; printf "\nPress Enter to close..."; read -r _'</command></action>
+      </item>
+      <item label="NEXUS First-Boot Setup">
+        <action name="Execute"><command>/usr/local/bin/nexus-launch-app firstboot</command></action>
+      </item>
+      <item label="NEXUS Recovery Tools">
+        <action name="Execute"><command>lxterminal -e sh -c 'nexus-recovery --help; printf "\nPress Enter to close..."; read -r _'</command></action>
+      </item>
+      <item label="Install NEXUS OS">
+        <action name="Execute"><command>nexus-installer-launcher</command></action>
+      </item>
+    </menu>
     <item label="Openbox Preferences">
       <action name="Execute"><command>obconf</command></action>
     </item>
