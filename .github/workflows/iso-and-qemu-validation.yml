@@ -254,17 +254,50 @@ jobs:
 
       - name: Build and verify NEXUS ${{ matrix.edition }} ISO
         run: |
+          out_iso="build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso"
+          build_cmd=""
           if [ "${{ matrix.edition }}" = "lite" ]; then
-            sudo bash linux/lite/build-nexus-lite-iso.sh
+            build_cmd="sudo bash linux/lite/build-nexus-lite-iso.sh"
           elif [ "${{ matrix.edition }}" = "lite-lxqt" ]; then
-            sudo bash linux/lite/scripts/build-nexus-lite-lxqt-iso.sh
+            build_cmd="sudo bash linux/lite/scripts/build-nexus-lite-lxqt-iso.sh"
           else
-            sudo bash linux/build/build-nexus-iso.sh --edition "${{ matrix.edition }}"
+            build_cmd="sudo bash linux/build/build-nexus-iso.sh --edition ${{ matrix.edition }}"
           fi
-          bash linux/build/verify-nexus-iso.sh --edition "${{ matrix.edition }}"
+          set +e
+          $build_cmd > /tmp/iso-build.log 2>&1
+          build_rc=$?
+          set -e
+          cat /tmp/iso-build.log
+          if [ "$build_rc" -ne 0 ]; then
+            iso_exists="false"
+            iso_bytes="0"
+            if [ -f "$out_iso" ]; then
+              iso_exists="true"
+              iso_bytes="$(stat -c %s "$out_iso" 2>/dev/null || echo 0)"
+            fi
+            err_tail="$(tail -n 20 /tmp/iso-build.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-ISO-BUILD-FAIL-${{ matrix.job_slug }}::edition=${{ matrix.edition }} cmd='${build_cmd}' rc=${build_rc} out_iso=${out_iso} iso_exists=${iso_exists} iso_bytes=${iso_bytes} tail=${err_tail}"
+            exit "$build_rc"
+          fi
+          set +e
+          bash linux/build/verify-nexus-iso.sh --edition "${{ matrix.edition }}" > /tmp/iso-verify.log 2>&1
+          verify_rc=$?
+          set -e
+          cat /tmp/iso-verify.log
+          if [ "$verify_rc" -ne 0 ]; then
+            iso_exists="false"
+            iso_bytes="0"
+            if [ -f "$out_iso" ]; then
+              iso_exists="true"
+              iso_bytes="$(stat -c %s "$out_iso" 2>/dev/null || echo 0)"
+            fi
+            err_tail="$(tail -n 20 /tmp/iso-verify.log | tr '\n' ' ' | cut -c1-1000)"
+            echo "::error title=NEXUS-ISO-VERIFY-FAIL-${{ matrix.job_slug }}::edition=${{ matrix.edition }} rc=${verify_rc} out_iso=${out_iso} iso_exists=${iso_exists} iso_bytes=${iso_bytes} tail=${err_tail}"
+            exit "$verify_rc"
+          fi
           (cd build/iso/out && sha256sum -c "nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")
           iso_sha="$(awk '{print $1}' "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256")"
-          iso_bytes="$(stat -c %s "build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso")"
+          iso_bytes="$(stat -c %s "$out_iso")"
           echo "::notice title=NEXUS-ISO-${{ matrix.job_slug }}::file=nexus-os-22.3-${{ matrix.edition }}-amd64.iso bytes=${iso_bytes} sha256=${iso_sha}"
           sudo rm -rf "build/iso/work-${{ matrix.edition }}" build/downloads/*.iso
 
@@ -514,7 +547,7 @@ jobs:
 
   compare-lite-report:
     needs: iso-and-qemu
-    if: ${{ !cancelled() && (github.event_name == 'push' || github.event.inputs.edition == 'all' || github.event.inputs.edition == 'lite-pair') }}
+    if: ${{ success() && (github.event_name == 'push' || github.event.inputs.edition == 'all' || github.event.inputs.edition == 'lite-pair') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -546,12 +579,12 @@ jobs:
               print(f"::notice title=NEXUS-124-COMPARE-{row['ram_mib']}M::" + json.dumps(row, separators=(",", ":")))
           PY
           else
-            echo "::error title=NEXUS-124-COMPARE::Missing Openbox or LXQt QEMU JSON artifacts (ob=${#ob_jsons[@]}, lx=${#lx_jsons[@]})."
+            echo "::error title=NEXUS-124-COMPARE::Missing Openbox or LXQt QEMU JSON artifacts (ob=${#ob_jsons[@]}, lx=${#lx_jsons[@]}; verify upstream lite-openbox-compare and lite-lxqt-* jobs uploaded qemu-results-*.json)."
             exit 1
           fi
 
       - name: Upload Lite comparison report artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: nexus-lite-comparison-report

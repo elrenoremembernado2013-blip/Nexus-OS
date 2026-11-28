@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reproducible Linux Mint 22.3 live-ISO builder for NEXUS OS (Standard Cinnamon,
 # MADOO Xfce, and Lite Openbox editions kept strictly isolated).
-set -euo pipefail
+set -eEuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
@@ -149,7 +149,7 @@ if [[ "$DRY_RUN" == true ]]; then
   echo "Step 1: bash $PREREQ_SCRIPT --edition $out_slug --strict"
   echo "Step 2: Verify $BASE_ISO SHA-256 against $MANIFEST_FILE"
   echo "Step 3: Extract ISO tree via xorriso into $WORK_DIR/iso-root and unpack casper/filesystem.squashfs via unsquashfs"
-  echo "Step 4: Mount dev/proc/sys in $WORK_DIR/squashfs-root, run $PROVISION_SCRIPT, and apply $out_slug branding"
+  echo "Step 4: Stage linux/, LICENSE, docs/, index.html, app.js, styles.css, apps/, assets/ and mount dev/proc/sys in $WORK_DIR/squashfs-root, run $PROVISION_SCRIPT, and apply $out_slug branding"
   echo "Step 5: Repack casper/filesystem.squashfs via mksquashfs -comp xz and update casper/filesystem.size + md5sum.txt"
   echo "Step 6: Repack hybrid BIOS+UEFI ISO with xorriso to $OUT_ISO and generate .sha256 + $BUILD_INFO_PATH"
   exit 0
@@ -177,6 +177,7 @@ squash_root="$WORK_DIR/squashfs-root"
 mounted_chroot=false
 resolv_backup=""
 policy_rc_added=false
+CURRENT_STAGE="init"
 
 cleanup() {
   if [[ "$policy_rc_added" == true ]]; then
@@ -200,15 +201,34 @@ cleanup() {
     umount -lf "$squash_root/run" 2>/dev/null || true
   fi
 }
+
+on_error() {
+  local rc=$?
+  local failed_cmd="${BASH_COMMAND:-unknown}"
+  local iso_exists="false"
+  local iso_size="0"
+  if [[ -f "$OUT_ISO" ]]; then
+    iso_exists="true"
+    iso_size="$(stat -c %s "$OUT_ISO" 2>/dev/null || echo 0)"
+  fi
+  printf 'BUILD STAGE FAILED: stage=%s edition=%s exit=%s out_iso=%s iso_exists=%s iso_size=%s cmd=%s\n' \
+    "$CURRENT_STAGE" "$out_slug" "$rc" "$OUT_ISO" "$iso_exists" "$iso_size" "$failed_cmd" >&2
+}
+
+trap on_error ERR
 trap cleanup EXIT
 
+CURRENT_STAGE="clean-work-dir"
 rm -rf -- "$iso_root" "$squash_root"
 mkdir -p -- "$iso_root" "$OUT_DIR"
 
+CURRENT_STAGE="extract-base-iso"
 xorriso -osirrox on -indev "$BASE_ISO" -extract / "$iso_root"
 chmod -R u+w "$iso_root"
+CURRENT_STAGE="unsquashfs"
 unsquashfs -d "$squash_root" "$iso_root/casper/filesystem.squashfs"
 
+CURRENT_STAGE="mount-chroot"
 mount --bind /dev "$squash_root/dev"
 mount --bind /dev/pts "$squash_root/dev/pts"
 mount -t proc proc "$squash_root/proc"
@@ -232,10 +252,22 @@ if [[ ! -e "$squash_root/usr/sbin/policy-rc.d" ]]; then
   policy_rc_added=true
 fi
 
+CURRENT_STAGE="stage-chroot-repo"
+for req_entry in linux LICENSE docs index.html app.js styles.css apps assets; do
+  [[ -e "$REPO_ROOT/$req_entry" ]] || {
+    printf 'Missing required repository artifact for chroot staging: %s\n' "$REPO_ROOT/$req_entry" >&2
+    exit 1
+  }
+done
 mkdir -p -- "$squash_root/tmp/nexus-repo"
 cp -a "$REPO_ROOT/linux" "$squash_root/tmp/nexus-repo/linux"
 cp -a "$REPO_ROOT/LICENSE" "$squash_root/tmp/nexus-repo/LICENSE"
 cp -a "$REPO_ROOT/docs" "$squash_root/tmp/nexus-repo/docs"
+cp -a "$REPO_ROOT/index.html" "$squash_root/tmp/nexus-repo/index.html"
+cp -a "$REPO_ROOT/app.js" "$squash_root/tmp/nexus-repo/app.js"
+cp -a "$REPO_ROOT/styles.css" "$squash_root/tmp/nexus-repo/styles.css"
+cp -a "$REPO_ROOT/apps" "$squash_root/tmp/nexus-repo/apps"
+cp -a "$REPO_ROOT/assets" "$squash_root/tmp/nexus-repo/assets"
 
 chroot_env=(PATH=/usr/sbin:/usr/bin:/sbin:/bin)
 chroot_args=(--skip-ufw --force)
@@ -251,21 +283,27 @@ elif [[ "$PROVISION_SCRIPT" == *"provision-nexus-lite.sh" || "$PROVISION_SCRIPT"
   chroot_args=(--skip-ufw --purge-bloat --force)
 fi
 
+CURRENT_STAGE="chroot-provision"
 chroot "$squash_root" /usr/bin/env -i "${chroot_env[@]}" \
   bash "/tmp/nexus-repo/${PROVISION_SCRIPT}" "${chroot_args[@]}"
+CURRENT_STAGE="chroot-apt-clean"
 chroot "$squash_root" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
   apt-get clean
 rm -rf -- "$squash_root/tmp/nexus-repo"
 
+CURRENT_STAGE="unmount-chroot"
 cleanup
 mounted_chroot=false
 
+CURRENT_STAGE="apply-iso-branding"
 bash "$BRANDING_SCRIPT" --iso-root "$iso_root" --squash-root "$squash_root" --edition "$out_slug"
 
+CURRENT_STAGE="mksquashfs"
 rm -f -- "$iso_root/casper/filesystem.squashfs"
 mksquashfs "$squash_root" "$iso_root/casper/filesystem.squashfs" -comp xz -noappend
 printf '%s\n' "$(du -sx --block-size=1 "$squash_root" | awk '{print $1}')" > "$iso_root/casper/filesystem.size"
 
+CURRENT_STAGE="md5sum-manifest"
 (
   cd "$iso_root"
   rm -f md5sum.txt
@@ -306,12 +344,16 @@ if [[ -n "$efi_img" ]]; then
   )
 fi
 
+CURRENT_STAGE="xorriso-mkisofs"
 xorriso -as mkisofs "${mkisofs_args[@]}" -output "$OUT_ISO" "$iso_root"
 
+CURRENT_STAGE="sha256sum"
 (
   cd "$OUT_DIR"
   sha256sum "${OUT_ISO##*/}" > "${OUT_ISO##*/}.sha256"
 )
+
+CURRENT_STAGE="build-info"
 
 built_sha="$(awk '{print $1}' "${OUT_ISO}.sha256")"
 git_commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo 'unknown')"

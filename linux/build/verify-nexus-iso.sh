@@ -72,12 +72,25 @@ size_bytes="$(stat -c %s "$ISO_PATH")"
   sha256sum -c "$(basename "${ISO_PATH}.sha256")"
 )
 
-[[ -r "$info_file" ]] || { printf 'Missing build metadata: %s\n' "$info_file" >&2; exit 1; }
-python3 - "$info_file" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
+[[ -r "$info_file" ]] || { printf 'VERIFY STAGE FAILED (metadata): Missing build metadata: %s\n' "$info_file" >&2; exit 1; }
+expected_edition="$EDITION"
+if [[ "$expected_edition" == "standard" ]]; then
+  expected_edition="cinnamon"
+fi
+python3 - "$info_file" "$expected_edition" "$ISO_PATH" <<'PY'
+import json, os, sys
+info_path, expected_edition, iso_path = sys.argv[1], sys.argv[2], sys.argv[3]
+data = json.load(open(info_path, encoding="utf-8"))
 for key in ("name", "base_distro", "base_version", "edition", "arch", "output_iso", "output_iso_sha256"):
-    assert data.get(key), f"Missing {key} in build-info.json"
+    assert data.get(key), f"VERIFY STAGE FAILED (metadata): Missing {key} in {info_path}"
+if expected_edition and data.get("edition") != expected_edition:
+    raise SystemExit(
+        f"VERIFY STAGE FAILED (metadata): Edition mismatch in {info_path}: expected={expected_edition!r}, got={data.get('edition')!r}"
+    )
+if data.get("output_iso") != os.path.basename(iso_path):
+    raise SystemExit(
+        f"VERIFY STAGE FAILED (metadata): output_iso mismatch in {info_path}: expected={os.path.basename(iso_path)!r}, got={data.get('output_iso')!r}"
+    )
 PY
 
 if command -v xorriso >/dev/null 2>&1; then
@@ -123,9 +136,9 @@ if command -v xorriso >/dev/null 2>&1; then
       echo 'SECURITY FAIL: Test agent/script found inside released ISO filesystem.squashfs!' >&2
       exit 1
     fi
-    for req_sq in '/usr/local/bin/nexus-system-bridge' '/etc/systemd/user/nexus-system-bridge.service' '/usr/local/share/nexus-os/ui/index.html'; do
+    for req_sq in '/usr/local/bin/nexus-system-bridge' '/etc/systemd/user/nexus-system-bridge.service' '/usr/local/share/nexus-os/ui/index.html' '/usr/local/share/nexus-os/ui/app.js' '/usr/local/share/nexus-os/ui/styles.css' '/usr/local/share/nexus-os/ui/apps/terminal.js'; do
       if [[ "$sq_list" != *"$req_sq"* ]]; then
-        printf 'FAIL: Missing required NEXUS runtime file in released ISO squashfs: %s\n' "$req_sq" >&2
+        printf 'VERIFY STAGE FAILED (squashfs-payload): Missing required NEXUS runtime file in released ISO squashfs: %s\n' "$req_sq" >&2
         exit 1
       fi
     done

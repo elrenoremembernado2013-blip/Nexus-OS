@@ -40,7 +40,7 @@ done
 bash "$VALIDATE_PKGS" "$LITE_MANIFEST" >/dev/null
 
 if [[ "$CHECK_ONLY" == true ]]; then
-  exec bash "$REPO_ROOT/linux/build/check-build-prereqs.sh"
+  exec bash "$REPO_ROOT/linux/build/check-build-prereqs.sh" --edition lite
 fi
 
 if [[ "$DRY_RUN" == true ]]; then

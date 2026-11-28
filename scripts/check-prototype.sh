@@ -44,6 +44,7 @@ node scripts/check-phase21-ecosystem.js
 node scripts/check-phase22-compatibility.js
 node scripts/check-phase23-validation.js
 node scripts/check-phase24-reliability.js
+node scripts/check-phase24-1-iso-pipeline.js
 bash scripts/check-native-launchers.sh
 
 python3 - <<'PY'
