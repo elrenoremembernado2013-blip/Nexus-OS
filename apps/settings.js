@@ -541,10 +541,24 @@
       }
     }
 
-    function syncNativePersonalisation(opts) {
+    function syncNativePersonalisation(opts = {}) {
       if (!window.NexusNativeServices?.status("personalisation")?.available) return Promise.resolve(false);
+      const savedPreset = readStorage("nexus-theme-preset");
+      const savedMode = readStorage("nexus-theme") || "dark";
+      const appearance = opts.appearance || (savedMode === "light" ? "light" : "dark");
+      const payload = {
+        theme: opts.theme || savedPreset || (appearance === "light" ? "arctic" : "midnight"),
+        appearance,
+        accent: opts.accent || readStorage("nexus-accent") || "#ffad7a",
+        effectLevel: opts.effectLevel || readStorage("nexus-effect-level") || "balanced",
+        dockPosition: opts.dockPosition || readStorage("nexus-dock-position") || "bottom",
+        panelAutohide: opts.panelAutohide || (readStorage("nexus-dock-autohide") === "true" ? "true" : "false"),
+        workspaces: opts.workspaces ?? Number(readStorage("nexus-workspace-count") || "4")
+      };
       try {
-        return Promise.resolve(window.NexusNativeServices.call("personalisation", "applyTheme", opts))
+        // Helpers receive a complete snapshot: their CLI defaults must never
+        // overwrite a different setting when one control changes.
+        return Promise.resolve(window.NexusNativeServices.call("personalisation", "applyTheme", payload))
           .then(result => result?.ok === true)
           .catch(() => false);
       } catch {
@@ -1070,7 +1084,7 @@
         " selected.";
       if (syncNative) {
         const presetId = readStorage("nexus-theme-preset");
-        const nativeTheme = presetId || (useLight ? "arctic" : "midnight");
+        const nativeTheme = useLight ? "arctic" : (presetId || "midnight");
         syncNativePersonalisation({
           theme: nativeTheme,
           appearance: useLight ? "light" : "dark",
