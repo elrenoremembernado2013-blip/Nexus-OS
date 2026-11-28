@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NEXUS Compatibility Centre
+Comment=Inspect Linux, Windows, Android, and Apple format compatibility and optional runtimes
+Exec=/usr/local/bin/nexus-launch-app compatibility
+Icon=/usr/local/share/nexus-os/branding/nexus-logo.svg
+Terminal=false
+Categories=System;Utility;
+StartupNotify=true

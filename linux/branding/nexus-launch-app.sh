@@ -8,6 +8,7 @@ STORE_CLI="${NEXUS_STORE_CLI:-/usr/local/bin/nexus-store-cli}"
 FIRSTBOOT_CLI="${NEXUS_FIRSTBOOT_CLI:-/usr/local/bin/nexus-firstboot}"
 GAMING_CLI="${NEXUS_GAMING_CLI:-/usr/local/bin/nexus-gaming-cli}"
 PERF_CLI="${NEXUS_PERF_CLI:-/usr/local/bin/nexus-performance-cli}"
+COMPAT_CLI="${NEXUS_COMPAT_CLI:-/usr/local/bin/nexus-compat-cli}"
 SECURITY_CLI="${NEXUS_SECURITY_CLI:-/usr/local/bin/nexus-security-cli}"
 WALLPAPER_CLI="${NEXUS_WALLPAPER_CLI:-/usr/local/bin/nexus-wallpaper}"
 
@@ -99,6 +100,11 @@ case "${1:-}" in
     [[ -x "$PERF_CLI" ]] || fail "NEXUS Performance CLI is not installed at $PERF_CLI"
     run_in_terminal "$PERF_CLI" overview || fail "no supported terminal emulator is available for NEXUS Performance Centre"
     ;;
+  compatibility)
+    shift
+    [[ -x "$COMPAT_CLI" ]] || fail "NEXUS Compatibility CLI is not installed at $COMPAT_CLI"
+    run_in_terminal "$COMPAT_CLI" status || fail "no supported terminal emulator is available for NEXUS Compatibility Centre"
+    ;;
   quantum)
     shift
     local_ui="/usr/local/share/nexus-os/ui/index.html"
@@ -109,7 +115,7 @@ case "${1:-}" in
     fail "no supported web browser is installed to open NEXUS Quantum"
     ;;
   *)
-    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot|gaming|security|wallpaper|performance|quantum}\n' "$0" >&2
+    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot|gaming|security|wallpaper|performance|compatibility|quantum}\n' "$0" >&2
     exit 2
     ;;
 esac

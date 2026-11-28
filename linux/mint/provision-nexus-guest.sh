@@ -167,6 +167,7 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" "$bin_dir/nex
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" "$bin_dir/nexus-security-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" "$bin_dir/nexus-gaming-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-performance-cli.sh" "$bin_dir/nexus-performance-cli"
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-compat-cli.sh" "$bin_dir/nexus-compat-cli"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-install-preflight.sh" "$bin_dir/nexus-install-preflight"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-installer-launcher.sh" "$bin_dir/nexus-installer-launcher"
 run_cmd install -m 0755 "$REPO_ROOT/linux/installer/nexus-disk-install.sh" "$bin_dir/nexus-disk-install"

@@ -18,6 +18,7 @@
     "hardware",
     "performance",
     "quantum",
+    "compatibility",
     "installer",
     "control-centre",
     "personalisation",
@@ -184,6 +185,14 @@
     registerSafe("quantum", {
       loadNotes: () => req("/api/quantum/notes"),
       saveNotes: notes => req("/api/quantum/notes", "POST", { notes }),
+    });
+    registerSafe("compatibility", {
+      status: () => req("/api/compat/status"),
+      catalog: () => req("/api/compat/catalog"),
+      inspect: filePath => req(`/api/compat/inspect?path=${encodeURIComponent(filePath)}`),
+      createPrefix: name => req("/api/compat/prefix/create", "POST", { name }),
+      installRuntime: (runtime, forceLowRam = false) => req("/api/compat/runtime/install", "POST", { runtime, confirm: true, forceLowRam: Boolean(forceLowRam) }),
+      launchFile: filePath => req("/api/compat/launch", "POST", { path: filePath, confirm: true }),
     });
     registerSafe("terminal", {
       openSession: opts => req("/api/terminal/open", "POST", opts || {}),

@@ -1238,6 +1238,40 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
             elif parsed.path == "/api/quantum/notes":
                 self._send_json(HTTPStatus.OK, read_quantum_notes())
+            elif parsed.path == "/api/compat/status":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-compat-cli.sh", "nexus-compat-cli") + ["status"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=10.0)
+            elif parsed.path == "/api/compat/catalog":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-compat-cli.sh", "nexus-compat-cli") + ["catalog"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=6.0)
+            elif parsed.path == "/api/compat/inspect":
+                qs = urllib.parse.parse_qs(parsed.query)
+                path_arg = (qs.get("path") or [""])[0]
+                try:
+                    resolved = files_mgr._resolve_in_home(path_arg, allow_root=False)
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                    return
+                except OSError as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+                    return
+                if not resolved.is_file():
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "Target file not found inside home directory"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-compat-cli.sh", "nexus-compat-cli") + ["inspect", str(resolved), resolved.name]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=10.0)
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":
@@ -1518,6 +1552,57 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                 try:
                     self._send_json(HTTPStatus.OK, write_quantum_notes(body.get("notes")))
                 except ValueError as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif self.path == "/api/compat/prefix/create":
+                slug = str(body.get("name") or "").strip()
+                if not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", slug):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Prefix name must be 1-48 alphanumeric, underscore, or hyphen characters."})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-compat-cli.sh", "nexus-compat-cli") + ["prefix", "create", slug]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=6.0)
+            elif self.path == "/api/compat/runtime/install":
+                rt = str(body.get("runtime") or "").strip()
+                confirmed = body.get("confirm") is True
+                if rt not in ("wine", "waydroid", "flatpak", "appimage-fuse") or not confirmed:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Runtime install requires a supported runtime id and explicit confirm=true."})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-compat-cli.sh", "nexus-compat-cli") + ["--confirm"]
+                    if body.get("forceLowRam") is True:
+                        cmd.append("--force-low-ram")
+                    cmd.extend(["install-runtime", rt])
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180.0)
+                    payload = json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()}
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Runtime installation timed out"})
+                    return
+                self._send_json(HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST, payload)
+            elif self.path == "/api/compat/launch":
+                confirmed = body.get("confirm") is True
+                path_arg = str(body.get("path") or "").strip()
+                if not confirmed or not path_arg:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Launching external files requires explicit confirm=true and a home path."})
+                    return
+                try:
+                    resolved = files_mgr._resolve_in_home(path_arg, allow_root=False)
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                    return
+                if not resolved.is_file():
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "Target file not found inside home directory."})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-compat-cli.sh", "nexus-compat-cli") + ["--confirm", "launch", str(resolved)]
+                    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                    self._send_json(HTTPStatus.OK, {"ok": True, "pid": proc.pid, "path": str(resolved)})
+                except (FileNotFoundError, OSError) as err:
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
             elif self.path == "/api/personalisation/apply":
                 try:

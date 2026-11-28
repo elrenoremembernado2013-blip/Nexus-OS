@@ -690,7 +690,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
   const { window: win, document: doc, makeEvent } = env;
   const expectedApps = [
     "files", "calendar", "software", "monitor", "notes", "settings",
-    "browser", "terminal", "calculator", "gaming", "hardware", "welcome", "quantum"
+    "browser", "terminal", "calculator", "gaming", "hardware", "compatibility", "welcome", "quantum"
   ];
   assert.deepEqual(Array.from(win.NexusAppRegistry.list(), a => a.id).sort(), [...expectedApps].sort());
 
@@ -968,7 +968,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
 {
   const desktopDir = path.join(rootDir, "linux", "branding", "applications");
   const files = fs.readdirSync(desktopDir).filter(f => f.endsWith(".desktop")).sort();
-  assert.equal(files.length, 14, "Expected 14 .desktop launcher files");
+  assert.equal(files.length, 15, "Expected 15 .desktop launcher files");
   const contents = new Map();
   for (const file of files) {
     const text = fs.readFileSync(path.join(desktopDir, file), "utf8");
@@ -998,6 +998,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
     "nexus-store.desktop": "store",
     "nexus-gaming.desktop": "gaming",
     "nexus-performance.desktop": "performance",
+    "nexus-compatibility.desktop": "compatibility",
     "nexus-quantum.desktop": "quantum"
   };
   for (const [file, target] of Object.entries(expectedTargets)) {

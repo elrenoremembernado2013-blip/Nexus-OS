@@ -180,8 +180,11 @@
           : application.type;
       metadata.append(
         makeTag(sourceLabel, "subtle"),
-        makeTag(application.capability === "planned" ? "Planned" : application.capability === "preview" ? "Preview" : application.capability === "unavailable" ? "Unavailable" : "Works in prototype")
+        makeTag(application.compatStatus || (application.capability === "planned" ? "Planned" : application.capability === "preview" ? "Preview" : application.capability === "unavailable" ? "Unavailable" : "Works in prototype"))
       );
+      if (application.targetOs) {
+        metadata.append(makeTag(application.targetOs, "subtle"));
+      }
       const action = appAction(application);
       const footer = node("div", "store-app-card-footer");
       const details = node("button", "store-text-button", "Details");
@@ -718,11 +721,70 @@
       const permissionList = node("ul");
       application.permissions.forEach(permission => permissionList.append(node("li", "", permission)));
       permissions.append(permissionList);
+      const compatBox = node("section", "store-permissions");
+      compatBox.append(node("h4", "", "Cross-platform compatibility"));
+      const compatList = node("dl", "store-detail-metadata");
+      const targetOs = application.targetOs || "Linux / Web Prototype";
+      const compatStatus = application.compatStatus || (application.capability === "functional" ? "Native" : application.capability === "unavailable" ? "Unsupported" : "Not tested");
+      const runtimeName = application.runtime || (application.linuxPackage ? `Linux Mint ${String(application.linuxPackage.source || "apt").toUpperCase()}` : "NEXUS Desktop Shell");
+      const testedLabel = application.testedState || (application.capability === "functional" ? "Tested" : "Estimated / Not tested");
+      let runtimeInstalledLabel = packagesAvailable() || window.NexusNativeServices?.status("compatibility")?.available
+        ? "Checking host runtime…"
+        : "Unknown in browser preview (Linux host bridge disconnected)";
+      if (compatStatus === "Unsupported") runtimeInstalledLabel = "Unsupported on Linux";
+      const rtDd = node("dd", "", runtimeInstalledLabel);
+      [
+        ["Designed for OS", targetOs],
+        ["Compatibility status", `${compatStatus} (${application.executionKind || "Local"})`],
+        ["Required runtime", runtimeName],
+      ].forEach(([term, value]) => {
+        compatList.append(node("dt", "", term), node("dd", "", value));
+      });
+      compatList.append(node("dt", "", "Runtime installed"), rtDd);
+      [
+        ["Verification", testedLabel],
+        ["Limitations", application.compatNotes || application.compatibility],
+      ].forEach(([term, value]) => {
+        compatList.append(node("dt", "", term), node("dd", "", value));
+      });
+      compatBox.append(compatList);
+      if (typeof context.launchApp === "function" && application.id !== "compatibility") {
+        const compatBtn = node("button", "store-text-button", "Open Compatibility Centre");
+        compatBtn.type = "button";
+        compatBtn.addEventListener("click", () => context.launchApp("compatibility"));
+        compatBox.append(compatBtn);
+      }
+
       const trust = node("p", "store-detail-security-note", "NEXUS Verified and automated security checks are not active. Listings are not endorsements or safety certifications.");
       body.append(main, node("aside", "store-detail-aside"));
-      body.lastChild.append(metadata, permissions, trust);
+      body.lastChild.append(metadata, compatBox, permissions, trust);
       wrapper.append(identity, actionArea, body);
       page.append(wrapper);
+
+      if (compatStatus !== "Unsupported" && window.NexusNativeServices?.status("compatibility")?.available) {
+        try {
+          Promise.resolve(window.NexusNativeServices.call("compatibility", "status"))
+            .then(host => {
+              if (!host?.ecosystems) return;
+              const lowerRt = runtimeName.toLowerCase();
+              if (lowerRt.includes("waydroid")) {
+                rtDd.textContent = host.ecosystems.android?.waydroid_installed ? "Installed (Waydroid)" : "Not installed (optional runtime)";
+              } else if (lowerRt.includes("wine") || lowerRt.includes("bottles") || lowerRt.includes("proton")) {
+                const ok = Boolean(host.ecosystems.windows?.wine_installed || host.ecosystems.windows?.proton_versions?.length || host.ecosystems.windows?.bottles);
+                rtDd.textContent = ok ? "Installed (Wine / Proton)" : "Not installed (optional runtime)";
+              } else if (lowerRt.includes("flatpak")) {
+                rtDd.textContent = host.ecosystems.linux?.flatpak ? "Installed (Flatpak)" : "Not installed (install flatpak)";
+              } else if (lowerRt.includes("apt")) {
+                rtDd.textContent = host.ecosystems.linux?.apt ? "Installed (APT)" : "Unavailable";
+              } else {
+                rtDd.textContent = "Included with NEXUS Desktop";
+              }
+            })
+            .catch(() => { rtDd.textContent = "Could not query host runtime"; });
+        } catch {
+          // Keep fallback
+        }
+      }
 
       if (packagesAvailable() && application.linuxPackage?.id) {
         const pkgSrc = application.linuxPackage.source || "apt";

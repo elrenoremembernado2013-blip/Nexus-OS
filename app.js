@@ -605,6 +605,7 @@
       settings: ["control-centre", "personalisation", "privacy-security"],
       gaming: ["gaming"],
       hardware: ["hardware"],
+      compatibility: ["compatibility"],
       welcome: ["installer"]
     };
     if (nativeMap[appId]) {
