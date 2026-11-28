@@ -56,6 +56,18 @@ assert(
   "verify-nexus-iso.sh must check NEXUS native bridge and UI bundle inside squashfs"
 );
 
+// Guard against grep -q + pipefail false negatives when checking captured ISO listings.
+assert(
+  verifyIsoSh.includes('[[ "$sq_list" != *"$req_sq"* ]]') &&
+    !verifyIsoSh.includes('grep -Fq "$req_sq"'),
+  "Squashfs required-file checks must not use grep -q on a piped listing"
+);
+assert(
+  verifyIsoSh.includes('[[ ! "$listing" =~ /boot/grub/efi\\.img|/efi\\.img|/EFI/boot/bootx64\\.efi ]]') &&
+    verifyIsoSh.includes('[[ ! "$listing" =~ /isolinux/isolinux\\.bin|/boot/grub/i386-pc/eltorito\\.img ]]'),
+  "ISO boot-entry checks must use pipefail-safe matching"
+);
+
 for (const args of [
   ["linux/build/build-nexus-iso.sh", "--edition", "cinnamon", "--dry-run"],
   ["linux/build/build-nexus-iso.sh", "--edition", "xfce", "--dry-run"],
