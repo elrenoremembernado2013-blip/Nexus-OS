@@ -220,4 +220,71 @@ for (const marker of ["PASS", "FAIL", "BLOCKED", "NOT TESTED", "Linux Mint 22.3"
   assert(doc.includes(marker), `docs/PHASE_23_BOOTABLE_ISO_VALIDATION.md missing ${marker}`);
 }
 
+// 7. Four-Edition Glitch Fix Regression Checks
+const os = require("os");
+const tmpCfg = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-glitch-reg-"));
+try {
+  // 7a. Lite LXQt PNG wallpaper & pcmanfm-qt config (avoids missing Qt SVG plugin black screen)
+  const lxqtPng = fs.readFileSync(path.join(ROOT, "linux/lite/lxqt/wallpaper-nexus-obsidian.png"));
+  assert(lxqtPng.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), "Lite LXQt wallpaper PNG signature invalid");
+  const pcmanCfg = read("linux/lite/lxqt/pcmanfm-qt/settings.conf");
+  assert(pcmanCfg.includes("wallpaper-nexus-obsidian.png"), "pcmanfm-qt settings.conf must use PNG wallpaper");
+  assert(read("linux/lite/scripts/provision-nexus-lite-lxqt.sh").includes("wallpaper-nexus-obsidian.png"), "LXQt provisioner must install PNG wallpaper");
+  assert(read("linux/build/apply-iso-branding.sh").includes("wallpaper-nexus-obsidian.png"), "ISO branding must stage LXQt PNG wallpaper");
+
+  // 7b. apply-nexus-lite-lxqt.sh updates [Palette] accent & light appearance cleanly
+  const lxqtRes = execFileSync("bash", ["linux/lite/scripts/apply-nexus-lite-lxqt.sh", "--profile", "lite-1g", "--theme", "emerald", "--appearance", "light"], {
+    cwd: ROOT,
+    env: { ...process.env, XDG_CONFIG_HOME: tmpCfg },
+    encoding: "utf8",
+  });
+  assert(lxqtRes.includes("Applied NEXUS Lite LXQt profile"), "apply-nexus-lite-lxqt.sh failed");
+  const appliedLxqtConf = fs.readFileSync(path.join(tmpCfg, "lxqt/lxqt.conf"), "utf8");
+  assert(appliedLxqtConf.includes("#34d399") && appliedLxqtConf.includes("theme=light"), "apply-nexus-lite-lxqt.sh must update [Palette] accent and light theme");
+
+  // 7c. First-boot autostart runs once cleanly via --autostart and skips subsequent logins
+  const fbDesktop = read("linux/branding/nexus-firstboot.desktop");
+  assert(fbDesktop.includes("--autostart") && fbDesktop.includes("Terminal=false"), "nexus-firstboot.desktop must use --autostart without spawning terminal popup");
+  for (const prov of ["linux/lite/provision-nexus-lite.sh", "linux/lite/scripts/provision-nexus-lite-lxqt.sh", "linux/mint/provision-nexus-guest.sh"]) {
+    assert(read(prov).includes("nexus-firstboot.desktop"), `${prov} must stage nexus-firstboot.desktop`);
+  }
+  const fb1 = execFileSync("bash", ["linux/mint/nexus-firstboot.sh", "--autostart", "--skip"], {
+    cwd: ROOT,
+    env: { ...process.env, XDG_CONFIG_HOME: tmpCfg },
+    encoding: "utf8",
+  });
+  assert(fb1.includes("Recorded first-boot preference"), "First --autostart run must write firstboot-done marker");
+  const fb2 = execFileSync("bash", ["linux/mint/nexus-firstboot.sh", "--autostart"], {
+    cwd: ROOT,
+    env: { ...process.env, XDG_CONFIG_HOME: tmpCfg },
+    encoding: "utf8",
+  });
+  assert.strictEqual(fb2.trim(), "", "Subsequent --autostart run must exit quietly without re-applying");
+
+  // 7d. Lite Openbox autostart respects saved WALLPAPER_FIT
+  const obAuto = read("linux/lite/openbox/autostart");
+  assert(obAuto.includes("WALLPAPER_FIT=") && obAuto.includes("--bg-center"), "Openbox autostart must honor WALLPAPER_FIT");
+
+  // 7e. QMP screenshot analyzer checks all 3 RGB channels & guest test disables screen blanking
+  assert(guestPy.includes("disable_screen_blanking") && guestPy.includes("offline_ui_present") && guestPy.includes("nexus_cli_tools_ok"), "nexus-guest-test.py missing blanking/CLI parity checks");
+  const rgbStats = execFileSync("python3", ["-c", `
+import importlib.util
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("qgr", "linux/test/qemu-graphical-runner.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+tmp = Path("${tmpCfg}")
+for tag, rgb, expected in [("blue", bytes([4, 10, 48] * 400), 100.0), ("black", bytes([0, 0, 0] * 400), 0.0)]:
+    ppm = tmp / f"{tag}.ppm"
+    png = tmp / f"{tag}.png"
+    ppm.write_bytes(b"P6\\n20 20\\n255\\n" + rgb)
+    res = mod.ppm_to_png_and_stats(ppm, png)
+    assert res["non_black_pct"] == expected, (tag, res)
+print("OK_RGB_STATS")
+`], { cwd: ROOT, encoding: "utf8" });
+  assert(rgbStats.includes("OK_RGB_STATS"), "qemu-graphical-runner.py RGB stats check failed");
+} finally {
+  fs.rmSync(tmpCfg, { recursive: true, force: true });
+}
+
 console.log("PASS Phase 23 bootable ISO, installer, QEMU BIOS+UEFI, 4-edition, and security checks passed.");

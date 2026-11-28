@@ -147,9 +147,13 @@ run_cmd install -m 0644 "$REPO_ROOT/linux/hardware/hw-compatibility-db.json" /us
 run_cmd install -m 0644 "$REPO_ROOT/linux/test/nexus-browser-bench.py" /usr/local/share/nexus-os/hardware/nexus-browser-bench.py
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/share/nexus-os/branding/nexus-logo.svg
 run_cmd install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" /usr/local/share/nexus-os/wallpapers.json
+run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.png" /usr/local/share/nexus-os/lite/wallpaper-nexus-obsidian.png
 run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.svg" /usr/local/share/nexus-os/lite/wallpaper-nexus-obsidian.svg
 run_cmd install -m 0644 "$LXQT_DIR/theme/nexus-dark/lxqt-panel.qss" /usr/local/share/lxqt/themes/nexus-dark/lxqt-panel.qss
 run_cmd cp -a "$LXQT_DIR" /usr/local/share/nexus-os/lite-lxqt/
+
+run_cmd install -d -m 0755 /etc/xdg/autostart
+run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-firstboot.desktop" /etc/xdg/autostart/nexus-firstboot.desktop
 
 for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do
   [[ -f "$desktop_file" ]] || continue

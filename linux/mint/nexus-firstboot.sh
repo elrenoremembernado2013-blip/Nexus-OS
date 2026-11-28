@@ -31,6 +31,7 @@ SECURITY_SUMMARY=false
 SKIP_SETUP=false
 MARK_DONE=false
 NON_INTERACTIVE=false
+AUTOSTART=false
 
 usage() {
   cat <<'USAGE'
@@ -49,6 +50,7 @@ Options:
   --security-summary    Report firewall, Secure Boot, LUKS, and update status
   --skip                Skip interactive setup and mark first-boot done
   --mark-done           Write ~/.config/nexus-os/firstboot-done marker
+  --autostart           Run once per user (exit 0 immediately if already completed)
   --non-interactive     Apply flags without prompting
   --dry-run             Preview actions without modifying user configuration
   --help, -h            Show this help message
@@ -71,12 +73,17 @@ while (($#)); do
     --security-summary) SECURITY_SUMMARY=true; shift ;;
     --skip) SKIP_SETUP=true; MARK_DONE=true; NON_INTERACTIVE=true; shift ;;
     --mark-done) MARK_DONE=true; shift ;;
+    --autostart) AUTOSTART=true; NON_INTERACTIVE=true; MARK_DONE=true; shift ;;
     --non-interactive) NON_INTERACTIVE=true; shift ;;
     --dry-run) DRY_RUN=true; NON_INTERACTIVE=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [[ "$AUTOSTART" == true && "$DRY_RUN" == false && -e "$MARKER_FILE" ]]; then
+  exit 0
+fi
 
 if [[ "$DRY_RUN" == false && "$(id -u)" -eq 0 ]]; then
   echo 'Run nexus-firstboot.sh as your regular Mint desktop user, not root.' >&2

@@ -86,8 +86,9 @@ if [[ "$EDITION" == "lite" ]]; then
   install -m 0644 "$REPO_ROOT/linux/lite/openbox/wallpaper.png" "$SQUASH_ROOT/usr/local/share/nexus-os/lite/wallpaper.png"
   install -m 0644 "$REPO_ROOT/docs/NEXUS_LITE.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/NEXUS_LITE.md"
 elif [[ "$EDITION" == "lite-lxqt" ]]; then
-  install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite-lxqt"
+  install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite" "$SQUASH_ROOT/usr/local/share/nexus-os/lite-lxqt"
   cp -a "$REPO_ROOT/linux/lite/lxqt" "$SQUASH_ROOT/usr/local/share/nexus-os/lite-lxqt/"
+  install -m 0644 "$REPO_ROOT/linux/lite/lxqt/wallpaper-nexus-obsidian.png" "$SQUASH_ROOT/usr/local/share/nexus-os/lite/wallpaper-nexus-obsidian.png"
   install -m 0644 "$REPO_ROOT/docs/NEXUS_LITE.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/NEXUS_LITE.md"
 else
   install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/cinnamon"

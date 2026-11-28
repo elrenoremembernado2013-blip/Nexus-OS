@@ -133,6 +133,8 @@ for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do
   [[ -f "$desktop_file" ]] || continue
   run_cmd install -m 0644 "$desktop_file" "/usr/local/share/applications/${desktop_file##*/}"
 done
+run_cmd install -d -m 0755 /etc/xdg/autostart
+run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-firstboot.desktop" /etc/xdg/autostart/nexus-firstboot.desktop
 
 run_cmd install -d -m 0755 /etc/skel/.config/openbox /etc/skel/.config/tint2 /etc/skel/.config/autostart /etc/skel/.config/nexus-os /etc/xdg/openbox /etc/xdg/tint2
 run_cmd install -m 0644 "$SCRIPT_DIR/openbox/rc.xml" /etc/skel/.config/openbox/rc.xml

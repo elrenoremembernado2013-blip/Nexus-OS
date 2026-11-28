@@ -38,9 +38,14 @@ def ppm_to_png_and_stats(ppm_path: Path, png_path: Path):
     if len(rgb) < h * stride:
         return {"width": w, "height": h, "non_black_pct": 0.0, "png": None}
 
-    sample = rgb[::30]
-    non_black = sum(1 for b in sample if b > 8)
-    non_black_pct = round((non_black / max(1, len(sample))) * 100.0, 2)
+    # Sample every 10th pixel across all 3 RGB channels so dark-blue/teal themes are measured accurately
+    sample_count = 0
+    non_black = 0
+    for idx in range(0, len(rgb) - 2, 30):
+        sample_count += 1
+        if rgb[idx] > 8 or rgb[idx + 1] > 8 or rgb[idx + 2] > 8:
+            non_black += 1
+    non_black_pct = round((non_black / max(1, sample_count)) * 100.0, 2)
 
     scanlines = bytearray()
     for y in range(h):
@@ -310,6 +315,7 @@ def main():
                             elif et == "desktop_ready":
                                 if qmp_ok:
                                     qmp.nudge_mouse()
+                                    time.sleep(0.5)
                                     current_shots.append(qmp.screendump(out_dir, f"b{cycle_idx}_01_desktop_initial"))
                                 vs.sendall(b'{"cmd":"ack"}\n')
                             elif et in ("app_file_manager", "app_terminal", "app_settings", "app_multi_apps", "ubiquity_ui", "browser_falkon_max", "browser_firefox_max"):

@@ -134,18 +134,23 @@ cp -f -- "$LXQT_SRC/qterminal.ini" "$XDG_CFG/qterminal.org/qterminal.ini"
 
 python3 - "$LXQT_DIR/lxqt.conf" "$effective_accent" "$APPEARANCE" <<'PY'
 from pathlib import Path
-import re, sys
+import sys
+
 cfg = Path(sys.argv[1])
 accent, appearance = sys.argv[2], sys.argv[3]
 text = cfg.read_text(encoding="utf-8")
-text = re.sub(r"highlight_color=#[0-9A-Fa-f]{6}", f"highlight_color={accent}", text)
-text = re.sub(r"link_color=#[0-9A-Fa-f]{6}", f"link_color={accent}", text)
+text = text.replace("#3b82f6", accent).replace("#66a3ff", accent)
 if appearance == "light":
-    text = text.replace("style=Breeze", "style=Fusion")
-    text = text.replace("window_color=#0f172a", "window_color=#eef3f8")
-    text = text.replace("base_color=#111a2e", "base_color=#ffffff")
-    text = text.replace("text_color=#eef4ff", "text_color=#0f172a")
-    text = text.replace("window_text_color=#eef4ff", "window_text_color=#0f172a")
+    text = text.replace("icon_theme=breeze-dark", "icon_theme=breeze")
+    text = text.replace("theme=nexus-dark", "theme=light")
+    text = text.replace(
+        "active_colors=#eef4ff, #11192e, #1c2848, #16213b, #080d18, #0e1526, #eef4ff, #ffffff, #eef4ff, #0b1020, #0d1424, #060911, #3b82f6, #ffffff, #66a3ff, #93c5fd",
+        f"active_colors=#0f172a, #eef3f8, #ffffff, #dbe5f1, #94a3b8, #cbd5e1, #0f172a, #ffffff, #0f172a, #f8fafc, #eef3f8, #cbd5e1, {accent}, #ffffff, {accent}, #1d4ed8",
+    )
+    text = text.replace(
+        "inactive_colors=#dbe7ff, #11192e, #1c2848, #16213b, #080d18, #0e1526, #dbe7ff, #ffffff, #dbe7ff, #0b1020, #0d1424, #060911, #2856a3, #ffffff, #66a3ff, #93c5fd",
+        f"inactive_colors=#334155, #eef3f8, #ffffff, #dbe5f1, #94a3b8, #cbd5e1, #334155, #ffffff, #334155, #f8fafc, #eef3f8, #cbd5e1, {accent}, #ffffff, {accent}, #1d4ed8",
+    )
 cfg.write_text(text, encoding="utf-8")
 PY
 

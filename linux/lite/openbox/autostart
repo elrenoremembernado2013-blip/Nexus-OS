@@ -3,11 +3,19 @@
 tint2 &
 WP_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os/wallpaper.conf"
 WP_PATH=""
+WP_FIT="zoom"
 if [ -r "$WP_CONF" ]; then
   WP_PATH="$(grep -E '^WALLPAPER_PATH=' "$WP_CONF" | head -n1 | cut -d= -f2-)"
+  WP_FIT="$(grep -E '^WALLPAPER_FIT=' "$WP_CONF" | head -n1 | cut -d= -f2-)"
 fi
 if [ -n "$WP_PATH" ] && [ -r "$WP_PATH" ] && command -v feh >/dev/null 2>&1; then
-  feh --no-fehbg --bg-fill "$WP_PATH" &
+  case "$WP_FIT" in
+    centered) feh --no-fehbg --bg-center "$WP_PATH" & ;;
+    wallpaper) feh --no-fehbg --bg-tile "$WP_PATH" & ;;
+    stretched) feh --no-fehbg --bg-scale "$WP_PATH" & ;;
+    scaled) feh --no-fehbg --bg-max "$WP_PATH" & ;;
+    zoom|*) feh --no-fehbg --bg-fill "$WP_PATH" & ;;
+  esac
 elif command -v feh >/dev/null 2>&1 && [ -r /usr/local/share/nexus-os/lite/wallpaper.jpg ]; then
   feh --no-fehbg --bg-scale /usr/local/share/nexus-os/lite/wallpaper.jpg &
 elif command -v feh >/dev/null 2>&1 && [ -r /usr/local/share/nexus-os/lite/wallpaper.png ]; then

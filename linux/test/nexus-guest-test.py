@@ -536,7 +536,51 @@ def check_native_services(sess, edition):
         except Exception as exc:
             svc_result["store_error"] = str(exc)
 
+    # 11. Offline NEXUS desktop UI bundle & native launcher CLI parity
+    svc_result["offline_ui_present"] = Path("/usr/local/share/nexus-os/ui/index.html").is_file()
+    required_clis = [
+        "nexus-launch-app",
+        "nexus-store-cli",
+        "nexus-control-centre",
+        "nexus-performance-cli",
+        "nexus-compat-cli",
+        "nexus-wallpaper",
+        "nexus-firstboot",
+    ]
+    svc_result["nexus_cli_tools_ok"] = all(bool(shutil.which(name)) for name in required_clis)
+
     return svc_result
+
+
+def disable_screen_blanking(sess, edition):
+    if shutil.which("xset"):
+        try:
+            run_as_user_capture(sess, ["xset", "s", "off", "s", "noblank", "-dpms"], timeout=5)
+            run_as_user_capture(sess, ["xset", "s", "reset"], timeout=5)
+            run_as_user_capture(sess, ["xset", "dpms", "force", "on"], timeout=5)
+        except Exception:
+            pass
+    if edition == "cinnamon" and shutil.which("gsettings"):
+        for schema, key, val in (
+            ("org.cinnamon.desktop.session", "idle-delay", "0"),
+            ("org.cinnamon.desktop.screensaver", "lock-enabled", "false"),
+            ("org.cinnamon.settings-daemon.plugins.power", "sleep-display-ac", "0"),
+            ("org.cinnamon.settings-daemon.plugins.power", "sleep-display-battery", "0"),
+        ):
+            try:
+                run_as_user_capture(sess, ["gsettings", "set", schema, key, val], timeout=5)
+            except Exception:
+                pass
+    elif edition == "xfce" and shutil.which("xfconf-query"):
+        for prop, ptype, val in (
+            ("/xfce4-power-manager/dpms-enabled", "bool", "false"),
+            ("/xfce4-power-manager/blank-on-ac", "int", "0"),
+            ("/xfce4-power-manager/blank-on-battery", "int", "0"),
+        ):
+            try:
+                run_as_user_capture(sess, ["xfconf-query", "-c", "xfce4-power-manager", "-p", prop, "-n", "-t", ptype, "-s", val], timeout=5)
+            except Exception:
+                pass
 
 
 def read_proc_names():
@@ -919,16 +963,7 @@ def main():
     stages = {}
     stages["1_post_login"] = run_probe("post_login")
     send_event(port_fd, "stage_mem", stages["1_post_login"])
-    if shutil.which("xset"):
-        try:
-            subprocess.run(
-                ["su", "-s", "/bin/sh", sess["user"], "-c", f"DISPLAY={sess['display']} xset s off -dpms"],
-                env={**os.environ, "DISPLAY": sess["display"], "XAUTHORITY": sess["xauthority"]},
-                capture_output=True,
-                timeout=5,
-            )
-        except Exception:
-            pass
+    disable_screen_blanking(sess, edition)
 
     # Wait up to panel_wait_sec for panel + desktop window to actually map in X11
     panel_expected = {"lite": "tint2", "lite-lxqt": "lxqt-panel", "cinnamon": "cinnamon", "xfce": "xfce4-panel"}.get(edition)
@@ -981,6 +1016,8 @@ def main():
         "initial_windows": len(x11_windows(sess)),
         "glx_diag": collect_glx_diag(sess) if edition == "cinnamon" else {},
     }
+    disable_screen_blanking(sess, edition)
+    time.sleep(0.5)
     send_event(port_fd, "desktop_ready", desktop_info)
     wait_for_cmd(port_file, "ack", timeout=15)
 
@@ -988,6 +1025,7 @@ def main():
     send_event(port_fd, "stage_mem", stages["2_post_session_init"])
 
     time.sleep(max(1, idle_seconds))
+    disable_screen_blanking(sess, edition)
     stages["3_idle"] = run_probe(f"idle_{idle_seconds}s")
     send_event(port_fd, "stage_mem", stages["3_idle"])
 
