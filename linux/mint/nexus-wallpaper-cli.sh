@@ -227,8 +227,11 @@ PY
             zoom) xfce_style=5 ;;
           esac
           while IFS= read -r prop; do
-            [[ "$prop" == */last-image ]] && xfconf-query -c xfce4-desktop -p "$prop" -s "$target_path" || true
-            [[ "$prop" == */image-style ]] && xfconf-query -c xfce4-desktop -p "$prop" -s "$xfce_style" || true
+            if [[ "$prop" == */last-image ]]; then
+              xfconf-query -c xfce4-desktop -p "$prop" -s "$target_path" || true
+            elif [[ "$prop" == */image-style ]]; then
+              xfconf-query -c xfce4-desktop -p "$prop" -s "$xfce_style" || true
+            fi
           done < <(xfconf-query -c xfce4-desktop -l 2>/dev/null || true)
         fi
         ;;

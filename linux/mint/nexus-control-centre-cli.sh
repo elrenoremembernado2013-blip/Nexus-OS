@@ -369,11 +369,12 @@ PY
 perform_action() {
   case "$ACTION_TYPE" in
     volume)
-      [[ "$ACTION_VAL" =~ ^[0-9]+$ ]] && (( ACTION_VAL >= 0 && ACTION_VAL <= 100 )) || {
-        echo '{"ok":false,"message":"Volume must be 0..100"}' >&2; exit 2
-      }
+      if ! [[ "$ACTION_VAL" =~ ^[0-9]+$ ]] || (( ACTION_VAL < 0 || ACTION_VAL > 100 )); then
+        echo '{"ok":false,"message":"Volume must be 0..100"}' >&2
+        exit 2
+      fi
       if command -v wpctl >/dev/null 2>&1; then
-        frac=$(python3 -c "print(f'{int(\"$ACTION_VAL\")/100:.2f}')")
+        frac="$(python3 -c 'import sys; print(f"{int(sys.argv[1])/100:.2f}")' "$ACTION_VAL")"
         wpctl set-volume @DEFAULT_AUDIO_SINK@ "$frac" && printf '{"ok":true,"volume":%s}\n' "$ACTION_VAL" && return 0
       elif command -v pactl >/dev/null 2>&1; then
         pactl set-sink-volume @DEFAULT_SINK@ "${ACTION_VAL}%" && printf '{"ok":true,"volume":%s}\n' "$ACTION_VAL" && return 0
@@ -389,22 +390,26 @@ perform_action() {
         *) echo '{"ok":false,"message":"Mute value must be toggle|on|off"}'; return 2 ;;
       esac
       if command -v wpctl >/dev/null 2>&1; then
-        v="toggle"; [[ "$ACTION_VAL" == "on" ]] && v=1; [[ "$ACTION_VAL" == "off" ]] && v=0
+        v="toggle"
+        if [[ "$ACTION_VAL" == "on" ]]; then v=1; elif [[ "$ACTION_VAL" == "off" ]]; then v=0; fi
         wpctl set-mute @DEFAULT_AUDIO_SINK@ "$v" && printf '{"ok":true,"mute":"%s"}\n' "$ACTION_VAL" && return 0
       elif command -v pactl >/dev/null 2>&1; then
-        v="toggle"; [[ "$ACTION_VAL" == "on" ]] && v=1; [[ "$ACTION_VAL" == "off" ]] && v=0
+        v="toggle"
+        if [[ "$ACTION_VAL" == "on" ]]; then v=1; elif [[ "$ACTION_VAL" == "off" ]]; then v=0; fi
         pactl set-sink-mute @DEFAULT_SINK@ "$v" && printf '{"ok":true,"mute":"%s"}\n' "$ACTION_VAL" && return 0
       elif command -v amixer >/dev/null 2>&1; then
-        v="toggle"; [[ "$ACTION_VAL" == "on" ]] && v="mute"; [[ "$ACTION_VAL" == "off" ]] && v="unmute"
+        v="toggle"
+        if [[ "$ACTION_VAL" == "on" ]]; then v="mute"; elif [[ "$ACTION_VAL" == "off" ]]; then v="unmute"; fi
         amixer -q sset Master "$v" && printf '{"ok":true,"mute":"%s"}\n' "$ACTION_VAL" && return 0
       fi
       echo '{"ok":false,"message":"No audio mixer available"}'
       return 1
       ;;
     brightness)
-      [[ "$ACTION_VAL" =~ ^[0-9]+$ ]] && (( ACTION_VAL >= 5 && ACTION_VAL <= 100 )) || {
-        echo '{"ok":false,"message":"Brightness must be 5..100"}'; return 2
-      }
+      if ! [[ "$ACTION_VAL" =~ ^[0-9]+$ ]] || (( ACTION_VAL < 5 || ACTION_VAL > 100 )); then
+        echo '{"ok":false,"message":"Brightness must be 5..100"}'
+        return 2
+      fi
       if command -v brightnessctl >/dev/null 2>&1; then
         if brightnessctl -q set "${ACTION_VAL}%"; then
           printf '{"ok":true,"brightness":%s}\n' "$ACTION_VAL"
@@ -433,7 +438,7 @@ perform_action() {
         on|off) ;;
         *) echo '{"ok":false,"message":"Bluetooth value must be on|off"}'; return 2 ;;
       esac
-      if [[ ! -d /sys/class/bluetooth ]] || [[ -z "$(ls -A /sys/class/bluetooth 2>/dev/null || true)" ]]; then
+      if [[ ! -d /sys/class/bluetooth ]] || [[ -z "$(find /sys/class/bluetooth -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null || true)" ]]; then
         echo '{"ok":false,"message":"No Bluetooth adapter detected on this system"}'
         return 1
       fi
@@ -452,16 +457,26 @@ perform_action() {
         *) echo '{"ok":false,"message":"DND value must be on|off"}'; return 2 ;;
       esac
       mkdir -p "$STATE_DIR"
+      dnd_bool=false
       if [[ "$ACTION_VAL" == "on" ]]; then
+        dnd_bool=true
         printf '1\n' > "$DND_FILE"
-        command -v gsettings >/dev/null 2>&1 && gsettings set org.cinnamon.desktop.notifications display-notifications false >/dev/null 2>&1 || true
-        command -v xfconf-query >/dev/null 2>&1 && xfconf-query -c xfce4-notifyd -p /do-not-disturb -n -t bool -s true >/dev/null 2>&1 || true
+        if command -v gsettings >/dev/null 2>&1; then
+          gsettings set org.cinnamon.desktop.notifications display-notifications false >/dev/null 2>&1 || true
+        fi
+        if command -v xfconf-query >/dev/null 2>&1; then
+          xfconf-query -c xfce4-notifyd -p /do-not-disturb -n -t bool -s true >/dev/null 2>&1 || true
+        fi
       else
         printf '0\n' > "$DND_FILE"
-        command -v gsettings >/dev/null 2>&1 && gsettings set org.cinnamon.desktop.notifications display-notifications true >/dev/null 2>&1 || true
-        command -v xfconf-query >/dev/null 2>&1 && xfconf-query -c xfce4-notifyd -p /do-not-disturb -n -t bool -s false >/dev/null 2>&1 || true
+        if command -v gsettings >/dev/null 2>&1; then
+          gsettings set org.cinnamon.desktop.notifications display-notifications true >/dev/null 2>&1 || true
+        fi
+        if command -v xfconf-query >/dev/null 2>&1; then
+          xfconf-query -c xfce4-notifyd -p /do-not-disturb -n -t bool -s false >/dev/null 2>&1 || true
+        fi
       fi
-      printf '{"ok":true,"dnd":%s}\n' "$([[ "$ACTION_VAL" == "on" ]] && echo true || echo false)"
+      printf '{"ok":true,"dnd":%s}\n' "$dnd_bool"
       ;;
     *)
       printf '{"ok":false,"message":"Unknown action type: %s"}\n' "$ACTION_TYPE"
