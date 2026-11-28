@@ -1026,3 +1026,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
 
+
+/* Phase 25 — persistent notification cards */
+.nexus-notification{padding:11px 12px;margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.045);font-size:11px;color:var(--text)}
+.nexus-notification.is-unread{border-left:3px solid var(--accent);background:rgba(255,255,255,.07)}
+.nexus-notification.is-read{opacity:.78}
+.nexus-notification-title{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.nexus-notification-title strong{font-size:12px;line-height:1.35}
+.notification-category{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:3px 6px;border:1px solid var(--line);border-radius:20px;white-space:nowrap}
+.nexus-notification p{margin:7px 0;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.notification-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px}
+.notification-mark-read{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.06);color:var(--text);padding:5px 8px;font:inherit;cursor:pointer}
+.notification-mark-read:hover{background:rgba(255,255,255,.12)}
