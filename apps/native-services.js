@@ -115,6 +115,7 @@
     registerSafe("personalisation", {
       listWallpapers: () => req("/api/wallpapers"),
       applyWallpaper: opts => req("/api/wallpapers/apply", "POST", opts),
+      importWallpaper: opts => req("/api/wallpapers/import", "POST", opts),
       applyTheme: opts => req("/api/personalisation/apply", "POST", opts),
     });
     registerSafe("packages", {
