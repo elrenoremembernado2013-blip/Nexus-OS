@@ -1422,11 +1422,11 @@
     // mount. Native helpers write user-local desktop configuration so it survives
     // logout/restart; unsupported options are safely ignored by each edition.
     const savedMode = readStorage("nexus-theme") || "dark";
-    const savedPreset = readStorage("nexus-theme-preset");
-    const savedPresetMeta = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[savedPreset];
+    const startupPresetId = readStorage("nexus-theme-preset");
+    const savedPresetMeta = window.NexusPersonalisationCatalog?.THEME_PRESETS?.[startupPresetId];
     const nativeAppearance = savedPresetMeta?.mode || (savedMode === "light" ? "light" : "dark");
     syncNativePersonalisation({
-      theme: savedPreset || (nativeAppearance === "light" ? "arctic" : "midnight"),
+      theme: startupPresetId || (nativeAppearance === "light" ? "arctic" : "midnight"),
       appearance: nativeAppearance,
       accent: readStorage("nexus-accent") || "#ffad7a",
       effectLevel: readStorage("nexus-effect-level") || "balanced",
