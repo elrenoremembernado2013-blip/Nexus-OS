@@ -106,7 +106,7 @@ if command -v xorriso >/dev/null 2>&1; then
     xorriso -osirrox on -indev "$ISO_PATH" -extract "$initrd_entry" "$sep_tmp/initrd" >/dev/null 2>&1
     mkdir -p -- "$sep_tmp/initrd-tree"
     unmkinitramfs "$sep_tmp/initrd" "$sep_tmp/initrd-tree"
-    if find "$sep_tmp/initrd-tree" \( -name '*nexus-test*' -o -name '*casper-test*' -o -name '*99nexus_test_harness*' -o -name '*nexus-guest-test*' \) | grep -q .; then
+    if find "$sep_tmp/initrd-tree" \( -name '*nexus-test*' -o -name '*casper-test*' -o -name '*99nexus_test_harness*' -o -name '*nexus-guest-test*' \) -print -quit | grep . >/dev/null; then
       echo 'SECURITY FAIL: Test harness artifact found inside released ISO initramfs!' >&2
       exit 1
     fi
