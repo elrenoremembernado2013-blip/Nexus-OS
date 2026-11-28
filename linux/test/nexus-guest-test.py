@@ -351,7 +351,7 @@ def check_native_services(sess, edition):
                     f"{bridge_url}/api/terminal/write",
                     method="POST",
                     token=bridge_token,
-                    body={"sessionId": sid, "data": 'printf "NEXUS_PTY_OK:%s\\n" "$BASH_VERSION"\n'},
+                    body={"sessionId": sid, "data": 'printf "NEXUS_PTY_%s:%s\\n" "VERIFIED" "$BASH_VERSION"\n'},
                 )
                 out_acc = ""
                 deadline = time.time() + 6.0
@@ -359,33 +359,39 @@ def check_native_services(sess, edition):
                     c_rd, r_rd = http_json(f"{bridge_url}/api/terminal/read?sessionId={sid}", method="GET", token=bridge_token)
                     if c_rd == 200:
                         out_acc += str(r_rd.get("output") or "")
-                        if "NEXUS_PTY_OK:" in out_acc:
+                        if "NEXUS_PTY_VERIFIED:" in out_acc:
                             break
                     time.sleep(0.2)
                 for line in out_acc.splitlines():
-                    if "NEXUS_PTY_OK:" in line:
-                        svc_result["pty_bash_sample"] = line.strip()[:80]
+                    clean_line = line.strip()
+                    if clean_line.startswith("NEXUS_PTY_VERIFIED:"):
+                        svc_result["pty_bash_sample"] = clean_line[:80]
                         break
-                svc_result["pty_bash_ok"] = "NEXUS_PTY_OK:" in out_acc
+                svc_result["pty_bash_ok"] = any(
+                    ln.strip().startswith("NEXUS_PTY_VERIFIED:") for ln in out_acc.splitlines()
+                )
             finally:
                 http_json(f"{bridge_url}/api/terminal/close", method="POST", token=bridge_token, body={"sessionId": sid})
 
         # 5. System Monitor /proc + /sys telemetry
         c_tel, r_tel = http_json(f"{bridge_url}/api/telemetry", method="GET", token=bridge_token)
         if c_tel == 200 and isinstance(r_tel, dict):
-            mem = r_tel.get("memory") or {}
-            procs_tel = r_tel.get("processes") or []
+            proc_d = r_tel.get("processor") or {}
+            mem_d = r_tel.get("memory") or {}
+            stor_d = r_tel.get("storage") or {}
+            procs_d = r_tel.get("processes") or {}
+            proc_items = procs_d.get("items") or []
             svc_result["telemetry_ok"] = bool(
-                (mem.get("totalBytes") or 0) > 0
-                and (mem.get("usedBytes") or 0) > 0
-                and len(procs_tel) > 0
-                and r_tel.get("telemetrySource")
+                str(proc_d.get("summary") or "") not in ("", "Unavailable")
+                and str(mem_d.get("summary") or "") not in ("", "Unavailable")
+                and str(stor_d.get("summary") or "") not in ("", "Unavailable")
+                and len(proc_items) > 0
             )
             svc_result["telemetry_summary"] = {
-                "cpu_pct": (r_tel.get("cpu") or {}).get("usagePercent"),
-                "mem_total_mib": round((mem.get("totalBytes") or 0) / (1024 * 1024), 1),
-                "mem_used_mib": round((mem.get("usedBytes") or 0) / (1024 * 1024), 1),
-                "proc_count": len(procs_tel),
+                "cpu_summary": proc_d.get("summary"),
+                "mem_summary": mem_d.get("summary"),
+                "storage_summary": stor_d.get("summary"),
+                "proc_count": len(proc_items),
             }
 
         # 6. Native Settings tools + real GUI launch
@@ -436,12 +442,18 @@ def check_native_services(sess, edition):
         # 9. Security & Privacy actual status (read-only, never modifies firewall)
         c_sec, r_sec = http_json(f"{bridge_url}/api/security/status", method="GET", token=bridge_token, timeout=15)
         if c_sec == 200 and isinstance(r_sec, dict):
-            svc_result["security_status_ok"] = bool("firewall" in r_sec and "secureBoot" in r_sec and "diskEncryption" in r_sec)
+            svc_result["security_status_ok"] = bool(
+                isinstance(r_sec.get("firewall"), dict)
+                and isinstance(r_sec.get("secure_boot"), dict)
+                and isinstance(r_sec.get("disk_encryption"), dict)
+                and isinstance(r_sec.get("security_updates"), dict)
+                and isinstance(r_sec.get("account"), dict)
+            )
             svc_result["security_summary"] = {
-                "firewall": r_sec.get("firewall"),
-                "secure_boot": r_sec.get("secureBoot"),
-                "disk_encryption": r_sec.get("diskEncryption"),
-                "user": r_sec.get("user"),
+                "firewall": (r_sec.get("firewall") or {}).get("status"),
+                "secure_boot": (r_sec.get("secure_boot") or {}).get("status"),
+                "disk_encryption": (r_sec.get("disk_encryption") or {}).get("status"),
+                "user": (r_sec.get("account") or {}).get("user"),
             }
 
     # 10. Store APT / Flatpak availability (read-only)
