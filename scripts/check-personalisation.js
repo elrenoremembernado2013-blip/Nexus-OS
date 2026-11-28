@@ -27,6 +27,7 @@ for (const catKey of requiredCategories) {
 
 for (const wp of sharedWallpapersJson.wallpapers) {
   assert.ok(wp.photographer && wp.sourceName && wp.sourceUrl && wp.license, `Missing attribution on ${wp.id}`);
+  assert.equal(wp.mediaType, "real-photograph", `Only genuine photography is allowed in the wallpaper library: ${wp.id}`);
   assert.ok(wp.imageUrl.startsWith("https://"), `Expected https imageUrl for ${wp.id}`);
   assert.ok(wp.hdUrl && wp.hdUrl.startsWith("https://"), `Expected https hdUrl for ${wp.id}`);
   assert.ok(wp.sourceUrl.startsWith("https://"), `Expected https sourceUrl for ${wp.id}`);
@@ -56,7 +57,8 @@ for (const wp of cat.WALLPAPERS) {
   assert.equal(wp.category, jsonWp.categoryKey);
   assert.equal(wp.sourceUrl, jsonWp.sourceUrl);
   assert.ok(wp.hd && wp.uhd && wp.thumb && wp.photographer && wp.sourceUrl && wp.license, `Missing metadata on ${wp.id}`);
+  assert.equal(wp.mediaType, "real-photograph", `Catalog must exclude AI/CGI artwork: ${wp.id}`);
   assert.deepEqual([...wp.editions], ["cinnamon", "xfce", "lite-lxqt", "lite"]);
 }
 
-console.log("PASS Phase 17 personalisation themes, profiles, 7-category wallpaper ecosystem, and attribution tests");
+console.log("PASS Phase 17 personalisation themes, profiles, 7-category real-photography wallpaper ecosystem, and attribution tests");
