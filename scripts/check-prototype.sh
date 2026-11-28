@@ -36,6 +36,7 @@ node scripts/check-personalisation.js
 node scripts/check-installer.js
 node scripts/check-system-monitor.js
 node scripts/check-terminal-preview.js
+node scripts/check-notification-center.js
 node scripts/check-desktop-integration.js
 node scripts/check-phase18-integration.js
 node scripts/check-phase19-hardware-release.js
