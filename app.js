@@ -209,18 +209,48 @@
     });
   });
 
-  $("#clearNotifications").addEventListener("click", () => {
+  function renderNotifications(items) {
     const list = $("#notificationList");
+    if (!list) return;
     list.replaceChildren();
-    const empty = document.createElement("div");
-    empty.className = "notification-empty";
-    const title = document.createElement("p");
-    title.textContent = "You're all caught up.";
-    const sub = document.createElement("small");
-    sub.textContent = "Notifications will appear here.";
-    empty.append(title, sub);
-    list.append(empty);
-    notify("Notifications cleared");
+    const unread = items.filter(item => !item.read).length;
+    $("#notificationHeading").textContent = unread ? `Notifications · ${unread} unread` : "Notifications";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "notification-empty";
+      const title = document.createElement("p");
+      title.textContent = "You're all caught up.";
+      const sub = document.createElement("small");
+      sub.textContent = "Notifications from NEXUS apps will appear here.";
+      empty.append(title, sub); list.append(empty); return;
+    }
+    items.forEach(item => {
+      const card = document.createElement("article");
+      card.className = "nexus-notification" + (item.read ? " is-read" : " is-unread");
+      const heading = document.createElement("div"); heading.className = "nexus-notification-title";
+      const title = document.createElement("strong"); title.textContent = item.title;
+      const category = document.createElement("span"); category.className = "notification-category"; category.textContent = item.category;
+      heading.append(title, category);
+      const body = document.createElement("p"); body.textContent = item.body;
+      const meta = document.createElement("div"); meta.className = "notification-meta";
+      const time = document.createElement("time"); time.dateTime = new Date(item.timestamp).toISOString();
+      time.textContent = new Date(item.timestamp).toLocaleString();
+      meta.append(time);
+      if (!item.read) {
+        const button = document.createElement("button"); button.type = "button"; button.className = "notification-mark-read"; button.textContent = "Mark read";
+        button.addEventListener("click", () => window.NexusNotifications.markRead(item.id));
+        meta.append(button);
+      }
+      card.append(heading, body, meta); list.append(card);
+    });
+  }
+  if (window.NexusNotifications) {
+    renderNotifications(window.NexusNotifications.list());
+    window.NexusNotifications.subscribe(renderNotifications);
+  }
+  $("#clearNotifications").addEventListener("click", () => {
+    if (window.NexusNotifications?.clear()) notify("Notifications cleared");
+    else notify("Could not clear notifications");
   });
 
   $("#launcherButton").addEventListener("click", event => {
