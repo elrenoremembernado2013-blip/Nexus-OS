@@ -83,6 +83,56 @@ for (const args of [
   assert(res.stdout.trim().length > 0, `Expected non-empty dry-run output for ${args.join(" ")}`);
 }
 
+// Exercise each complete edition build entry point and assert that the four
+// variants resolve to distinct output images (prevents accidental overwrites).
+const editionBuilds = [
+  {
+    name: "Standard Cinnamon",
+    args: ["linux/build/build-nexus-iso.sh", "--edition", "cinnamon", "--dry-run"],
+    expected: "nexus-os-22.3-cinnamon-amd64.iso",
+  },
+  {
+    name: "XFCE",
+    args: ["linux/build/build-nexus-iso.sh", "--edition", "xfce", "--dry-run"],
+    expected: "nexus-os-22.3-xfce-amd64.iso",
+  },
+  {
+    name: "Lite Openbox",
+    args: ["linux/lite/build-nexus-lite-iso.sh", "--dry-run"],
+    expected: "nexus-os-22.3-lite-amd64.iso",
+  },
+  {
+    name: "Lite LXQt",
+    args: ["linux/lite/scripts/build-nexus-lite-lxqt-iso.sh", "--dry-run"],
+    expected: "nexus-os-22.3-lite-lxqt-amd64.iso",
+  },
+];
+const editionOutputs = new Set();
+for (const edition of editionBuilds) {
+  const result = runCmd("bash", edition.args);
+  assert(
+    result.stdout.includes(edition.expected),
+    `${edition.name} build entry point must target ${edition.expected}`
+  );
+  editionOutputs.add(edition.expected);
+}
+assert.strictEqual(editionOutputs.size, 4, "All four NEXUS editions must have unique ISO output paths");
+
+// Provisioner dry-runs catch missing edition-specific scripts/configuration before
+// expensive ISO remastering begins. These commands do not install or change packages.
+const provisionerDryRuns = [
+  ["linux/mint/provision-nexus-guest.sh", "--dry-run"],
+  ["linux/lite/provision-nexus-lite.sh", "--dry-run"],
+  ["linux/lite/scripts/provision-nexus-lite-lxqt.sh", "--dry-run"],
+];
+for (const args of provisionerDryRuns) {
+  const result = runCmd("bash", args);
+  assert(
+    result.stdout.includes("[dry-run]"),
+    `Provisioner must expose a safe dry-run: ${args.join(" ")}`
+  );
+}
+
 // Verify check-build-prereqs.sh --strict reports missing tools/ISO cleanly without placeholder ISOs
 const prereqRes = runCmd("bash", ["linux/build/check-build-prereqs.sh", "--edition", "lite", "--strict"], true);
 if (!prereqRes.ok) {
