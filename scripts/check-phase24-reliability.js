@@ -173,7 +173,7 @@ function testBashAndConfigFixes() {
     "Openbox autostart must invoke nexus-firstboot --autostart"
   );
 
-  // 2. Terminal=true desktop files pause before exit
+  // 2. Terminal=true desktop files pause before exit and follow XDG Exec quoting rules
   for (const df of [
     "linux/branding/applications/nexus-hw-diagnostics.desktop",
     "linux/branding/applications/nexus-recovery.desktop",
@@ -181,6 +181,9 @@ function testBashAndConfigFixes() {
   ]) {
     const content = fs.readFileSync(path.join(ROOT, df), "utf8");
     assert(content.includes("read -r _"), `${df} must wait for user input before closing terminal`);
+    const execLine = content.split("\n").find(l => l.startsWith("Exec=")) || "";
+    assert(!execLine.includes("'"), `${df} Exec= must use XDG double quotes instead of unescaped single quotes`);
+    assert(!execLine.includes("\\n"), `${df} Exec= must not contain raw \\n escape sequences`);
   }
 
   // 3. app.js hash launch support
