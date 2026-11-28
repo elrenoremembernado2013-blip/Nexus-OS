@@ -5,6 +5,16 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
+const settingsSource = fs.readFileSync("apps/settings.js", "utf8");
+assert.match(settingsSource, /function syncNativePersonalisation\(opts = \{\}\)/, "Native personalisation sync should accept optional partial updates");
+for (const field of ["theme:", "appearance,", "accent:", "effectLevel:", "dockPosition:", "panelAutohide:", "workspaces:"]) {
+  assert.ok(settingsSource.includes(field), `Native personalisation snapshot is missing ${field}`);
+}
+assert.match(settingsSource, /syncNativePersonalisation\(\{ effectLevel: level \}\)/, "Effect changes must reach the native desktop");
+assert.match(settingsSource, /syncNativePersonalisation\(\{ dockPosition: dockPos\.value \}\)/, "Dock position changes must reach the native desktop");
+assert.match(settingsSource, /syncNativePersonalisation\(\{ workspaces: clamped \}\)/, "Workspace count changes must reach the native desktop");
+assert.match(settingsSource, /Reconcile browser-saved preferences with the native desktop/, "Saved preferences must be reconciled on Settings startup");
+
 // 1. Verify linux/config/wallpapers.json, linux/cinnamon/wallpapers.json, and themes.json consistency
 const sharedWallpapersJson = JSON.parse(fs.readFileSync("linux/config/wallpapers.json", "utf8"));
 const cinnamonWallpapersJson = JSON.parse(fs.readFileSync("linux/cinnamon/wallpapers.json", "utf8"));
