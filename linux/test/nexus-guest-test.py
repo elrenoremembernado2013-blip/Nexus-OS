@@ -581,6 +581,12 @@ def disable_screen_blanking(sess, edition):
                 run_as_user_capture(sess, ["xfconf-query", "-c", "xfce4-power-manager", "-p", prop, "-n", "-t", ptype, "-s", val], timeout=5)
             except Exception:
                 pass
+    elif edition == "lite-lxqt":
+        if shutil.which("xrefresh"):
+            try:
+                run_as_user_capture(sess, ["xrefresh"], timeout=5)
+            except Exception:
+                pass
 
 
 def read_proc_names():
@@ -1017,7 +1023,10 @@ def main():
         "glx_diag": collect_glx_diag(sess) if edition == "cinnamon" else {},
     }
     disable_screen_blanking(sess, edition)
-    time.sleep(0.5)
+    if edition == "lite-lxqt":
+        time.sleep(2.5)
+    else:
+        time.sleep(0.5)
     send_event(port_fd, "desktop_ready", desktop_info)
     wait_for_cmd(port_file, "ack", timeout=15)
 
@@ -1305,14 +1314,26 @@ def main():
                         if ub_proc.poll() is not None:
                             break
                         prev_count = len(screens_observed)
-                        send_event(port_fd, "qmp_send_key", {"keys": ["ret"]})
+                        # Ubiquity GTK3 Continue button uses Alt+C accelerator; fall back to Enter if needed
+                        send_event(port_fd, "qmp_send_key", {"keys": ["alt", "c"]})
                         wait_for_cmd(port_file, "ack", timeout=15)
-                        for _ in range(12):
+                        advanced = False
+                        for _ in range(8):
                             time.sleep(0.5)
                             cur_steps = read_ub_steps()
                             if len(cur_steps) > prev_count:
                                 screens_observed = cur_steps
+                                advanced = True
                                 break
+                        if not advanced and ub_proc.poll() is None:
+                            send_event(port_fd, "qmp_send_key", {"keys": ["ret"]})
+                            wait_for_cmd(port_file, "ack", timeout=15)
+                            for _ in range(8):
+                                time.sleep(0.5)
+                                cur_steps = read_ub_steps()
+                                if len(cur_steps) > prev_count:
+                                    screens_observed = cur_steps
+                                    break
                         send_event(port_fd, "ubiquity_step", {"step": step_label, "steps": screens_observed})
                         wait_for_cmd(port_file, "ack", timeout=15)
                 except Exception:

@@ -17,6 +17,7 @@ RUN_LUKS=false
 RUN_BROWSER_BENCH=false
 BENCH_TIERS="1024 2048 4096"
 VGA_MODE="std"
+STRICT=false
 DRY_RUN=false
 
 usage() {
@@ -31,6 +32,7 @@ Usage: run-phase125-tests.sh [options]
   --browser-bench         Run Falkon vs Firefox benchmark on installed disposable disk
   --bench-ram-tiers "..." Space-separated RAM tiers in MiB (default: "1024 2048 4096")
   --vga <std|virtio>      QEMU VGA adapter (default: std)
+  --strict                Exit non-zero if any requested suite fails
   --dry-run               Validate args and print execution plan
 EOF
 }
@@ -46,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --browser-bench) RUN_BROWSER_BENCH=true; shift ;;
     --bench-ram-tiers) BENCH_TIERS="$2"; shift 2 ;;
     --vga) VGA_MODE="$2"; shift 2 ;;
+    --strict) STRICT=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'Unknown argument: %s\n' "$1" >&2; exit 2 ;;
@@ -403,3 +406,22 @@ if bdir.is_dir():
 out_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(summary, indent=2))
 PY
+
+if [[ "$STRICT" == true ]]; then
+  python3 - "$TEST_DIR/phase125-summary-${EDITION}.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+bad = []
+for m, mv in (d.get("unencrypted_installer_tests") or {}).items():
+    if not (mv.get("install_success") and mv.get("installed_boot_ok") and mv.get("failed_systemd_units", 0) == 0):
+        bad.append(f"unenc:{m}")
+luks = d.get("luks_encrypted_installer_tests") or {}
+if luks and not (luks.get("install_success") and luks.get("boot1_from_luks") and luks.get("boot2_from_luks") and luks.get("boot2_persistence_verified")):
+    bad.append("luks")
+bench = d.get("browser_benchmarks") or {}
+if bench and not (bench.get("tiers") or {}):
+    bad.append("bench:no_tiers")
+if bad:
+    raise SystemExit(f"Phase 12.5 STRICT FAIL: {bad}")
+PY
+fi

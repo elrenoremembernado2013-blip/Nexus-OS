@@ -13,6 +13,7 @@ DRY_RUN=false
 WITH_BROWSER=false
 WITH_FLATPAK=false
 SKIP_UFW=false
+UFW_OFFLINE=false
 PURGE_BLOAT=false
 FORCE=false
 
@@ -28,6 +29,7 @@ Options:
   --with-browser  Include optional lightweight browser (falkon)
   --with-flatpak  Include optional Flatpak integration
   --skip-ufw      Do not invoke ufw enable (recommended inside chroot ISO builds)
+  --ufw-offline   Configure UFW enabled + default-deny offline for chroot ISO builds
   --purge-bloat   Remove heavy Mint desktop apps (Firefox/LibreOffice/Thunderbird/Xfce) during ISO remastering
   --force         Skip OS check
   --help, -h      Show this help message
@@ -40,6 +42,7 @@ while (($#)); do
     --with-browser) WITH_BROWSER=true; shift ;;
     --with-flatpak) WITH_FLATPAK=true; shift ;;
     --skip-ufw) SKIP_UFW=true; shift ;;
+    --ufw-offline) UFW_OFFLINE=true; shift ;;
     --purge-bloat) PURGE_BLOAT=true; shift ;;
     --force) FORCE=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -212,7 +215,7 @@ autologin-session=lxqt
 DM
   chmod 0644 /etc/lightdm/lightdm.conf.d/90-nexus-lite-lxqt.conf
 
-  if [[ "$SKIP_UFW" == true ]]; then
+  if [[ "$SKIP_UFW" == true || "$UFW_OFFLINE" == true ]]; then
     cat > /etc/default/zramswap <<'CFG'
 ALGO=zstd
 PERCENT=50
@@ -220,6 +223,17 @@ PRIORITY=100
 CFG
     if command -v systemctl >/dev/null 2>&1; then
       systemctl enable zramswap.service >/dev/null 2>&1 || true
+    fi
+    if [[ "$UFW_OFFLINE" == true ]]; then
+      if [[ -f /etc/ufw/ufw.conf ]]; then
+        sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
+      fi
+      if [[ -f /etc/default/ufw ]]; then
+        sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/; s/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/; s/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/' /etc/default/ufw
+      fi
+      if command -v systemctl >/dev/null 2>&1; then
+        systemctl enable ufw.service >/dev/null 2>&1 || true
+      fi
     fi
   else
     bash "$REPO_ROOT/linux/lite/configure-zram.sh" enable

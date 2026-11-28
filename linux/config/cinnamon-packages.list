@@ -9,6 +9,7 @@ core:ca-certificates
 core:gnupg
 core:curl
 core:grub2-common
+core:grub-pc-bin
 core:grub-efi-amd64-bin
 core:grub-efi-amd64-signed
 core:shim-signed
@@ -18,6 +19,8 @@ core:parted
 core:dosfstools
 core:ntfs-3g
 core:os-prober
+core:cryptsetup
+core:cryptsetup-initramfs
 
 # Desktop (Linux Mint Cinnamon flagship)
 desktop:cinnamon

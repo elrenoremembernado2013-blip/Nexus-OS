@@ -106,12 +106,17 @@ expect_fail "QEMU image validator rejects backing filename" python3 "$image_guar
 expect_fail "QEMU image validator rejects invalid JSON" python3 "$image_guard" < "$tmp_dir/invalid-image.json"
 echo "PASS [qemu-image-metadata] qcow2 format, standalone-image, and malformed-metadata checks verified"
 
-# Dry-run coverage across all supported modes
+# Dry-run coverage across all supported modes & boot targets (UEFI + Legacy BIOS)
 bash "$DISK_INSTALL" --disk /dev/vda --edition cinnamon --dry-run >/dev/null
 bash "$DISK_INSTALL" --disk /dev/vda --edition xfce --dry-run >/dev/null
 bash "$DISK_INSTALL" --disk /dev/vda --edition lite --luks --dry-run >/dev/null
 bash "$DISK_INSTALL" --disk /dev/vda --edition lite-lxqt --efi-part /dev/vda1 --root-part /dev/vda3 --keep-efi --dry-run >/dev/null
-echo "PASS [installer-modes] dry-run guided, manual, dual-boot (--keep-efi), and LUKS2 across all 4 editions"
+bios_out="$(bash "$DISK_INSTALL" --disk /dev/vda --edition lite-lxqt --boot-mode bios --dry-run)"
+printf '%s\n' "$bios_out" | grep -Fq 'boot_mode=bios'
+printf '%s\n' "$bios_out" | grep -Fq '2 MiB bios_grub'
+expect_fail "invalid --boot-mode rejected" bash "$DISK_INSTALL" --disk /dev/vda --boot-mode efi-legacy --dry-run
+expect_fail "--boot-mode bios combined with --keep-efi rejected" bash "$DISK_INSTALL" --disk /dev/vda --boot-mode bios --efi-part /dev/vda1 --root-part /dev/vda2 --keep-efi --dry-run
+echo "PASS [installer-modes] dry-run guided, manual, dual-boot (--keep-efi), Legacy BIOS (--boot-mode bios), and LUKS2 across all 4 editions"
 
 # 3. Launcher & Lite edition consistency checks
 expect_fail "launcher refuses launch without --launch" bash "$LAUNCHER"

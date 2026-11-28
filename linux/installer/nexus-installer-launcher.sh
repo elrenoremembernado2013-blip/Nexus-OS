@@ -88,6 +88,21 @@ if [[ "$CONFIRM_LAUNCH" == false ]]; then
   exit 2
 fi
 
+notify_gui_warning() {
+  local title="$1" msg="$2"
+  if [[ ! -t 1 && ! -t 2 && -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+    if command -v zenity >/dev/null 2>&1; then
+      zenity --warning --title="$title" --text="$msg" >/dev/null 2>&1 || true
+    elif command -v yad >/dev/null 2>&1; then
+      yad --image=dialog-warning --title="$title" --text="$msg" --button=OK:0 >/dev/null 2>&1 || true
+    elif command -v xmessage >/dev/null 2>&1; then
+      xmessage -center "$title: $msg" >/dev/null 2>&1 || true
+    elif command -v notify-send >/dev/null 2>&1; then
+      notify-send -u critical "$title" "$msg" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 # Never silently bypass hard hardware blockers
 HARD_BLOCKER="$(printf '%s\n' "$PREFLIGHT_JSON" | python3 -c '
 import json, sys
@@ -98,14 +113,16 @@ if bs:
 ')"
 if [[ -n "$HARD_BLOCKER" ]]; then
   echo "INSTALLATION BLOCKED: $HARD_BLOCKER" >&2
+  notify_gui_warning "NEXUS OS Installer Blocked" "$HARD_BLOCKER"
   exit 1
 fi
 
 RAM_MIB="$(printf '%s\n' "$PREFLIGHT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("hardware", {}).get("ram_total_mib") or 0)')"
 if (( RAM_MIB > 0 && RAM_MIB < 850 )) && [[ "$FORCE_LOW_RAM" == false ]]; then
-  echo "WARNING: Detected ${RAM_MIB} MiB RAM (below 850 MiB safe floor for graphical Ubiquity)." >&2
-  echo "Use the low-RAM CLI installer instead: sudo nexus-lite-install --disk /dev/sdX --user <name> --yes-erase-disk" >&2
+  low_ram_msg="Detected ${RAM_MIB} MiB RAM (below 850 MiB safe floor for graphical Ubiquity). Open a terminal and run: sudo nexus-lite-install --disk /dev/sdX --user <name> --yes-erase-disk"
+  echo "WARNING: $low_ram_msg" >&2
   echo "Or pass --force-low-ram if you explicitly want to attempt Ubiquity GTK anyway." >&2
+  notify_gui_warning "NEXUS OS Low-RAM Installer Guidance" "$low_ram_msg"
   exit 1
 fi
 

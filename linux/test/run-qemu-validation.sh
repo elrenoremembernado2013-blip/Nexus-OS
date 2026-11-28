@@ -21,6 +21,7 @@ INSTALL_TEST=false
 RELIABILITY=false
 BIOS_CHECK="auto"
 VGA_MODE="std"
+STRICT=false
 DRY_RUN=false
 
 usage() {
@@ -44,6 +45,7 @@ Options:
   --bios-check              Force Legacy BIOS (SeaBIOS) ISO boot check on every RAM tier
   --no-bios-check           Skip Legacy BIOS ISO boot check
   --vga TYPE                QEMU VGA device: std | virtio (default: std)
+  --strict                  Exit non-zero if any tested tier fails boot, live, install, or persistence
   --dry-run                 Print QEMU validation plan without launching VMs
   --help, -h                Show this help message
 USAGE
@@ -64,6 +66,7 @@ while (($#)); do
     --bios-check) BIOS_CHECK="always"; shift ;;
     --no-bios-check) BIOS_CHECK="never"; shift ;;
     --vga) [[ $# -ge 2 ]] || { echo '--vga requires std or virtio' >&2; exit 2; }; VGA_MODE="$2"; shift 2 ;;
+    --strict) STRICT=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -584,10 +587,10 @@ def diag_for(src_path):
 
 entry = {
     "ram_mib": ram_mb,
-    "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0 or (serial_log.stat().st_size > 0 if serial_log.is_file() else uefi_alive)),
+    "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0),
     "uefi_boot_screenshot": uefi_shot,
     "bios_boot_tested": bios_tested,
-    "bios_boot_success": (bios_alive and (bios_shot.get("non_black_pct", 0) > 0 or (bios_serial_log.stat().st_size > 0 if bios_serial_log.is_file() else bios_alive))) if bios_tested else None,
+    "bios_boot_success": (bios_alive and (bios_shot.get("non_black_pct", 0) > 0)) if bios_tested else None,
     "bios_boot_screenshot": bios_shot if bios_tested else None,
     "live_attempts": len(live_reps),
     "live_successes": sum(1 for r in live_reps if r.get("graphical_session_success") and r.get("application_test_success")),
@@ -626,3 +629,31 @@ PY
 done
 
 [[ -n "$overlay_dir" ]] && rm -rf -- "$overlay_dir"
+
+if [[ "$STRICT" == true ]]; then
+  python3 - "$SUMMARY" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+runs = data.get("runs") or []
+if not runs:
+    raise SystemExit("STRICT FAIL: zero QEMU runs recorded")
+bad = []
+for r in runs:
+    ram = r.get("ram_mib")
+    if not r.get("uefi_boot_success"):
+        bad.append(f"{ram}M:uefi_boot")
+    if r.get("bios_boot_tested") and not r.get("bios_boot_success"):
+        bad.append(f"{ram}M:bios_boot")
+    if r.get("live_attempts", 0) > 0 and r.get("live_successes", 0) < r.get("live_attempts", 0):
+        bad.append(f"{ram}M:live")
+    if r.get("install_attempts", 0) > 0:
+        if r.get("install_successes", 0) < r.get("install_attempts", 0):
+            bad.append(f"{ram}M:install")
+        if r.get("installed_boot_successes", 0) < r.get("installed_boot_attempts", 0):
+            bad.append(f"{ram}M:installed_boot")
+        if r.get("installed_boot_attempts", 0) >= 2 and not r.get("persistence_verified"):
+            bad.append(f"{ram}M:persistence")
+if bad:
+    raise SystemExit(f"STRICT FAIL: {bad}")
+PY
+fi

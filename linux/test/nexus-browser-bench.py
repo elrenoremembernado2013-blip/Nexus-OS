@@ -404,7 +404,9 @@ def run_browser_suite(sess, port_fd=None, port_file=None, send_event=None, wait_
                     break
                 time.sleep(0.5)
 
-            b_deadline = time.time() + 30
+            sw_mode = not gpu_env.get("bare_metal_gpu_qualified")
+            tab_wait_sec = 45 if sw_mode else 30
+            b_deadline = time.time() + tab_wait_sec
             while time.time() < b_deadline and srv.count() == ev_idx:
                 time.sleep(0.3)
             tab1_loads = srv.recent_loads(ev_idx)
@@ -430,7 +432,7 @@ def run_browser_suite(sess, port_fd=None, port_file=None, send_event=None, wait_
                     procs.append(run_as_user(sess, build_cmd(u, False)))
                     time.sleep(1.2)
 
-                wait_dl = time.time() + 30
+                wait_dl = time.time() + tab_wait_sec
                 while time.time() < wait_dl and (srv.count() - step_ev_idx) < needed:
                     time.sleep(0.4)
                 loads = srv.recent_loads(step_ev_idx)

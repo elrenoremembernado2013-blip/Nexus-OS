@@ -270,9 +270,9 @@ cp -a "$REPO_ROOT/apps" "$squash_root/tmp/nexus-repo/apps"
 cp -a "$REPO_ROOT/assets" "$squash_root/tmp/nexus-repo/assets"
 
 chroot_env=(PATH=/usr/sbin:/usr/bin:/sbin:/bin)
-chroot_args=(--skip-ufw --force)
+chroot_args=(--ufw-offline --force)
 if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then
-  chroot_args=(--skip-ufw --autostart-firstboot --force)
+  chroot_args=(--ufw-offline --autostart-firstboot --force)
   [[ "$WITH_GAMING" == true ]] && chroot_args+=(--with-gaming)
   [[ "$WITH_DEV" == true ]] && chroot_args+=(--with-dev)
   chroot_env+=(
@@ -280,7 +280,7 @@ if [[ "$PROVISION_SCRIPT" == *"provision-nexus-guest.sh" ]]; then
     "NEXUS_PKG_MANIFEST=/tmp/nexus-repo/linux/config/${PKG_MANIFEST##*/}"
   )
 elif [[ "$PROVISION_SCRIPT" == *"provision-nexus-lite.sh" || "$PROVISION_SCRIPT" == *"provision-nexus-lite-lxqt.sh" ]]; then
-  chroot_args=(--skip-ufw --purge-bloat --force)
+  chroot_args=(--ufw-offline --purge-bloat --force)
 fi
 
 CURRENT_STAGE="chroot-provision"

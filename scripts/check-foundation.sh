@@ -275,5 +275,8 @@ done
 python3 -m py_compile linux/mint/nexus-system-bridge.py scripts/check-linux-bridge.py scripts/check-native-services-reliability.py linux/test/nexus-guest-test.py linux/test/qemu-graphical-runner.py linux/test/nexus-browser-bench.py linux/lite/scripts/nexus-lite-compare.py
 python3 scripts/check-linux-bridge.py
 python3 scripts/check-native-services-reliability.py
+node scripts/check-phase24-1-iso-pipeline.js
+node scripts/check-phase24-reliability.js
+node scripts/check-audit-reliability.js
 
 bash scripts/check-prototype.sh

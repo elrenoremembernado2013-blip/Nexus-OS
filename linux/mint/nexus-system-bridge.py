@@ -59,7 +59,7 @@ ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "updates": [["mintupdate"]],
     "wallpaper": [["cinnamon-settings", "backgrounds"], ["xfdesktop-settings"], ["pcmanfm-qt", "--desktop-pref"], ["nitrogen"]],
     "gaming": [["steam"]],
-    "installer": [["nexus-installer-launcher"], ["ubiquity"]],
+    "installer": [["nexus-installer-launcher", "--launch"], ["ubiquity"]],
 }
 
 TOOL_INSTALL_HINTS: dict[str, str] = {

@@ -12,6 +12,7 @@ core:curl
 core:network-manager
 core:zram-tools
 core:grub2-common
+core:grub-pc-bin
 core:grub-efi-amd64-bin
 core:grub-efi-amd64-signed
 core:shim-signed

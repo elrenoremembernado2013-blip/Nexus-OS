@@ -14,6 +14,7 @@ WITH_GAMING=false
 WITH_DEV=false
 WITH_OPTIONAL=false
 SKIP_UFW=false
+UFW_OFFLINE=false
 AUTOSTART_FIRSTBOOT=false
 FORCE_DISTRO=false
 PREFIX_DIR="/usr/local"
@@ -33,6 +34,7 @@ Options:
   --with-dev             Include optional development packages (git, build-essential, python3)
   --with-optional        Include optional desktop applications
   --skip-ufw             Do not alter UFW firewall state
+  --ufw-offline          Configure UFW enabled + default-deny offline for chroot ISO builds
   --autostart-firstboot  Install /etc/xdg/autostart/nexus-firstboot.desktop
   --force                Skip Linux Mint / Ubuntu Noble OS verification check
   --help, -h             Show this help message
@@ -46,6 +48,7 @@ while (($#)); do
     --with-dev) WITH_DEV=true; shift ;;
     --with-optional) WITH_OPTIONAL=true; shift ;;
     --skip-ufw) SKIP_UFW=true; shift ;;
+    --ufw-offline) UFW_OFFLINE=true; shift ;;
     --autostart-firstboot) AUTOSTART_FIRSTBOOT=true; shift ;;
     --force) FORCE_DISTRO=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -134,7 +137,21 @@ echo "Provisioning NEXUS OS Mint baseline (host=$os_id, codename=$os_codename, g
 run_cmd env DEBIAN_FRONTEND=noninteractive apt-get update
 run_cmd env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
 
-if [[ "$SKIP_UFW" == false ]]; then
+if [[ "$UFW_OFFLINE" == true ]]; then
+  if [[ "$DRY_RUN" == true ]]; then
+    echo '[dry-run] Configure offline UFW (/etc/ufw/ufw.conf ENABLED=yes, /etc/default/ufw DROP incoming, enable ufw.service)'
+  else
+    if [[ -f /etc/ufw/ufw.conf ]]; then
+      sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
+    fi
+    if [[ -f /etc/default/ufw ]]; then
+      sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/; s/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/; s/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/' /etc/default/ufw
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl enable ufw.service >/dev/null 2>&1 || true
+    fi
+  fi
+elif [[ "$SKIP_UFW" == false ]]; then
   run_cmd ufw default deny incoming
   run_cmd ufw default allow outgoing
   run_cmd ufw --force enable

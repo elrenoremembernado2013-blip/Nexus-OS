@@ -15,6 +15,7 @@ TEST_DIR=""
 RUN_DUALBOOT=false
 RUN_SECURE_BOOT=false
 VGA_MODE="std"
+STRICT=false
 DRY_RUN=false
 
 usage() {
@@ -26,6 +27,7 @@ Usage: run-phase130-tests.sh [options]
   --dualboot-test         Simulate ESP+NTFS dual-boot disk, verify preflight detection + --keep-efi preservation
   --secure-boot-test      Boot installed disk (and live ISO) under OVMF Secure Boot (if secboot OVMF firmware present)
   --vga <std|virtio>      QEMU VGA adapter (default: std)
+  --strict                Exit non-zero if dualboot or Secure Boot test fails/is skipped
   --dry-run               Validate args and print execution plan
 EOF
 }
@@ -38,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --dualboot-test) RUN_DUALBOOT=true; shift ;;
     --secure-boot-test) RUN_SECURE_BOOT=true; shift ;;
     --vga) VGA_MODE="$2"; shift 2 ;;
+    --strict) STRICT=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'Unknown argument: %s\n' "$1" >&2; exit 2 ;;
@@ -344,3 +347,19 @@ if sbdir.is_dir():
 out_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(summary, indent=2))
 PY
+
+if [[ "$STRICT" == true ]]; then
+  python3 - "$TEST_DIR/phase130-summary-${EDITION}.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+bad = []
+db = d.get("dualboot_test") or {}
+if db and not (db.get("install_success") and db.get("installed_boot_ok") and db.get("dualboot_efi_preserved_after_boot") and db.get("dualboot_os_part_preserved_after_boot")):
+    bad.append("dualboot")
+sb = d.get("secure_boot_test") or {}
+if sb and (not sb.get("tested") or not sb.get("install_success") or not sb.get("installed_boot_ok") or sb.get("secure_boot_state") != "enabled"):
+    bad.append(f"secure_boot:{sb.get('reason') or sb.get('secure_boot_state')}")
+if bad:
+    raise SystemExit(f"Phase 13.0 STRICT FAIL: {bad}")
+PY
+fi

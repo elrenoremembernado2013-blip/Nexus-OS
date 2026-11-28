@@ -404,15 +404,34 @@ jobs:
                   "installed": [b.get("native_services") for b in iboot],
               }
               print(f"::notice title=NEXUS-16-SVC-{slug}-{r.get('ram_mib')}M::" + json.dumps(svc_payload, separators=(",", ":")))
-          bad = [
-              r.get("ram_mib") for r in data["runs"]
-              if r.get("install_attempts", 0) > 0 and (
-                  (data["edition"] in ("lite", "lite-lxqt") and r.get("ram_mib") in (1024, 2048))
-                  or (data["edition"] in ("xfce", "cinnamon") and r.get("ram_mib") == 4096)
-              ) and (r.get("install_successes", 0) == 0 or r.get("installed_boot_successes", 0) == 0)
-          ]
+          bad = []
+          runs = data.get("runs") or []
+          if not runs:
+              bad.append("no_runs_recorded")
+          for r in runs:
+              ram = r.get("ram_mib")
+              reasons = []
+              if not r.get("uefi_boot_success"):
+                  reasons.append("uefi_boot")
+              if r.get("bios_boot_tested") and not r.get("bios_boot_success"):
+                  reasons.append("bios_boot")
+              if r.get("live_attempts", 0) == 0 or r.get("live_successes", 0) < r.get("live_attempts", 0):
+                  reasons.append(f"live:{r.get('live_successes')}/{r.get('live_attempts')}")
+              if r.get("install_attempts", 0) > 0:
+                  if r.get("install_successes", 0) < r.get("install_attempts", 0):
+                      reasons.append(f"inst:{r.get('install_successes')}/{r.get('install_attempts')}")
+                  if r.get("installed_boot_successes", 0) < r.get("installed_boot_attempts", 0):
+                      reasons.append(f"iboot:{r.get('installed_boot_successes')}/{r.get('installed_boot_attempts')}")
+                  if r.get("installed_boot_attempts", 0) >= 2 and not r.get("persistence_verified"):
+                      reasons.append("persistence")
+                  for b in r.get("installed_boots") or []:
+                      fu = (b.get("installed_checks") or {}).get("failed_systemd_units", 0)
+                      if fu:
+                          reasons.append(f"boot{b.get('boot_num')}_failed_units:{fu}")
+              if reasons:
+                  bad.append(f"{ram}M({','.join(reasons)})")
           if bad:
-              print(f"::error title=NEXUS-124-FAIL-{slug}::Primary tier install/installed-boot failure at RAM={bad}")
+              print(f"::error title=NEXUS-124-FAIL-{slug}::QEMU validation failure(s): {bad}")
               sys.exit(1)
           PY
 
@@ -476,9 +495,13 @@ jobs:
                   print(f"::notice title=NEXUS-125-BENCH-{slug}-{tier}::" + json.dumps(compact, separators=(",", ":")))
           bad = []
           for m, mv in unenc.items():
-              if not (mv.get("install_success") and mv.get("installed_boot_ok")):
+              if not (mv.get("install_success") and mv.get("installed_boot_ok") and mv.get("failed_systemd_units", 0) == 0):
                   bad.append(f"unenc:{m}")
-          if luks and not (luks.get("install_success") and luks.get("boot1_from_luks") and luks.get("boot2_from_luks") and luks.get("boot2_persistence_verified") and (luks.get("luks_unlock_diag") or {}).get("wrong_passphrase_rejected")):
+              if m == "recovery" and not (mv.get("refused_without_confirm") and mv.get("dirty_mount_created")):
+                  bad.append("unenc:recovery_guards")
+              if m == "manual" and not (mv.get("manual_extra_part_preserved") and mv.get("extra_partition_preserved_after_boot")):
+                  bad.append("unenc:manual_partition_preserve")
+          if luks and not (luks.get("install_success") and luks.get("crypto_luks_blkid") and luks.get("crypttab_ok") and luks.get("boot1_from_luks") and luks.get("boot2_from_luks") and luks.get("boot2_persistence_verified") and (luks.get("luks_unlock_diag") or {}).get("wrong_passphrase_rejected")):
               bad.append("luks")
           if bench:
               tiers = bench.get("tiers") or {}
@@ -486,8 +509,14 @@ jobs:
                   bad.append("bench:no_tiers")
               for tier, tdata in tiers.items():
                   bs = tdata.get("browsers") or {}
-                  if not bs.get("falkon", {}).get("available") or not bs.get("firefox", {}).get("available"):
-                      bad.append(f"bench:{tier}:missing_results")
+                  for bname in ("falkon", "firefox"):
+                      bres = bs.get(bname) or {}
+                      if not bres.get("available"):
+                          bad.append(f"bench:{tier}:{bname}:unavailable")
+                      elif not bres.get("window_mapped"):
+                          bad.append(f"bench:{tier}:{bname}:not_mapped")
+                      elif bres.get("crashes", 0) > 0 or bres.get("oom_kills_delta", 0) > 0:
+                          bad.append(f"bench:{tier}:{bname}:crash_or_oom")
           if bad:
               print(f"::error title=NEXUS-125-FAIL-{slug}::Failures: {bad}")
               sys.exit(1)
@@ -517,10 +546,18 @@ jobs:
           if sb:
               print(f"::notice title=NEXUS-130-SECBOOT-{slug}::" + json.dumps(sb, separators=(",", ":")))
           bad = []
-          if db and not (db.get("install_success") and db.get("installed_boot_ok") and db.get("dualboot_preflight_detected") and db.get("dualboot_efi_preserved_after_boot") and db.get("dualboot_os_part_preserved_after_boot")):
+          bad = []
+          if db and not (db.get("install_success") and db.get("installed_boot_ok") and db.get("dualboot_preflight_detected") and db.get("dualboot_efi_preserved_after_boot") and db.get("dualboot_os_part_preserved_after_boot") and db.get("failed_systemd_units", 0) == 0):
               bad.append("dualboot")
-          if sb.get("tested") and not (sb.get("install_success") and sb.get("installed_boot_ok") and sb.get("efi_boot_ok") and sb.get("secure_boot_state") == "enabled"):
+          if not sb.get("tested"):
+              bad.append(f"secure_boot_not_tested:{sb.get('reason')}")
+          elif not (sb.get("install_success") and sb.get("installed_boot_ok") and sb.get("efi_boot_ok") and sb.get("secure_boot_state") == "enabled" and sb.get("failed_systemd_units", 0) == 0):
               bad.append(f"secure_boot:{sb.get('secure_boot_state')}")
+          else:
+              chain = sb.get("secure_boot_chain") or {}
+              for k in ("shim_signed", "grub_signed", "kernel_signed"):
+                  if chain.get(k) != "signed_pe_present":
+                      bad.append(f"secure_boot_chain:{k}={chain.get(k)}")
           if bad:
               print(f"::error title=NEXUS-130-FAIL-{slug}::Failures: {bad}")
               sys.exit(1)

@@ -8,6 +8,7 @@ set -euo pipefail
 DISK=""
 EFI_PART=""
 ROOT_PART=""
+BOOT_MODE="auto"
 KEEP_EFI=false
 LUKS_ENABLED=false
 LUKS_PASS_FILE=""
@@ -32,16 +33,17 @@ usage() {
 Usage: sudo bash linux/installer/nexus-disk-install.sh --disk /dev/sdX [OPTIONS]
 
 Installs the booted NEXUS OS live filesystem onto a target block device with
-UEFI FAT32 ESP + ext4 root (or LUKS2 encrypted root with separate /boot),
-locale/keyboard/timezone configuration, UUID /etc/fstab, initramfs
-regeneration, and UEFI GRUB bootloader.
+UEFI FAT32 ESP + ext4 root (or Legacy BIOS GPT bios_grub + ext4 root, or LUKS2
+encrypted root with separate /boot), locale/keyboard/timezone configuration,
+UUID /etc/fstab, initramfs regeneration, and GRUB bootloader.
 
 Options:
   --disk DEV                    Target block device (e.g. /dev/vda) [required]
   --efi-part DEV                Use pre-created EFI System Partition (manual partitioning)
   --root-part DEV               Use pre-created root partition (manual partitioning)
+  --boot-mode MODE              auto | uefi | bios (default: auto)
   --keep-efi                    Do not reformat --efi-part (preserve existing EFI files)
-  --luks                        Enable LUKS2 root encryption (creates ESP + /boot + LUKS2 /)
+  --luks                        Enable LUKS2 root encryption (creates boot + LUKS2 /)
   --luks-passphrase-file PATH   File containing LUKS passphrase (read & removed by caller, never logged)
   --hostname NAME               Installed system hostname (default: nexus-os)
   --user NAME                   Primary sudo user to create (default: nexus)
@@ -65,6 +67,7 @@ while (($#)); do
     --disk) [[ $# -ge 2 ]] || { echo '--disk requires a device path' >&2; exit 2; }; DISK="$2"; shift 2 ;;
     --efi-part) [[ $# -ge 2 ]] || { echo '--efi-part requires a device path' >&2; exit 2; }; EFI_PART="$2"; shift 2 ;;
     --root-part) [[ $# -ge 2 ]] || { echo '--root-part requires a device path' >&2; exit 2; }; ROOT_PART="$2"; shift 2 ;;
+    --boot-mode) [[ $# -ge 2 ]] || { echo '--boot-mode requires auto|uefi|bios' >&2; exit 2; }; BOOT_MODE="$2"; shift 2 ;;
     --keep-efi) KEEP_EFI=true; shift ;;
     --luks) LUKS_ENABLED=true; shift ;;
     --luks-passphrase-file) [[ $# -ge 2 ]] || { echo '--luks-passphrase-file requires a path' >&2; exit 2; }; LUKS_PASS_FILE="$2"; shift 2 ;;
@@ -87,6 +90,10 @@ while (($#)); do
 done
 
 [[ -n "$DISK" ]] || { echo 'Missing --disk /dev/... argument.' >&2; usage >&2; exit 2; }
+case "$BOOT_MODE" in
+  auto|uefi|bios) ;;
+  *) printf 'Invalid --boot-mode: %s (expected auto | uefi | bios)\n' "$BOOT_MODE" >&2; exit 2 ;;
+esac
 [[ "$HOSTNAME_NEW" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]] || { echo 'Invalid --hostname.' >&2; exit 2; }
 [[ "$USERNAME_NEW" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { echo 'Invalid --user.' >&2; exit 2; }
 [[ "$LOCALE_NEW" =~ ^[A-Za-z0-9_.-]{2,32}$ ]] || { echo 'Invalid --locale.' >&2; exit 2; }
@@ -104,6 +111,7 @@ fi
 if [[ -n "$EFI_PART" || -n "$ROOT_PART" ]]; then
   [[ -n "$EFI_PART" && -n "$ROOT_PART" ]] || { echo 'Manual partitioning requires both --efi-part and --root-part.' >&2; exit 2; }
   [[ "$EFI_PART" != "$ROOT_PART" ]] || { echo '--efi-part and --root-part must be distinct partitions.' >&2; exit 2; }
+  [[ "$BOOT_MODE" != "bios" ]] || { echo '--boot-mode bios cannot be combined with --efi-part.' >&2; exit 2; }
 fi
 
 if [[ "$KEEP_EFI" == true && -z "$EFI_PART" ]]; then
@@ -116,17 +124,32 @@ if [[ "$LUKS_ENABLED" == true && -n "$EFI_PART" ]]; then
   exit 2
 fi
 
+EFFECTIVE_BOOT_MODE="$BOOT_MODE"
+if [[ "$EFFECTIVE_BOOT_MODE" == "auto" ]]; then
+  if [[ -n "$EFI_PART" || -d /sys/firmware/efi ]]; then
+    EFFECTIVE_BOOT_MODE="uefi"
+  elif [[ -d /usr/lib/grub/i386-pc ]]; then
+    EFFECTIVE_BOOT_MODE="bios"
+  else
+    EFFECTIVE_BOOT_MODE="uefi"
+  fi
+fi
+
 if [[ "$VALIDATE_ONLY" == true ]]; then
   echo "NEXUS Disk Installer Configuration Validated (read-only):"
-  echo "  disk=$DISK edition=${EDITION_OVERRIDE:-auto} locale=$LOCALE_NEW keymap=$KEYMAP_NEW timezone=$TIMEZONE_NEW user=$USERNAME_NEW hostname=$HOSTNAME_NEW luks=$LUKS_ENABLED keep_efi=$KEEP_EFI"
+  echo "  disk=$DISK edition=${EDITION_OVERRIDE:-auto} boot_mode=$EFFECTIVE_BOOT_MODE locale=$LOCALE_NEW keymap=$KEYMAP_NEW timezone=$TIMEZONE_NEW user=$USERNAME_NEW hostname=$HOSTNAME_NEW luks=$LUKS_ENABLED keep_efi=$KEEP_EFI"
   exit 0
 fi
 
 if [[ "$DRY_RUN" == true || "$YES_ERASE" == false ]]; then
   echo "NEXUS Disk Installer Plan (dry-run / unconfirmed):"
-  echo "  Target disk: $DISK"
+  echo "  Target disk: $DISK (boot_mode=$EFFECTIVE_BOOT_MODE)"
   if [[ -n "$EFI_PART" ]]; then
     echo "  Partitioning: Manual -> EFI=$EFI_PART (keep=$KEEP_EFI), root=$ROOT_PART (ext4)"
+  elif [[ "$EFFECTIVE_BOOT_MODE" == "bios" && "$LUKS_ENABLED" == true ]]; then
+    echo "  Partitioning: GPT (BIOS) -> 2 MiB bios_grub + 1024 MiB ext4 (/boot) + LUKS2 encrypted root (/)"
+  elif [[ "$EFFECTIVE_BOOT_MODE" == "bios" ]]; then
+    echo "  Partitioning: Guided GPT (BIOS) -> 2 MiB bios_grub + ext4 root (/)"
   elif [[ "$LUKS_ENABLED" == true ]]; then
     echo "  Partitioning: GPT -> 512 MiB FAT32 ESP (/boot/efi) + 1024 MiB ext4 (/boot) + LUKS2 encrypted root (/)"
   else
@@ -166,7 +189,14 @@ else
   exit 1
 fi
 
-for cmd in parted mkfs.vfat mkfs.ext4 blkid chroot grub-install update-grub; do
+req_tools=(parted mkfs.ext4 blkid chroot grub-install update-grub)
+if [[ "$EFFECTIVE_BOOT_MODE" == "uefi" ]]; then
+  req_tools+=(mkfs.vfat)
+elif [[ ! -d /usr/lib/grub/i386-pc ]]; then
+  echo 'Legacy BIOS mode selected, but /usr/lib/grub/i386-pc (grub-pc-bin) is not installed.' >&2
+  exit 1
+fi
+for cmd in "${req_tools[@]}"; do
   command -v "$cmd" >/dev/null 2>&1 || { printf 'Missing required installer tool: %s\n' "$cmd" >&2; exit 1; }
 done
 
@@ -293,6 +323,7 @@ fi
 
 log_msg "Starting NEXUS OS installation (edition=$EDITION disk=$DISK source=$SOURCE_MODE user=$USERNAME_NEW luks=$LUKS_ENABLED manual=$is_manual)"
 
+PART_EFI=""
 PART_BOOT=""
 PART_LUKS=""
 LUKS_UUID=""
@@ -352,42 +383,53 @@ if [[ -n "$EFI_PART" ]]; then
   log_msg "Formatting manual root partition $PART_ROOT (ext4)"
   mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
 else
-  # Guided partitioning (standard or LUKS2)
+  # Guided partitioning (UEFI or Legacy BIOS, standard or LUKS2)
   CURRENT_STAGE="partitioning"
   DISK_MODIFIED=true
   wipefs -af "$DISK" >/dev/null 2>&1 || true
   parted -s "$DISK" mklabel gpt
-  parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
-  parted -s "$DISK" set 1 esp on
-  if [[ "$LUKS_ENABLED" == true ]]; then
-    parted -s "$DISK" mkpart boot ext4 513MiB 1537MiB
-    parted -s "$DISK" mkpart cryptroot ext4 1537MiB 100%
+  if [[ "$EFFECTIVE_BOOT_MODE" == "bios" ]]; then
+    parted -s "$DISK" mkpart bios_grub 1MiB 3MiB
+    parted -s "$DISK" set 1 bios_grub on
+    if [[ "$LUKS_ENABLED" == true ]]; then
+      parted -s "$DISK" mkpart boot ext4 3MiB 1027MiB
+      parted -s "$DISK" mkpart cryptroot ext4 1027MiB 100%
+    else
+      parted -s "$DISK" mkpart root ext4 3MiB 100%
+    fi
   else
-    parted -s "$DISK" mkpart root ext4 513MiB 100%
+    parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
+    parted -s "$DISK" set 1 esp on
+    if [[ "$LUKS_ENABLED" == true ]]; then
+      parted -s "$DISK" mkpart boot ext4 513MiB 1537MiB
+      parted -s "$DISK" mkpart cryptroot ext4 1537MiB 100%
+    else
+      parted -s "$DISK" mkpart root ext4 513MiB 100%
+    fi
   fi
   partprobe "$DISK" || true
   udevadm settle || sleep 2
 
+  part_prefix=""
   if [[ "$DISK" == *nvme* || "$DISK" == *mmcblk* || "$DISK" == *loop* ]]; then
-    PART_EFI="${DISK}p1"
-    if [[ "$LUKS_ENABLED" == true ]]; then
-      PART_BOOT="${DISK}p2"
-      PART_LUKS="${DISK}p3"
-    else
-      PART_ROOT="${DISK}p2"
-    fi
+    part_prefix="p"
+  fi
+  if [[ "$EFFECTIVE_BOOT_MODE" == "uefi" ]]; then
+    PART_EFI="${DISK}${part_prefix}1"
+  fi
+  if [[ "$LUKS_ENABLED" == true ]]; then
+    PART_BOOT="${DISK}${part_prefix}2"
+    PART_LUKS="${DISK}${part_prefix}3"
   else
-    PART_EFI="${DISK}1"
-    if [[ "$LUKS_ENABLED" == true ]]; then
-      PART_BOOT="${DISK}2"
-      PART_LUKS="${DISK}3"
-    else
-      PART_ROOT="${DISK}2"
-    fi
+    PART_ROOT="${DISK}${part_prefix}2"
   fi
 
   for _ in $(seq 1 15); do
-    if [[ "$LUKS_ENABLED" == true ]]; then
+    if [[ "$EFFECTIVE_BOOT_MODE" == "bios" && "$LUKS_ENABLED" == true ]]; then
+      [[ -b "$PART_BOOT" && -b "$PART_LUKS" ]] && break
+    elif [[ "$EFFECTIVE_BOOT_MODE" == "bios" ]]; then
+      [[ -b "$PART_ROOT" ]] && break
+    elif [[ "$LUKS_ENABLED" == true ]]; then
       [[ -b "$PART_EFI" && -b "$PART_BOOT" && -b "$PART_LUKS" ]] && break
     else
       [[ -b "$PART_EFI" && -b "$PART_ROOT" ]] && break
@@ -396,10 +438,15 @@ else
   done
 
   if [[ "$LUKS_ENABLED" == true ]]; then
-    [[ -b "$PART_EFI" && -b "$PART_BOOT" && -b "$PART_LUKS" ]] || { echo "LUKS partitions did not appear on $DISK." >&2; exit 1; }
+    [[ -b "$PART_BOOT" && -b "$PART_LUKS" ]] || { echo "LUKS partitions did not appear on $DISK." >&2; exit 1; }
     CURRENT_STAGE="filesystem_format"
-    log_msg "Formatting $PART_EFI (FAT32) and $PART_BOOT (ext4 /boot)"
-    mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+    if [[ "$EFFECTIVE_BOOT_MODE" == "uefi" ]]; then
+      [[ -b "$PART_EFI" ]] || { echo "EFI partition did not appear on $DISK." >&2; exit 1; }
+      log_msg "Formatting $PART_EFI (FAT32) and $PART_BOOT (ext4 /boot)"
+      mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+    else
+      log_msg "Formatting $PART_BOOT (ext4 /boot)"
+    fi
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_boot "$PART_BOOT" >/dev/null
     CURRENT_STAGE="luks_format"
     log_msg "Formatting $PART_LUKS as LUKS2 (argon2id 64 MiB memory bound for low-RAM reliability)"
@@ -421,10 +468,15 @@ else
     log_msg "Formatting decrypted root $PART_ROOT (ext4)"
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
   else
-    [[ -b "$PART_EFI" && -b "$PART_ROOT" ]] || { echo "Partitions did not appear on $DISK ($PART_EFI, $PART_ROOT)." >&2; exit 1; }
+    [[ -b "$PART_ROOT" ]] || { echo "Root partition did not appear on $DISK ($PART_ROOT)." >&2; exit 1; }
     CURRENT_STAGE="filesystem_format"
-    log_msg "Formatting $PART_EFI (FAT32) and $PART_ROOT (ext4)"
-    mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+    if [[ "$EFFECTIVE_BOOT_MODE" == "uefi" ]]; then
+      [[ -b "$PART_EFI" ]] || { echo "EFI partition did not appear on $DISK ($PART_EFI)." >&2; exit 1; }
+      log_msg "Formatting $PART_EFI (FAT32) and $PART_ROOT (ext4)"
+      mkfs.vfat -F32 -n NEXUS_EFI "$PART_EFI" >/dev/null
+    else
+      log_msg "Formatting $PART_ROOT (ext4)"
+    fi
     mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L nexus_root "$PART_ROOT" >/dev/null
   fi
 fi
@@ -438,8 +490,10 @@ if [[ -n "$PART_BOOT" ]]; then
   mkdir -p -- "$TARGET/boot"
   mount "$PART_BOOT" "$TARGET/boot"
 fi
-mkdir -p -- "$TARGET/boot/efi"
-mount "$PART_EFI" "$TARGET/boot/efi"
+if [[ -n "$PART_EFI" ]]; then
+  mkdir -p -- "$TARGET/boot/efi"
+  mount "$PART_EFI" "$TARGET/boot/efi"
+fi
 
 CURRENT_STAGE="filesystem_copy"
 write_status "filesystem_copy" 4 "running"
@@ -460,7 +514,10 @@ mount --bind /run "$TARGET/run"
 
 CURRENT_STAGE="system_config"
 uuid_root="$(blkid -s UUID -o value "$PART_ROOT")"
-uuid_efi="$(blkid -s UUID -o value "$PART_EFI")"
+uuid_efi=""
+if [[ -n "$PART_EFI" ]]; then
+  uuid_efi="$(blkid -s UUID -o value "$PART_EFI")"
+fi
 
 if [[ "$LUKS_ENABLED" == true ]]; then
   uuid_boot="$(blkid -s UUID -o value "$PART_BOOT")"
@@ -472,8 +529,10 @@ CRYPTTAB
 # /etc/fstab: static file system information for NEXUS OS (LUKS2 encrypted root)
 /dev/mapper/${CRYPT_NAME}  /          ext4  errors=remount-ro  0  1
 UUID=${uuid_boot}          /boot      ext4  defaults           0  2
-UUID=${uuid_efi}           /boot/efi  vfat  umask=0077         0  1
 FSTAB
+  if [[ -n "$uuid_efi" ]]; then
+    printf 'UUID=%s           /boot/efi  vfat  umask=0077         0  1\n' "$uuid_efi" >> "$TARGET/etc/fstab"
+  fi
   mkdir -p -- "$TARGET/etc/cryptsetup-initramfs" "$TARGET/usr/local/share/nexus-os"
   printf 'CRYPTSETUP=y\n' > "$TARGET/etc/cryptsetup-initramfs/conf-hook"
   cat > "$TARGET/usr/local/share/nexus-os/luks-recovery-guide.txt" <<GUIDE
@@ -493,8 +552,10 @@ else
   cat > "$TARGET/etc/fstab" <<FSTAB
 # /etc/fstab: static file system information for NEXUS OS
 UUID=${uuid_root}  /          ext4  errors=remount-ro  0  1
-UUID=${uuid_efi}   /boot/efi  vfat  umask=0077         0  1
 FSTAB
+  if [[ -n "$uuid_efi" ]]; then
+    printf 'UUID=%s   /boot/efi  vfat  umask=0077         0  1\n' "$uuid_efi" >> "$TARGET/etc/fstab"
+  fi
 fi
 
 printf '%s\n' "$HOSTNAME_NEW" > "$TARGET/etc/hostname"
@@ -578,41 +639,60 @@ else
 fi
 rm -f -- "$initrd_speed_conf"
 
+# Ensure UFW firewall is enabled offline on installed target (default deny incoming)
+if [[ -f "$TARGET/etc/ufw/ufw.conf" ]]; then
+  sed -i 's/^ENABLED=.*/ENABLED=yes/' "$TARGET/etc/ufw/ufw.conf" || true
+fi
+if [[ -f "$TARGET/etc/default/ufw" ]]; then
+  sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/; s/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/; s/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/' "$TARGET/etc/default/ufw" || true
+fi
+if [[ -x "$TARGET/bin/systemctl" || -x "$TARGET/usr/bin/systemctl" ]]; then
+  chroot "$TARGET" systemctl enable ufw.service >/dev/null 2>&1 || true
+fi
+
 CURRENT_STAGE="bootloader_install"
 write_status "bootloader_install" 7 "running"
-# Install UEFI GRUB bootloader + fallback EFI/BOOT/BOOTX64.EFI
-log_msg "Installing UEFI GRUB bootloader onto $DISK ($PART_EFI)"
-chroot "$TARGET" /usr/sbin/grub-install \
-  --target=x86_64-efi \
-  --efi-directory=/boot/efi \
-  --bootloader-id=nexus \
-  --recheck \
-  --no-nvram
+if [[ "$EFFECTIVE_BOOT_MODE" == "bios" ]]; then
+  log_msg "Installing Legacy BIOS GRUB bootloader onto $DISK"
+  chroot "$TARGET" /usr/sbin/grub-install \
+    --target=i386-pc \
+    --recheck \
+    "$DISK"
+else
+  # Install UEFI GRUB bootloader + fallback EFI/BOOT/BOOTX64.EFI
+  log_msg "Installing UEFI GRUB bootloader onto $DISK ($PART_EFI)"
+  chroot "$TARGET" /usr/sbin/grub-install \
+    --target=x86_64-efi \
+    --efi-directory=/boot/efi \
+    --bootloader-id=nexus \
+    --recheck \
+    --no-nvram
 
-mkdir -p -- "$TARGET/boot/efi/EFI/BOOT" "$TARGET/boot/efi/EFI/ubuntu"
-cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/BOOT/"
-# Signed Ubuntu/Mint grubx64.efi looks for /EFI/ubuntu/grub.cfg even when --bootloader-id=nexus
-cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/ubuntu/"
-# Ensure signed UEFI Secure Boot chain (shimx64.efi -> grubx64.efi -> signed kernel) when available
-if [[ -f "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" ]]; then
-  mv -f -- "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
-elif [[ -f "$TARGET/usr/lib/shim/shimx64.efi.signed" ]]; then
-  cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
-  cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/nexus/shimx64.efi"
-  cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/ubuntu/shimx64.efi"
-  if [[ -f "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" ]]; then
-    cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/BOOT/grubx64.efi"
-    cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/nexus/grubx64.efi"
-    cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/ubuntu/grubx64.efi"
-  fi
-  for aux_efi in mmx64.efi fbx64.efi; do
-    if [[ -f "$TARGET/usr/lib/shim/$aux_efi" ]]; then
-      cp -f -- "$TARGET/usr/lib/shim/$aux_efi" "$TARGET/boot/efi/EFI/BOOT/$aux_efi"
-      cp -f -- "$TARGET/usr/lib/shim/$aux_efi" "$TARGET/boot/efi/EFI/ubuntu/$aux_efi"
+  mkdir -p -- "$TARGET/boot/efi/EFI/BOOT" "$TARGET/boot/efi/EFI/ubuntu"
+  cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/BOOT/"
+  # Signed Ubuntu/Mint grubx64.efi looks for /EFI/ubuntu/grub.cfg even when --bootloader-id=nexus
+  cp -a "$TARGET/boot/efi/EFI/nexus/." "$TARGET/boot/efi/EFI/ubuntu/"
+  # Ensure signed UEFI Secure Boot chain (shimx64.efi -> grubx64.efi -> signed kernel) when available
+  if [[ -f "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" ]]; then
+    mv -f -- "$TARGET/boot/efi/EFI/BOOT/shimx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+  elif [[ -f "$TARGET/usr/lib/shim/shimx64.efi.signed" ]]; then
+    cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+    cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/nexus/shimx64.efi"
+    cp -f -- "$TARGET/usr/lib/shim/shimx64.efi.signed" "$TARGET/boot/efi/EFI/ubuntu/shimx64.efi"
+    if [[ -f "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" ]]; then
+      cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/BOOT/grubx64.efi"
+      cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/nexus/grubx64.efi"
+      cp -f -- "$TARGET/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$TARGET/boot/efi/EFI/ubuntu/grubx64.efi"
     fi
-  done
-elif [[ -f "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" ]]; then
-  cp -f -- "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+    for aux_efi in mmx64.efi fbx64.efi; do
+      if [[ -f "$TARGET/usr/lib/shim/$aux_efi" ]]; then
+        cp -f -- "$TARGET/usr/lib/shim/$aux_efi" "$TARGET/boot/efi/EFI/BOOT/$aux_efi"
+        cp -f -- "$TARGET/usr/lib/shim/$aux_efi" "$TARGET/boot/efi/EFI/ubuntu/$aux_efi"
+      fi
+    done
+  elif [[ -f "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" ]]; then
+    cp -f -- "$TARGET/boot/efi/EFI/BOOT/grubx64.efi" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+  fi
 fi
 
 # Configure GRUB with clean timeout & console logging
@@ -632,6 +712,7 @@ write_status "finalizing" 8 "running"
 cat > "$TARGET/etc/nexus-installed.json" <<META
 {
   "edition": "${EDITION}",
+  "boot_mode": "${EFFECTIVE_BOOT_MODE}",
   "disk": "${DISK}",
   "layout": "${layout_name}",
   "encrypted": ${LUKS_ENABLED},
