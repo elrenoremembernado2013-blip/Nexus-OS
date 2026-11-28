@@ -83,7 +83,7 @@ PY
 if command -v xorriso >/dev/null 2>&1; then
   listing="$(xorriso -indev "$ISO_PATH" -find / -maxdepth 4 2>/dev/null || true)"
   for required in "/casper/filesystem.squashfs" "/casper/vmlinuz"; do
-    printf '%s\n' "$listing" | grep -Fq "$required" || {
+    [[ "$listing" == *"$required"* ]] || {
       printf 'Missing required live/boot entry in ISO: %s\n' "$required" >&2
       exit 1
     }
@@ -119,12 +119,12 @@ if command -v xorriso >/dev/null 2>&1; then
   if command -v unsquashfs >/dev/null 2>&1; then
     xorriso -osirrox on -indev "$ISO_PATH" -extract /casper/filesystem.squashfs "$sep_tmp/fs.squashfs" >/dev/null 2>&1
     sq_list="$(unsquashfs -l "$sep_tmp/fs.squashfs" 2>/dev/null || true)"
-    if printf '%s\n' "$sq_list" | grep -Eq 'nexus-test-agent|nexus-guest-test|casper-test-hook|99nexus_test_harness|/libexec/nexus-test'; then
+    if printf '%s\n' "$sq_list" | grep -E 'nexus-test-agent|nexus-guest-test|casper-test-hook|99nexus_test_harness|/libexec/nexus-test' >/dev/null; then
       echo 'SECURITY FAIL: Test agent/script found inside released ISO filesystem.squashfs!' >&2
       exit 1
     fi
     for req_sq in '/usr/local/bin/nexus-system-bridge' '/etc/systemd/user/nexus-system-bridge.service' '/usr/local/share/nexus-os/ui/index.html'; do
-      if ! printf '%s\n' "$sq_list" | grep -Fq "$req_sq"; then
+      if [[ "$sq_list" != *"$req_sq"* ]]; then
         printf 'FAIL: Missing required NEXUS runtime file in released ISO squashfs: %s\n' "$req_sq" >&2
         exit 1
       fi
