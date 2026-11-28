@@ -35,8 +35,8 @@ Run `bash scripts/check-foundation.sh` (or `npm test`) from the repository root.
 ## Prototype limitations
 The File Manager uses browser file-system permissions only after the user explicitly chooses a folder. Browsers without the File System Access API can open selected files for read-only preview; folder mutations remain unavailable there. File operations are confined to the browser-granted folder. Package installation, hardware controls, system monitoring and Steam/Proton support are not native Linux integrations. Wi-Fi, Bluetooth and system volume controls are unavailable here; no host metrics are fabricated. Notes and desktop preferences use local browser storage. The Browser opens websites in separate tabs.
 
-## Linux foundation status
-Linux Mint Xfce on Ubuntu LTS is the selected first base for the reported HP Chromebook x360 14b hardware. Stock Mint reached its live desktop in QEMU on the Mac development host. **This is not a NEXUS image and does not qualify the Chromebook.** See the [MADOO Chromebook qualification plan](docs/MADOO_CHROMEBOOK_QUALIFICATION.md) before any physical-device or firmware work.
+## Linux foundation & ISO validation status
+NEXUS OS is an engineering-stage Linux Mint 22.3 (Ubuntu 24.04 LTS "Noble") distribution build across four editions (Standard Cinnamon, XFCE, Lite LXQt, and Lite Openbox) with reproducible ISO remastering, disposable-disk installation, and QEMU CI validation. **It is not yet a publicly released beta/stable OS, and bare-metal physical hardware (GPU acceleration, Wi-Fi, Bluetooth, audio, suspend/resume) has not yet been qualified.** See [Phase 23: Bootable ISO, Installation & Real-World Validation](docs/PHASE_23_BOOTABLE_ISO_VALIDATION.md) and the [MADOO Chromebook qualification plan](docs/MADOO_CHROMEBOOK_QUALIFICATION.md) for verified results, host prerequisites, and remaining hardware checks.
 
 ## Roadmap
 1. Stabilize desktop shell and accessibility.

@@ -30,9 +30,16 @@ on:
       - arena/33e911d5-nexus-os
       - arena/f18c36a4-nexus-os
     paths:
+      - "index.html"
+      - "app.js"
+      - "styles.css"
+      - "apps/**"
       - "linux/**"
       - "scripts/download-linux-mint.sh"
       - "scripts/launch-qemu.sh"
+      - "scripts/check-*.sh"
+      - "scripts/check-*.js"
+      - "docs/PHASE_23_BOOTABLE_ISO_VALIDATION.md"
       - ".github/workflows/iso-and-qemu-validation.yml"
 
 permissions:
@@ -219,13 +226,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bash coreutils curl gnupg xorriso squashfs-tools \
             qemu-system-x86 qemu-utils ovmf shellcheck cpio gzip \
-            initramfs-tools-core zstd xz-utils
+            initramfs-tools-core zstd xz-utils desktop-file-utils nodejs
 
       - name: Validate scripts, package manifests, hardware inventory, and security audit
         run: |
-          shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh \
-            linux/mint/*.sh linux/installer/*.sh linux/build/*.sh linux/cinnamon/*.sh \
+          shellcheck scripts/download-linux-mint.sh scripts/download-ubuntu.sh scripts/launch-qemu.sh scripts/check-foundation.sh scripts/check-prototype.sh scripts/check-native-launchers.sh \
+            linux/mint/*.sh linux/branding/*.sh linux/installer/*.sh linux/build/*.sh linux/cinnamon/*.sh \
             linux/lite/*.sh linux/lite/scripts/*.sh linux/hardware/*.sh linux/security/*.sh linux/test/*.sh
+          bash scripts/check-native-launchers.sh
           bash linux/build/validate-packages.sh linux/config/mint-packages.list
           bash linux/build/validate-packages.sh linux/config/cinnamon-packages.list
           bash linux/build/validate-packages.sh linux/lite/lite-packages.list
@@ -239,6 +247,7 @@ jobs:
           bash linux/installer/nexus-recovery.sh --diagnose --json --redacted >/dev/null
           bash linux/test/test-installer-safety.sh
           bash linux/security/nexus-security-audit.sh --repo-only --repo . --strict
+          node scripts/check-phase23-validation.js
 
       - name: Download and GPG-verify Linux Mint 22.3 base ISO (${{ matrix.base_edition }})
         run: bash scripts/download-linux-mint.sh --edition "${{ matrix.base_edition }}"
@@ -287,7 +296,7 @@ jobs:
             --edition "${{ matrix.edition }}" \
             --from-qemu-json "build/qemu-test/qemu-results-${{ matrix.edition }}.json" \
             --skip-foundation \
-            --out-dir "build/qemu-test" || true
+            --out-dir "build/qemu-test"
           python3 - "build/qemu-test/qemu-results-${{ matrix.edition }}.json" "${{ matrix.job_slug }}" <<'PY'
           import json, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -335,6 +344,8 @@ jobs:
               summary = {
                   "ram": r.get("ram_mib"),
                   "uefi": r.get("uefi_boot_success"),
+                  "bios_tested": r.get("bios_boot_tested"),
+                  "bios": r.get("bios_boot_success"),
                   "live": f"{r.get('live_successes')}/{r.get('live_attempts')}",
                   "inst": f"{r.get('install_successes')}/{r.get('install_attempts')}",
                   "iboot": f"{r.get('installed_boot_successes')}/{r.get('installed_boot_attempts')}",
@@ -483,11 +494,11 @@ jobs:
           PY
 
       - name: Upload ISO, SHA-256, and build metadata (${{ matrix.edition }})
-        if: always() && matrix.upload_iso
+        if: success() && matrix.upload_iso
         uses: actions/upload-artifact@v4
         with:
           name: nexus-iso-${{ matrix.edition }}
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
             build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso
             build/iso/out/nexus-os-22.3-${{ matrix.edition }}-amd64.iso.sha256
@@ -503,7 +514,7 @@ jobs:
 
   compare-lite-report:
     needs: iso-and-qemu
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && (github.event_name == 'push' || github.event.inputs.edition == 'all' || github.event.inputs.edition == 'lite-pair') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -535,7 +546,8 @@ jobs:
               print(f"::notice title=NEXUS-124-COMPARE-{row['ram_mib']}M::" + json.dumps(row, separators=(",", ":")))
           PY
           else
-            echo "::warning title=NEXUS-124-COMPARE::Missing Openbox or LXQt QEMU JSON artifacts (ob=${#ob_jsons[@]}, lx=${#lx_jsons[@]})."
+            echo "::error title=NEXUS-124-COMPARE::Missing Openbox or LXQt QEMU JSON artifacts (ob=${#ob_jsons[@]}, lx=${#lx_jsons[@]})."
+            exit 1
           fi
 
       - name: Upload Lite comparison report artifact
@@ -543,7 +555,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nexus-lite-comparison-report
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
             build/lite-comparison.json
             build/lite-comparison.md

@@ -205,6 +205,7 @@ add_local_check("iso_integrity", "Built ISO integrity & test-leak verification",
 vm_specs = [
     ("vm_iso_boot", "ISO boot"),
     ("vm_uefi_boot", "UEFI boot (OVMF)"),
+    ("vm_bios_boot", "Legacy BIOS boot (SeaBIOS)"),
     ("vm_bootloader", "Bootloader (EFI + GRUB config)"),
     ("vm_installer_launch", "Installer launch (Ubiquity / CLI)"),
     ("vm_installation", "Installation onto disposable virtual disk"),
@@ -226,7 +227,8 @@ if qemu_json_path and Path(qemu_json_path).is_file():
 def eval_vm_checks():
     if qemu_data and qemu_data.get("runs"):
         runs = qemu_data["runs"]
-        run0 = runs[0]
+        run0 = next((r for r in runs if r.get("install_attempts", 0) > 0), runs[0])
+        bios_run = next((r for r in runs if r.get("bios_boot_tested")), None)
         live_reps = run0.get("live_reps") or []
         l0 = live_reps[0] if live_reps else {}
         iboots = run0.get("installed_boots") or []
@@ -250,6 +252,11 @@ def eval_vm_checks():
         results = {
             "vm_iso_boot": pf(bool(run0.get("uefi_boot_success")), f"uefi_boot_success={run0.get('uefi_boot_success')}"),
             "vm_uefi_boot": pf(bool(ic0.get("efi_boot_ok") or run0.get("uefi_boot_success")), f"efi_boot_ok={ic0.get('efi_boot_ok')}"),
+            "vm_bios_boot": (
+                pf(bool(bios_run.get("bios_boot_success")), f"bios_boot_success={bios_run.get('bios_boot_success')}")
+                if bios_run is not None
+                else ("NOT TESTED", ["Legacy BIOS boot check not executed for this run"])
+            ),
             "vm_bootloader": pf(bool(ic0.get("grub_cfg_ok") and ic0.get("efi_boot_ok")), f"grub_cfg_ok={ic0.get('grub_cfg_ok')}"),
             "vm_installer_launch": (
                 ("PASS", [f"ubiquity_tier={ub_ui.get('qualification_tier')}"]) if ub_ok

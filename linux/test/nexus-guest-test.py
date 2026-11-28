@@ -286,6 +286,14 @@ def check_native_services(sess, edition):
         "store_sources_ok": False,
         "gaming_status_ok": False,
         "security_status_ok": False,
+        "control_centre_ok": False,
+        "files_jailed_ok": False,
+        "quantum_ok": False,
+        "perf_ok": False,
+        "hw_ok": False,
+        "compat_ok": False,
+        "wallpaper_cli_ok": False,
+        "ui_bundle_present": Path("/usr/local/share/nexus-os/ui/index.html").is_file() and bool(shutil.which("nexus-launch-app")),
     }
 
     # 1. Wait up to 16s for systemd --user nexus-system-bridge.service activation
@@ -456,7 +464,67 @@ def check_native_services(sess, edition):
                 "user": (r_sec.get("account") or {}).get("user"),
             }
 
-    # 10. Store APT / Flatpak availability (read-only)
+        # 9b. Control Centre status & notifications integration
+        c_cc, r_cc = http_json(f"{bridge_url}/api/control-centre", method="GET", token=bridge_token, timeout=10)
+        if c_cc == 200 and isinstance(r_cc, dict):
+            svc_result["control_centre_ok"] = bool("do_not_disturb" in r_cc or "network" in r_cc or "sound" in r_cc or "ok" in r_cc)
+
+        # 9c. $HOME-jailed File Manager CRUD + 403 out-of-$HOME confinement
+        c_fl, r_fl = http_json(f"{bridge_url}/api/files/list", method="GET", token=bridge_token, timeout=10)
+        c_esc, _ = http_json(f"{bridge_url}/api/files/preview?path=/etc/passwd", method="GET", token=bridge_token, timeout=10)
+        crud_ok = False
+        if c_fl == 200 and isinstance(r_fl, dict) and c_esc == 403:
+            tname = f".nexus-p23-{os.getpid()}"
+            c_mk, _ = http_json(f"{bridge_url}/api/files/mkdir", method="POST", token=bridge_token, body={"path": "", "name": tname})
+            c_tc, _ = http_json(f"{bridge_url}/api/files/touch", method="POST", token=bridge_token, body={"path": tname, "name": "probe.txt"})
+            c_rn, _ = http_json(f"{bridge_url}/api/files/rename", method="POST", token=bridge_token, body={"path": f"{tname}/probe.txt", "newName": "probe2.txt"})
+            c_pv, _ = http_json(f"{bridge_url}/api/files/preview?path={tname}/probe2.txt", method="GET", token=bridge_token)
+            c_d1, _ = http_json(f"{bridge_url}/api/files/delete", method="POST", token=bridge_token, body={"path": f"{tname}/probe2.txt"})
+            c_d2, _ = http_json(f"{bridge_url}/api/files/delete", method="POST", token=bridge_token, body={"path": tname})
+            crud_ok = (c_mk == 200 and c_tc == 200 and c_rn == 200 and c_pv == 200 and c_d1 == 200 and c_d2 == 200)
+        svc_result["files_jailed_ok"] = bool(crud_ok and c_esc == 403)
+
+        # 9d. Quantum local notes persistence
+        c_qn_get, r_qn_get = http_json(f"{bridge_url}/api/quantum/notes", method="GET", token=bridge_token, timeout=10)
+        if c_qn_get == 200 and isinstance(r_qn_get, dict):
+            orig_notes = r_qn_get.get("notes") if isinstance(r_qn_get.get("notes"), list) else []
+            test_notes = orig_notes + [{"id": "p23-probe", "title": "Phase 23 Probe", "body": "verified"}]
+            c_qn_post, _ = http_json(f"{bridge_url}/api/quantum/notes", method="POST", token=bridge_token, body={"notes": test_notes})
+            c_qn_chk, r_qn_chk = http_json(f"{bridge_url}/api/quantum/notes", method="GET", token=bridge_token)
+            http_json(f"{bridge_url}/api/quantum/notes", method="POST", token=bridge_token, body={"notes": orig_notes})
+            svc_result["quantum_ok"] = bool(c_qn_post == 200 and c_qn_chk == 200 and any(n.get("id") == "p23-probe" for n in (r_qn_chk.get("notes") or [])))
+
+        # 9e. Performance Centre overview
+        c_pf, r_pf = http_json(f"{bridge_url}/api/performance/overview", method="GET", token=bridge_token, timeout=10)
+        if c_pf == 200 and isinstance(r_pf, dict):
+            svc_result["perf_ok"] = bool("memory" in r_pf or "low_resource_mode" in r_pf or "disk" in r_pf)
+
+        # 9f. Hardware Compatibility Centre inventory + redacted diagnostics
+        c_hw1, r_hw1 = http_json(f"{bridge_url}/api/hardware/inventory", method="GET", token=bridge_token, timeout=15)
+        c_hw2, r_hw2 = http_json(f"{bridge_url}/api/hardware/diagnostics", method="GET", token=bridge_token, timeout=15)
+        svc_result["hw_ok"] = bool(c_hw1 == 200 and isinstance(r_hw1, dict) and c_hw2 == 200 and isinstance(r_hw2, dict) and r_hw2.get("privacy_redacted") is True)
+
+        # 9g. NEXUS Compatibility Centre status, catalog & security checks
+        c_cs, r_cs = http_json(f"{bridge_url}/api/compat/status", method="GET", token=bridge_token, timeout=10)
+        c_ccat, r_ccat = http_json(f"{bridge_url}/api/compat/catalog", method="GET", token=bridge_token, timeout=10)
+        c_ci, _ = http_json(f"{bridge_url}/api/compat/inspect?path=/etc/passwd", method="GET", token=bridge_token, timeout=10)
+        c_cl, _ = http_json(f"{bridge_url}/api/compat/launch", method="POST", token=bridge_token, body={"path": "nope.exe"})
+        svc_result["compat_ok"] = bool(
+            c_cs == 200 and isinstance(r_cs, dict) and "runtimes" in r_cs
+            and c_ccat == 200 and isinstance(r_ccat, dict) and len(r_ccat.get("entries") or []) > 0
+            and c_ci == 403 and c_cl == 400
+        )
+
+    # 10. Store APT / Flatpak availability (read-only) + wallpaper/control-centre CLIs
+    wp_bin = shutil.which("nexus-wallpaper")
+    cc_bin = shutil.which("nexus-control-centre")
+    if wp_bin and cc_bin:
+        try:
+            wres = run_as_user_capture(sess, [wp_bin, "list"], timeout=10)
+            cres = run_as_user_capture(sess, [cc_bin, "status"], timeout=10)
+            svc_result["wallpaper_cli_ok"] = (wres.returncode == 0 and cres.returncode == 0)
+        except Exception:
+            pass
     store_bin = shutil.which("nexus-store-cli")
     if store_bin:
         try:
@@ -481,6 +549,7 @@ def verify_persistence(sess, boot_num, edition):
     cfg_dir = home / ".config" / "nexus-os"
     docs_dir = home / "Documents"
     marker = cfg_dir / "persist-marker.json"
+    personalisation_file = cfg_dir / "personalisation.json"
     doc_file = docs_dir / "nexus-reboot-check.txt"
     pw = pwd.getpwuid(sess["uid"])
 
@@ -488,13 +557,16 @@ def verify_persistence(sess, boot_num, edition):
         cfg_dir.mkdir(parents=True, exist_ok=True)
         docs_dir.mkdir(parents=True, exist_ok=True)
         payload = {"created_boot": boot_num, "edition": edition, "theme_pref": "nexus-obsidian", "ts": time.time()}
+        pers_payload = {"wallpaper": "obsidian-glass", "accent": "#4cc9f0", "theme": "dark", "low_resource_mode": edition in ("lite", "lite-lxqt"), "created_boot": boot_num}
         marker.write_text(json.dumps(payload), encoding="utf-8")
+        personalisation_file.write_text(json.dumps(pers_payload), encoding="utf-8")
         doc_file.write_text(f"nexus-persist-ok-boot-{boot_num}\n", encoding="utf-8")
-        for p in (cfg_dir, marker, docs_dir, doc_file):
+        for p in (cfg_dir, marker, personalisation_file, docs_dir, doc_file):
             os.chown(p, pw.pw_uid, pw.pw_gid)
         return {"written_on_boot": boot_num, "persistence_verified": None}
 
     ok_marker = False
+    ok_pers = False
     ok_doc = False
     marker_data = None
     if marker.is_file():
@@ -503,14 +575,21 @@ def verify_persistence(sess, boot_num, edition):
             ok_marker = marker_data.get("created_boot") == 1 and marker_data.get("theme_pref") == "nexus-obsidian"
         except Exception:
             pass
+    if personalisation_file.is_file():
+        try:
+            pdata = json.loads(personalisation_file.read_text(encoding="utf-8"))
+            ok_pers = pdata.get("wallpaper") == "obsidian-glass" and pdata.get("accent") == "#4cc9f0"
+        except Exception:
+            pass
     if doc_file.is_file():
         ok_doc = "nexus-persist-ok-boot-1" in doc_file.read_text(encoding="utf-8", errors="replace")
     return {
         "boot_num": boot_num,
         "marker_ok": ok_marker,
+        "personalisation_ok": ok_pers,
         "doc_ok": ok_doc,
         "marker_data": marker_data,
-        "persistence_verified": bool(ok_marker and ok_doc),
+        "persistence_verified": bool(ok_marker and ok_pers and ok_doc),
     }
 
 

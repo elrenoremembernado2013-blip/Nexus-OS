@@ -123,7 +123,13 @@ if command -v xorriso >/dev/null 2>&1; then
       echo 'SECURITY FAIL: Test agent/script found inside released ISO filesystem.squashfs!' >&2
       exit 1
     fi
-    echo 'PASS production/test separation: zero test agents in released ISO squashfs.'
+    for req_sq in '/usr/local/bin/nexus-system-bridge' '/etc/systemd/user/nexus-system-bridge.service' '/usr/local/share/nexus-os/ui/index.html'; do
+      if ! printf '%s\n' "$sq_list" | grep -Fq "$req_sq"; then
+        printf 'FAIL: Missing required NEXUS runtime file in released ISO squashfs: %s\n' "$req_sq" >&2
+        exit 1
+      fi
+    done
+    echo 'PASS production/test separation & NEXUS native/UI payload verified in released ISO squashfs.'
   fi
   rm -rf -- "$sep_tmp"
   trap - EXIT

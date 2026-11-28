@@ -19,6 +19,7 @@ PRIMARY_IDLE_SECONDS=120
 GRAPHICAL=false
 INSTALL_TEST=false
 RELIABILITY=false
+BIOS_CHECK="auto"
 VGA_MODE="std"
 DRY_RUN=false
 
@@ -26,7 +27,7 @@ usage() {
   cat <<'USAGE'
 Usage: bash linux/test/run-qemu-validation.sh [OPTIONS]
 
-Runs UEFI/OVMF ISO boot checks, graphical live tests, disposable-disk installation,
+Runs UEFI/OVMF and Legacy BIOS ISO boot checks, graphical live tests, disposable-disk installation,
 and post-install multi-reboot validation without the live ISO.
 
 Options:
@@ -34,12 +35,14 @@ Options:
   --iso PATH                Override ISO file path
   --ram-matrix LIST         Space-separated MiB list (default: "512 768 1024 2048 4096")
   --install-ram-matrix LIST Optional subset of MiB tiers to install + 3-reboot test
-  --boot-seconds SEC        UEFI boot check window in seconds (default: 35)
+  --boot-seconds SEC        Firmware ISO boot check window in seconds (default: 35)
   --idle-seconds SEC        Secondary-tier guest idle probe window (default: 30)
   --primary-idle SEC        Primary-tier guest idle probe window (default: 120)
   --graphical               Enable virtio-serial + QMP live graphical & memory suite
   --install-test            Install onto disposable qcow2 and run 3 installed-disk boots (no ISO)
   --reliability             Add repeated live boots (3x) and repeated installs (2x) on primary tier
+  --bios-check              Force Legacy BIOS (SeaBIOS) ISO boot check on every RAM tier
+  --no-bios-check           Skip Legacy BIOS ISO boot check
   --vga TYPE                QEMU VGA device: std | virtio (default: std)
   --dry-run                 Print QEMU validation plan without launching VMs
   --help, -h                Show this help message
@@ -58,6 +61,8 @@ while (($#)); do
     --graphical) GRAPHICAL=true; shift ;;
     --install-test) INSTALL_TEST=true; GRAPHICAL=true; shift ;;
     --reliability) RELIABILITY=true; shift ;;
+    --bios-check) BIOS_CHECK="always"; shift ;;
+    --no-bios-check) BIOS_CHECK="never"; shift ;;
     --vga) [[ $# -ge 2 ]] || { echo '--vga requires std or virtio' >&2; exit 2; }; VGA_MODE="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -78,6 +83,7 @@ fi
 if [[ "$DRY_RUN" == true ]]; then
   echo "NEXUS QEMU Multi-RAM Validation Plan (dry-run)"
   echo "  Edition: $EDITION (vga=$VGA_MODE)"
+  echo "  Firmware modes: UEFI (OVMF) + Legacy BIOS (SeaBIOS, policy=$BIOS_CHECK)"
   echo "  Graphical mode: $GRAPHICAL | Install+3-Reboot mode: $INSTALL_TEST | Reliability repeats: $RELIABILITY"
   echo "  ISO: $ISO_PATH"
   echo "  RAM matrix (MiB): $RAM_LIST"
@@ -281,6 +287,41 @@ PY
   fi
   wait "$qemu_pid" 2>/dev/null || true
 
+  # Stage 1b: Legacy BIOS (SeaBIOS) ISO boot check (ISOLINUX / El Torito boot verification)
+  bios_tested=false
+  bios_alive=false
+  bios_serial_log="$run_dir/bios-serial.log"
+  bios_qmp_sock="$run_dir/bios-qmp.sock"
+  bios_ppm="$run_dir/bios_boot.ppm"
+  bios_png="$run_dir/bios_boot.png"
+  rm -f -- "$bios_qmp_sock" "$bios_ppm" "$bios_png"
+  if [[ "$BIOS_CHECK" == "always" ]] || { [[ "$BIOS_CHECK" == "auto" ]] && is_primary_tier "$EDITION" "$ram_mb"; }; then
+    bios_tested=true
+    qemu-system-x86_64 \
+      -machine "q35,accel=${ACCEL}" -cpu max -smp 2 -m "$ram_mb" \
+      -drive "file=${disk},if=virtio,format=qcow2" \
+      -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
+      -vga "$VGA_MODE" -display none -serial "file:${bios_serial_log}" \
+      -qmp "unix:${bios_qmp_sock},server,nowait" \
+      -cdrom "$ISO_PATH" -boot order=d >/dev/null 2>&1 &
+    bios_pid=$!
+    sleep "$BOOT_SECONDS"
+    if kill -0 "$bios_pid" 2>/dev/null; then
+      bios_alive=true
+      python3 - "$bios_qmp_sock" "$bios_ppm" <<'PY' 2>/dev/null || true
+import json, socket, sys
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+    s.settimeout(5); s.connect(sys.argv[1]); s.recv(4096)
+    s.sendall(b'{"execute":"qmp_capabilities"}\n'); s.recv(4096)
+    s.sendall(json.dumps({"execute":"screendump","arguments":{"filename":sys.argv[2]}}).encode()+b"\n"); s.recv(4096)
+    s.sendall(b'{"execute":"quit"}\n')
+PY
+      sleep 2
+      kill "$bios_pid" 2>/dev/null || true
+    fi
+    wait "$bios_pid" 2>/dev/null || true
+  fi
+
   # Determine idle & repeat counts
   idle_sec="$IDLE_SECONDS"
   if [[ ( "$EDITION" == "lite" || "$EDITION" == "lite-lxqt" ) && ( "$ram_mb" == "512" || "$ram_mb" == "1024" ) ]]; then
@@ -410,7 +451,7 @@ except Exception: print("0")' "$rep_json")"
       --timeout-seconds $(( idle_sec + 900 )) > "$inst_cold_json" || true
   fi
 
-  python3 - "$SUMMARY" "$ram_mb" "$uefi_alive" "$serial_log" "$screendump_ppm" "$screendump_png" "$live_runs_dir" "$inst_warm_json" "$inst_cold_json" "$cinn_virtio_json" "$SCRIPT_DIR" <<'PY'
+  python3 - "$SUMMARY" "$ram_mb" "$uefi_alive" "$serial_log" "$screendump_ppm" "$screendump_png" "$live_runs_dir" "$inst_warm_json" "$inst_cold_json" "$cinn_virtio_json" "$SCRIPT_DIR" "$bios_tested" "$bios_alive" "$bios_serial_log" "$bios_ppm" "$bios_png" <<'PY'
 import importlib.util, json, sys
 from pathlib import Path
 
@@ -427,6 +468,10 @@ live_runs_dir = Path(sys.argv[7])
 inst_warm_json = Path(sys.argv[8])
 inst_cold_json = Path(sys.argv[9])
 cinn_virtio_json = Path(sys.argv[10])
+bios_tested = sys.argv[12] == "true"
+bios_alive = sys.argv[13] == "true"
+bios_serial_log = Path(sys.argv[14])
+bios_ppm, bios_png = Path(sys.argv[15]), Path(sys.argv[16])
 
 def load_json(p):
     if p.is_file() and p.read_text(encoding="utf-8").strip():
@@ -439,6 +484,9 @@ def load_json(p):
 uefi_shot = {"non_black_pct": 0.0, "png": None}
 if uefi_ppm.is_file():
     uefi_shot = runner.ppm_to_png_and_stats(uefi_ppm, uefi_png)
+bios_shot = {"non_black_pct": 0.0, "png": None}
+if bios_ppm.is_file():
+    bios_shot = runner.ppm_to_png_and_stats(bios_ppm, bios_png)
 
 live_reps = []
 for rep_file in sorted(live_runs_dir.glob("rep-*/live-result.json")):
@@ -470,6 +518,8 @@ for rep_file in sorted(live_runs_dir.glob("rep-*/live-result.json")):
         "zram_pressure": zp,
         "hw_summary": gr.get("hw_summary"),
         "sec_summary": gr.get("sec_summary"),
+        "update_status": gr.get("update_status"),
+        "recovery_diag": gr.get("recovery_diag"),
         "native_services": gr.get("native_services"),
         "screenshots": ld.get("screenshots", []),
         "desktop_failed": ld.get("desktop_failed"),
@@ -506,6 +556,8 @@ for src_name, src_path in (("warm_cycle", inst_warm_json), ("cold_boot", inst_co
             "stages": stages,
             "zram_pressure": zp,
             "installed_checks": ic,
+            "update_status": gr.get("update_status"),
+            "recovery_diag": gr.get("recovery_diag"),
             "native_services": gr.get("native_services"),
             "screenshots": cyc.get("screenshots", []),
         })
@@ -534,6 +586,9 @@ entry = {
     "ram_mib": ram_mb,
     "uefi_boot_success": uefi_alive and (uefi_shot.get("non_black_pct", 0) > 0 or (serial_log.stat().st_size > 0 if serial_log.is_file() else uefi_alive)),
     "uefi_boot_screenshot": uefi_shot,
+    "bios_boot_tested": bios_tested,
+    "bios_boot_success": (bios_alive and (bios_shot.get("non_black_pct", 0) > 0 or (bios_serial_log.stat().st_size > 0 if bios_serial_log.is_file() else bios_alive))) if bios_tested else None,
+    "bios_boot_screenshot": bios_shot if bios_tested else None,
     "live_attempts": len(live_reps),
     "live_successes": sum(1 for r in live_reps if r.get("graphical_session_success") and r.get("application_test_success")),
     "install_attempts": inst_try_count,

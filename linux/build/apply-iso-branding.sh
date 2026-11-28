@@ -46,6 +46,7 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "[dry-run] Install Cinnamon/Xfce theme assets, LICENSE, and docs into ${SQUASH_ROOT:-<squash-root>}/usr/local/share/nexus-os/"
   fi
   echo "[dry-run] Stage Install NEXUS OS shortcut in ${SQUASH_ROOT:-<squash-root>}/etc/skel/Desktop/nexus-installer.desktop"
+  echo "[dry-run] Stage offline NEXUS desktop UI bundle in ${SQUASH_ROOT:-<squash-root>}/usr/local/share/nexus-os/ui/"
   exit 0
 fi
 
@@ -66,11 +67,18 @@ for cfg in "$ISO_ROOT/boot/grub/grub.cfg" "$ISO_ROOT/isolinux/txt.cfg" "$ISO_ROO
   fi
 done
 
-install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/docs" "$SQUASH_ROOT/usr/local/share/nexus-os/branding"
+install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/docs" "$SQUASH_ROOT/usr/local/share/nexus-os/branding" "$SQUASH_ROOT/usr/local/share/nexus-os/ui"
 install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" "$SQUASH_ROOT/usr/local/share/nexus-os/branding/nexus-logo.svg"
 install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" "$SQUASH_ROOT/usr/local/share/nexus-os/wallpapers.json"
 install -m 0644 "$REPO_ROOT/LICENSE" "$SQUASH_ROOT/usr/local/share/nexus-os/LICENSE"
 install -m 0644 "$REPO_ROOT/docs/RECOVERY_AND_BOOT.md" "$SQUASH_ROOT/usr/local/share/nexus-os/docs/RECOVERY_AND_BOOT.md"
+
+# Stage offline NEXUS OS desktop shell bundle for Quantum / offline launcher use
+install -m 0644 "$REPO_ROOT/index.html" "$SQUASH_ROOT/usr/local/share/nexus-os/ui/index.html"
+install -m 0644 "$REPO_ROOT/app.js" "$SQUASH_ROOT/usr/local/share/nexus-os/ui/app.js"
+install -m 0644 "$REPO_ROOT/styles.css" "$SQUASH_ROOT/usr/local/share/nexus-os/ui/styles.css"
+cp -a "$REPO_ROOT/apps" "$SQUASH_ROOT/usr/local/share/nexus-os/ui/"
+cp -a "$REPO_ROOT/assets" "$SQUASH_ROOT/usr/local/share/nexus-os/ui/"
 
 if [[ "$EDITION" == "lite" ]]; then
   install -d -m 0755 "$SQUASH_ROOT/usr/local/share/nexus-os/lite"

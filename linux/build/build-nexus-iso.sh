@@ -314,17 +314,42 @@ xorriso -as mkisofs "${mkisofs_args[@]}" -output "$OUT_ISO" "$iso_root"
 )
 
 built_sha="$(awk '{print $1}' "${OUT_ISO}.sha256")"
+git_commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo 'unknown')"
+git_branch="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+git_dirty="false"
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null || true)" ]]; then
+  git_dirty="true"
+fi
+xorriso_ver="$(xorriso -version 2>/dev/null | head -n1 | tr -d '"' || echo 'unknown')"
+mksquashfs_ver="$(mksquashfs -version 2>/dev/null | head -n1 | tr -d '"' || echo 'unknown')"
+host_os="$(uname -sr 2>/dev/null | tr -d '"' || echo 'unknown')"
+host_arch="$(uname -m 2>/dev/null | tr -d '"' || echo 'unknown')"
 cat > "$BUILD_INFO_PATH" <<JSON
 {
   "name": "NEXUS OS",
   "base_distro": "linuxmint",
   "base_version": "${conf_version}",
+  "ubuntu_codename": "noble",
   "edition": "${out_slug}",
   "arch": "${iso_arch}",
   "base_iso": "${iso_basename}",
   "base_iso_sha256": "${actual_sha}",
   "output_iso": "${OUT_ISO##*/}",
   "output_iso_sha256": "${built_sha}",
+  "checksum_file": "${OUT_ISO##*/}.sha256",
+  "source_commit": "${git_commit}",
+  "source_branch": "${git_branch}",
+  "source_dirty": ${git_dirty},
+  "package_repositories": [
+    "Ubuntu 24.04 Noble (signed APT)",
+    "Linux Mint 22.3 Zena (signed APT)"
+  ],
+  "build_environment": {
+    "host_os": "${host_os}",
+    "host_arch": "${host_arch}",
+    "xorriso": "${xorriso_ver}",
+    "mksquashfs": "${mksquashfs_ver}"
+  },
   "with_gaming": ${WITH_GAMING},
   "with_dev": ${WITH_DEV},
   "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
