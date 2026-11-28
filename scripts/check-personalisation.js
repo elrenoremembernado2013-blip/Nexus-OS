@@ -7,11 +7,12 @@ const vm = require("node:vm");
 
 const settingsSource = fs.readFileSync("apps/settings.js", "utf8");
 assert.match(settingsSource, /function syncNativePersonalisation\(opts = \{\}\)/, "Native personalisation sync should accept optional partial updates");
-for (const field of ["theme:", "appearance,", "accent:", "effectLevel:", "dockPosition:", "panelAutohide:", "workspaces:"]) {
+for (const field of ["theme:", "appearance,", "accent:", "effectLevel:", "dockPosition:", "panelSize:", "panelAutohide:", "workspaces:"]) {
   assert.ok(settingsSource.includes(field), `Native personalisation snapshot is missing ${field}`);
 }
 assert.match(settingsSource, /syncNativePersonalisation\(\{ effectLevel: level \}\)/, "Effect changes must reach the native desktop");
 assert.match(settingsSource, /syncNativePersonalisation\(\{ dockPosition: dockPos\.value \}\)/, "Dock position changes must reach the native desktop");
+assert.match(settingsSource, /panelSize: opts\.panelSize \|\| readStorage\("nexus-panel-size"\) \|\| "medium"/, "Panel size must be included in the native personalisation snapshot");
 assert.match(settingsSource, /syncNativePersonalisation\(\{ workspaces: clamped \}\)/, "Workspace count changes must reach the native desktop");
 assert.match(settingsSource, /Reconcile browser-saved preferences with the native desktop/, "Saved preferences must be reconciled on Settings startup");
 
