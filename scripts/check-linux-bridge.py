@@ -111,6 +111,18 @@ def main() -> None:
         wp_list = api("/api/wallpapers")
         assert wp_list.get("version") == 3 and len(wp_list.get("categories", [])) == 7 and len(wp_list.get("wallpapers", [])) == 18
 
+        # Custom wallpaper import rejects malformed or mismatched image payloads before writing files.
+        for invalid_wallpaper in (
+            {"mime": "image/png", "data": "not-base64"},
+            {"mime": "image/png", "data": "bm90IGEgcG5n"},  # valid base64, invalid PNG signature
+            {"mime": "image/svg+xml", "data": "PHN2Zz4="},
+        ):
+            try:
+                api("/api/wallpapers/import", invalid_wallpaper)
+                raise AssertionError(f"Expected invalid custom wallpaper to be rejected: {invalid_wallpaper}")
+            except urllib.error.HTTPError as err:
+                assert err.code == 400, f"Unexpected custom wallpaper rejection status: {err.code}"
+
         store_sources = api("/api/store/sources")
         assert "apt" in store_sources and "flatpak" in store_sources
         store_inst = api("/api/store/installed")
