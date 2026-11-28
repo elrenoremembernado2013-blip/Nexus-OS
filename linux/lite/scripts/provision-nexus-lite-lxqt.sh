@@ -136,6 +136,7 @@ run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-firstboot.sh" /usr/local/bi
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-store-cli.sh" /usr/local/bin/nexus-store-cli
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-security-cli.sh" /usr/local/bin/nexus-security-cli
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-gaming-cli.sh" /usr/local/bin/nexus-gaming-cli
+run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-performance-cli.sh" /usr/local/bin/nexus-performance-cli
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-control-centre-cli.sh" /usr/local/bin/nexus-control-centre
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-wallpaper-cli.sh" /usr/local/bin/nexus-wallpaper
 run_cmd install -m 0755 "$REPO_ROOT/linux/mint/nexus-system-bridge.py" /usr/local/bin/nexus-system-bridge

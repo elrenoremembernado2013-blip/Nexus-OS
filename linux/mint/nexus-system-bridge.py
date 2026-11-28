@@ -36,6 +36,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+_UID_NAME_CACHE: dict[int, str] = {}
+_LAST_CPU_SAMPLE: tuple[int, int] | None = None
+_CPU_LOCK = threading.Lock()
 
 ALLOWLISTED_TOOLS: dict[str, list[list[str]]] = {
     "files": [["nemo"], ["pcmanfm-qt"], ["pcmanfm"], ["thunar"], ["xdg-open", str(Path.home())]],
@@ -96,6 +99,8 @@ def read_text(path: Path) -> str | None:
 
 
 def read_cpu_percent(sample_seconds: float = 0.08, proc_root: Path = Path("/proc")) -> float | None:
+    global _LAST_CPU_SAMPLE
+
     def parse_stat() -> tuple[int, int] | None:
         raw = read_text(proc_root / "stat")
         if not raw:
@@ -111,6 +116,19 @@ def read_cpu_percent(sample_seconds: float = 0.08, proc_root: Path = Path("/proc
                 return idle, total
         return None
 
+    if proc_root == Path("/proc"):
+        with _CPU_LOCK:
+            cur = parse_stat()
+            if not cur:
+                return None
+            prev = _LAST_CPU_SAMPLE
+            _LAST_CPU_SAMPLE = cur
+            if prev and cur[1] > prev[1]:
+                idle_delta = cur[0] - prev[0]
+                total_delta = cur[1] - prev[1]
+                usage = 100.0 * (1.0 - (idle_delta / total_delta))
+                return round(max(0.0, min(100.0, usage)), 1)
+
     first = parse_stat()
     if not first:
         return None
@@ -118,6 +136,9 @@ def read_cpu_percent(sample_seconds: float = 0.08, proc_root: Path = Path("/proc
     second = parse_stat()
     if not second:
         return None
+    if proc_root == Path("/proc"):
+        with _CPU_LOCK:
+            _LAST_CPU_SAMPLE = second
     idle_delta = second[0] - first[0]
     total_delta = second[1] - first[1]
     if total_delta <= 0:
@@ -143,11 +164,17 @@ def read_memory(proc_root: Path = Path("/proc")) -> dict[str, object] | None:
     if not total_kb or avail_kb is None:
         return None
     used_kb = max(0, total_kb - avail_kb)
+    swap_total_kb = values.get("SwapTotal", 0)
+    swap_free_kb = values.get("SwapFree", 0)
+    swap_used_kb = max(0, swap_total_kb - swap_free_kb)
     return {
         "total_mib": round(total_kb / 1024),
         "used_mib": round(used_kb / 1024),
         "available_mib": round(avail_kb / 1024),
         "percent": round((used_kb / total_kb) * 100.0, 1),
+        "swap_total_mib": round(swap_total_kb / 1024),
+        "swap_used_mib": round(swap_used_kb / 1024),
+        "swap_percent": round((swap_used_kb / swap_total_kb) * 100.0, 1) if swap_total_kb > 0 else 0.0,
     }
 
 
@@ -253,13 +280,68 @@ def read_processes(limit: int = 8, proc_root: Path = Path("/proc")) -> list[dict
                     rss_kb = int(parts[0])
         user = str(uid) if uid is not None else "unknown"
         if uid is not None:
-            try:
-                user = pwd.getpwuid(uid).pw_name
-            except KeyError:
-                pass
+            cached = _UID_NAME_CACHE.get(uid)
+            if cached is not None:
+                user = cached
+            else:
+                try:
+                    user = pwd.getpwuid(uid).pw_name
+                except KeyError:
+                    pass
+                if len(_UID_NAME_CACHE) < 256:
+                    _UID_NAME_CACHE[uid] = user
         procs.append({"pid": pid, "name": name, "user": user, "rss_mib": round(rss_kb / 1024, 1)})
     procs.sort(key=lambda p: float(p["rss_mib"]), reverse=True)
     return procs[:limit]
+
+
+def read_gpu_telemetry(sys_root: Path = Path("/sys")) -> dict[str, object] | None:
+    pci_dir = sys_root / "bus" / "pci" / "devices"
+    try:
+        devs = sorted(pci_dir.glob("*"))
+    except OSError:
+        return None
+    for dev in devs:
+        cls = read_text(dev / "class") or ""
+        if not cls.startswith("0x03"):
+            continue
+        drv_link = dev / "driver"
+        drv = drv_link.resolve().name if drv_link.is_symlink() else "none"
+        busy_raw = read_text(dev / "gpu_busy_percent")
+        busy = int(busy_raw) if (busy_raw and busy_raw.isdigit()) else None
+        return {"driver": drv, "busy_percent": busy}
+    return None
+
+
+def read_uptime_seconds(proc_root: Path = Path("/proc")) -> int | None:
+    raw = read_text(proc_root / "uptime")
+    if not raw:
+        return None
+    try:
+        return round(float(raw.split()[0]))
+    except (ValueError, IndexError):
+        return None
+
+
+def read_disk_io_mib(proc_root: Path = Path("/proc")) -> dict[str, float] | None:
+    raw = read_text(proc_root / "diskstats")
+    if not raw:
+        return None
+    read_sec = 0
+    write_sec = 0
+    for line in raw.splitlines():
+        cols = line.split()
+        if len(cols) >= 10:
+            name = cols[2]
+            if re.fullmatch(r"(sd[a-z]+|nvme\d+n\d+|vd[a-z]+|mmcblk\d+)", name):
+                if cols[5].isdigit():
+                    read_sec += int(cols[5])
+                if cols[9].isdigit():
+                    write_sec += int(cols[9])
+    return {
+        "read_mib": round((read_sec * 512) / (1024 * 1024), 1),
+        "write_mib": round((write_sec * 512) / (1024 * 1024), 1),
+    }
 
 
 def collect_telemetry_snapshot(
@@ -278,19 +360,30 @@ def collect_telemetry_snapshot(
     bat = read_battery(sys_root=sys_root)
     temp = read_temperature(sys_root=sys_root)
     procs = read_processes(proc_root=proc_root)
+    gpu = read_gpu_telemetry(sys_root=sys_root)
+    uptime_s = read_uptime_seconds(proc_root=proc_root)
+    disk_io = read_disk_io_mib(proc_root=proc_root)
 
     return {
         "processor": {
             "summary": f"{cpu_pct}% used" if cpu_pct is not None else "Unavailable",
             "detail": f"Load avg (1m): {load_1m}" if load_1m else "CPU telemetry unavailable",
+            "percent": cpu_pct,
         },
         "memory": {
             "summary": f"{mem['used_mib']} / {mem['total_mib']} MiB ({mem['percent']}%)" if mem else "Unavailable",
-            "detail": f"{mem['available_mib']} MiB available" if mem else "Memory telemetry unavailable",
+            "detail": f"{mem['available_mib']} MiB available · Swap {mem['swap_used_mib']}/{mem['swap_total_mib']} MiB" if mem else "Memory telemetry unavailable",
+            "percent": mem["percent"] if mem else None,
+            "swap_percent": mem["swap_percent"] if mem else None,
+            "swap_used_mib": mem["swap_used_mib"] if mem else None,
+            "swap_total_mib": mem["swap_total_mib"] if mem else None,
         },
         "storage": {
             "summary": f"{storage['used_gib']} / {storage['total_gib']} GiB" if storage else "Unavailable",
-            "detail": f"{storage['available_gib']} GiB free on {storage_mount}" if storage else "Storage telemetry unavailable",
+            "detail": (
+                f"{storage['available_gib']} GiB free on {storage_mount}"
+                + (f" · IO {disk_io['read_mib']}R/{disk_io['write_mib']}W MiB" if disk_io else "")
+            ) if storage else "Storage telemetry unavailable",
         },
         "processes": {
             "summary": f"Top {len(procs)} by RSS" if procs else "Unavailable",
@@ -308,7 +401,10 @@ def collect_telemetry_snapshot(
         "temperature": {
             "summary": f"{temp['celsius']} °C" if temp else "Unavailable",
             "detail": temp["sensor"] if temp else "No readable thermal sensor",
+            "celsius": temp["celsius"] if temp else None,
         },
+        "gpu": gpu,
+        "uptime_seconds": uptime_s,
     }
 
 
@@ -941,6 +1037,13 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
                     return
                 self._run_cli_json(cmd, timeout=10.0)
+            elif parsed.path == "/api/performance/overview":
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-performance-cli.sh", "nexus-performance-cli") + ["overview"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=10.0)
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":
@@ -1135,6 +1238,59 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                 self._send_json(
                     HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.INTERNAL_SERVER_ERROR,
                     {"ok": proc.returncode == 0, "message": proc.stdout.strip() or proc.stderr.strip()},
+                )
+            elif self.path == "/api/performance/low-resource":
+                lr_action = str(body.get("action") or "").strip()
+                if lr_action not in ("enable", "disable"):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid low-resource action (expected enable or disable)"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-performance-cli.sh", "nexus-performance-cli") + ["low-resource", lr_action]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=12.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Low-resource helper timed out"})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
+                )
+            elif self.path == "/api/performance/startup":
+                st_action = str(body.get("action") or "").strip()
+                desk_id = str(body.get("id") or "").strip()
+                if st_action not in ("enable", "disable") or not re.fullmatch(r"[A-Za-z0-9_.-]+\.desktop", desk_id):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid startup action or desktop entry id"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-performance-cli.sh", "nexus-performance-cli") + ["startup", st_action, desk_id]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
+                )
+            elif self.path == "/api/performance/cleanup":
+                target = str(body.get("target") or "").strip()
+                confirmed = body.get("confirm") is True
+                if target not in ("thumbnails", "wallpapers", "mesa", "apt") or not confirmed:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Cleanup requires a valid target and explicit confirm=true"})
+                    return
+                try:
+                    cmd = resolve_helper("linux/mint/nexus-performance-cli.sh", "nexus-performance-cli") + ["cleanup", "--target", target, "--confirm"]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=25.0)
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                except subprocess.TimeoutExpired:
+                    self._send_json(HTTPStatus.GATEWAY_TIMEOUT, {"error": "Cache cleanup timed out"})
+                    return
+                self._send_json(
+                    HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
+                    {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
                 )
             elif self.path == "/api/personalisation/apply":
                 try:

@@ -126,37 +126,51 @@
     toastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2200);
   }
 
+  let launcherCacheKey = "";
+  const launcherButtonMap = new Map();
+
   function renderLauncher() {
     const grid = $("#appGrid");
     if (!grid) return;
     const term = $("#appSearch").value.trim().toLocaleLowerCase();
     const apps = window.NexusApplicationCatalog.getLauncherApps();
-    grid.replaceChildren();
+    const nextKey = apps.map(app => `${app.launchTarget}:${app.launcherName || app.name}:${app.icon}`).join("|");
     if (!apps.length) {
+      launcherCacheKey = "";
+      launcherButtonMap.clear();
+      grid.replaceChildren();
       const empty = document.createElement("p");
       empty.className = "launcher-empty";
       empty.textContent = "No apps available in the launcher.";
       grid.append(empty);
       return;
     }
-    apps.forEach(app => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "app-item";
-      button.dataset.app = app.launchTarget;
-      button.style.display = (app.name + " " + app.launcherName + " " + app.category)
-        .toLocaleLowerCase()
-        .includes(term)
-        ? "flex"
-        : "none";
-      const icon = document.createElement("img");
-      icon.className = "app-icon-img";
-      icon.src = app.icon;
-      icon.alt = "";
-      icon.setAttribute("aria-hidden", "true");
-      icon.decoding = "async";
-      button.append(icon, document.createTextNode(app.launcherName || app.name));
-      grid.append(button);
+    if (nextKey !== launcherCacheKey) {
+      launcherCacheKey = nextKey;
+      launcherButtonMap.clear();
+      grid.replaceChildren();
+      apps.forEach(app => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "app-item";
+        button.dataset.app = app.launchTarget;
+        const icon = document.createElement("img");
+        icon.className = "app-icon-img";
+        icon.src = app.icon;
+        icon.alt = "";
+        icon.setAttribute("aria-hidden", "true");
+        icon.loading = "lazy";
+        icon.decoding = "async";
+        button.append(icon, document.createTextNode(app.launcherName || app.name));
+        launcherButtonMap.set(app.launchTarget, {
+          button,
+          searchText: (app.name + " " + app.launcherName + " " + app.category).toLocaleLowerCase()
+        });
+        grid.append(button);
+      });
+    }
+    launcherButtonMap.forEach(({ button, searchText }) => {
+      button.style.display = searchText.includes(term) ? "flex" : "none";
     });
   }
 
@@ -268,9 +282,17 @@
     button.classList.toggle("active", enabled);
     button.setAttribute("aria-pressed", String(enabled));
     const isNativeDnd = key === "dnd" && Boolean(window.NexusNativeServices?.status("control-centre")?.available);
-    button.querySelector("small").textContent = (enabled ? "On" : "Off") + (isNativeDnd ? " · native" : " · preview");
+    const isNativePerf = key === "power" && Boolean(window.NexusNativeServices?.status("performance")?.available);
+    button.querySelector("small").textContent = (enabled ? "On" : "Off") + ((isNativeDnd || isNativePerf) ? " · native" : " · preview");
     writeStorage("nexus-control-" + key, String(enabled));
-    if (key === "power") desktop.classList.toggle("lightweight", enabled);
+    if (key === "power") {
+      desktop.classList.toggle("lightweight", enabled);
+      document.body.classList.toggle("low-resource-mode", enabled);
+      if (syncNative && isNativePerf) {
+        Promise.resolve(window.NexusNativeServices.call("performance", "setLowResource", enabled))
+          .catch(err => notify(err?.message || "Could not update Low-Resource Mode"));
+      }
+    }
     if (syncNative && isNativeDnd) {
       Promise.resolve(window.NexusNativeServices.call("control-centre", "action", "dnd", enabled ? "on" : "off"))
         .catch(err => notify(err?.message || "Could not update Do Not Disturb"));
@@ -284,9 +306,9 @@
     });
   }
 
-  function setControlPreference(key, enabled) {
+  function setControlPreference(key, enabled, syncNative = false) {
     const button = $(`[data-toggle="${key}"]`);
-    if (button) applyControlToggle(button, enabled, false);
+    if (button) applyControlToggle(button, enabled, syncNative);
   }
 
   $$("[data-toggle]").forEach(button => {
@@ -583,6 +605,8 @@
     setDesktopPreferences,
     getControlState: () => ({ ...controlState }),
     setControlPreference,
+    isLowResourceMode: () => Boolean(controlState.power),
+    setLowResourceMode: (enabled, syncNative = true) => setControlPreference("power", Boolean(enabled), syncNative),
     onControlChange(listener) {
       if (typeof listener !== "function") return () => {};
       controlListeners.add(listener);

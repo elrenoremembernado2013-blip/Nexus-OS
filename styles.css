@@ -980,5 +980,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .desktop.theme-light .hw-limited{color:#8a4f00}
 .desktop.theme-light .hw-detected{color:#144d8f}
 .desktop.theme-light .hw-unsupported{color:#9b1c1c}
+.desktop.lightweight *,.desktop.lightweight *::before,.desktop.lightweight *::after,body.low-resource-mode *{backdrop-filter:none!important;transition:none!important;animation:none!important}
+.perf-centre{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.perf-row-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.perf-sparkline{width:100%;height:44px;display:block;border-radius:8px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.perf-cleanup-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.perf-cleanup-row:first-of-type{margin-top:8px}
+.perf-row-actions{display:flex;gap:8px;align-items:center}
+.perf-changes-list{margin-top:8px}
+.desktop.theme-light .perf-sparkline{background:rgba(42,37,35,.05)}
 
 

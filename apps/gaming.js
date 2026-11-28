@@ -144,6 +144,10 @@
         if (state.data?.steam?.compatibility_caveat) {
           card.append(node("p", "settings-hint", state.data.steam.compatibility_caveat));
         }
+        const hints = state.data?.steam?.launch_options_hints || [];
+        if (hints.length) {
+          card.append(node("p", "settings-hint", `Recommended Steam Launch Options: ${hints.join(" · ")}`));
+        }
       }
       panel.append(card);
     };
@@ -155,12 +159,12 @@
       const gfx = state.data?.graphics;
       const dl = node("dl", "store-detail-metadata");
       const gpuSummary = gfx?.gpus?.length
-        ? gfx.gpus.map(g => `${g.vendor_name || g.vendor}:${g.device} (${g.driver})`).join(", ")
+        ? gfx.gpus.map(g => `${g.vendor_name || g.vendor}:${g.device} (${g.driver}${g.busy_percent != null ? `, ${g.busy_percent}% busy` : ""})`).join(", ")
         : (state.available ? "None detected" : "Unavailable");
       [
         ["CPU", hw?.cpu || "Unavailable"],
         ["RAM", hw?.ram_total_mib ? `${hw.ram_available_mib} / ${hw.ram_total_mib} MiB available` : "Unavailable"],
-        ["Free storage", hw?.storage_available_gib != null ? `${hw.storage_available_gib} GiB free on /` : "Unavailable"],
+        ["Free storage", hw?.storage_available_gib != null ? `${hw.storage_available_gib} GiB free on / (${hw.storage_kind === "rotational_hdd" ? "HDD" : hw.storage_kind === "ssd_or_nvme" ? "SSD/NVMe" : "disk"})` : "Unavailable"],
         ["GPU / Kernel driver", gpuSummary],
         ["Vulkan", gfx?.vulkan_devices?.length ? `${gfx.vulkan} (${gfx.vulkan_devices.join(", ")})` : (gfx?.vulkan || "Unavailable")],
         ["OpenGL renderer", gfx?.opengl_renderer || "Unavailable"]
@@ -170,6 +174,9 @@
       card.append(dl);
       if (gfx?.software_rendering) {
         card.append(node("p", "settings-hint", "Software OpenGL renderer (llvmpipe) detected: 3D gaming requires native hardware GPU drivers."));
+      }
+      if (state.data?.performance?.compositor_guidance) {
+        card.append(node("p", "settings-hint", state.data.performance.compositor_guidance));
       }
       (gfx?.gpus || []).forEach(g => {
         if (g.compatibility_note) card.append(node("p", "settings-hint", g.compatibility_note));

@@ -16,6 +16,7 @@
     "terminal",
     "gaming",
     "hardware",
+    "performance",
     "installer",
     "control-centre",
     "personalisation",
@@ -163,6 +164,12 @@
     });
     registerSafe("telemetry", {
       snapshot: () => req("/api/telemetry"),
+    });
+    registerSafe("performance", {
+      overview: () => req("/api/performance/overview"),
+      setLowResource: enable => req("/api/performance/low-resource", "POST", { action: enable ? "enable" : "disable" }),
+      setStartup: (id, enable) => req("/api/performance/startup", "POST", { id, action: enable ? "enable" : "disable" }),
+      cleanup: target => req("/api/performance/cleanup", "POST", { target, confirm: true }),
     });
     registerSafe("terminal", {
       openSession: opts => req("/api/terminal/open", "POST", opts || {}),

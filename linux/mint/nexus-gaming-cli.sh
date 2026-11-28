@@ -148,12 +148,15 @@ for dev in sorted(Path("/sys/bus/pci/devices").glob("*")):
         compat_note = "Intel Mesa Vulkan/ANV driver stack detected (lightweight/indie & compatible 3D titles)."
     else:
         compat_note = "Check Mesa/Vulkan ICD availability for this GPU."
+    busy_raw = read_text(dev / "gpu_busy_percent")
+    busy_pct = int(busy_raw) if (busy_raw and busy_raw.isdigit()) else None
     gpus.append({
         "slot": dev.name,
         "vendor": vendor,
         "vendor_name": vendor_name,
         "device": device,
         "driver": driver,
+        "busy_percent": busy_pct,
         "compatibility_note": compat_note,
     })
 
@@ -271,6 +274,39 @@ if not (lutris_bin or lutris_flatpak):
 if not (heroic_bin or heroic_flatpak):
     guidance.append("Heroic missing: optional install via flatpak install flathub com.heroicgameslauncher.hgl.")
 
+desktop_env = (os.environ.get("XDG_CURRENT_DESKTOP") or os.environ.get("DESKTOP_SESSION") or "").lower()
+if "cinnamon" in desktop_env:
+    compositor_guidance = "Cinnamon Muffin: Gaming Mode uses balanced/performance power profile; enable 'Disable compositing for full-screen windows' in Cinnamon System Settings -> General for lowest input latency."
+elif "xfce" in desktop_env:
+    compositor_guidance = "Xfce Xfwm4: Gaming Mode turns off compositor shadows/opacity via `nexus-apply-xfce --lightweight` and restores defaults when disabled."
+elif "lxqt" in desktop_env:
+    compositor_guidance = "Lite LXQt (Openbox): Zero compositor overhead by default for fullscreen games."
+elif "openbox" in desktop_env:
+    compositor_guidance = "Lite Openbox: Zero compositor overhead by default; minimal background CPU/RAM usage."
+else:
+    compositor_guidance = "Desktop compositor guidance adapts automatically to Cinnamon, Xfce, Lite LXQt, and Lite Openbox."
+
+storage_kind = "unknown"
+for blk in sorted(Path("/sys/block").iterdir()) if Path("/sys/block").is_dir() else []:
+    if blk.name.startswith(("loop", "ram", "zram", "dm-")):
+        continue
+    rot = read_text(blk / "queue/rotational")
+    if rot == "1":
+        storage_kind = "rotational_hdd"
+        break
+    if rot == "0":
+        storage_kind = "ssd_or_nvme"
+
+steam_launch_options = []
+if gamemode_ok:
+    steam_launch_options.append("gamemoderun %command%")
+if mangohud_ok:
+    steam_launch_options.append("mangohud %command%")
+if gamemode_ok and mangohud_ok:
+    steam_launch_options.append("gamemoderun mangohud %command%")
+if not steam_launch_options:
+    steam_launch_options.append("PROTON_LOG=1 %command% (for Proton troubleshooting)")
+
 payload = {
     "steam": {
         "installed": steam_installed,
@@ -280,6 +316,7 @@ payload = {
         "installed_games": installed_games,
         "proton_versions": sorted(proton_versions),
         "wine_installed": wine_installed,
+        "launch_options_hints": steam_launch_options,
         "compatibility_caveat": "Proton/Wine compatibility varies by title (kernel anti-cheat and third-party DRM may block some Windows games); no guarantee is made that every Windows game works.",
     },
     "launchers": {
@@ -308,6 +345,7 @@ payload = {
         "ram_total_mib": mem_total_mib,
         "ram_available_mib": mem_avail_mib,
         "storage_available_gib": storage_avail_gib,
+        "storage_kind": storage_kind,
     },
     "controllers": controllers,
     "performance": {
@@ -315,6 +353,7 @@ payload = {
         "gamemode_installed": gamemode_ok,
         "mangohud_installed": mangohud_ok,
         "power_profile": power_profile,
+        "compositor_guidance": compositor_guidance,
     },
     "capabilities": {
         "apt_available": apt_ok,
