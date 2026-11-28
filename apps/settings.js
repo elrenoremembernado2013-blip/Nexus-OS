@@ -38,7 +38,7 @@
     { id: "nature", label: "Nature" },
     { id: "architecture", label: "Architecture" },
     { id: "abstract", label: "Abstract" },
-    { id: "sci-fi", label: "Sci-Fi" },
+    { id: "sci-fi", label: "Space & Astronomy" },
     { id: "minimal", label: "Minimal" },
     { id: "gaming", label: "Gaming" }
   ];
@@ -280,6 +280,7 @@
                   <option value="300">Rotate every 5m</option>
                 </select>
               </div>
+              <p class="settings-hint wallpaper-authenticity-note">Real photography and genuine space imagery only — no AI-generated art, CGI, or synthetic wallpapers.</p>
               <div class="wallpaper-filters" role="group" aria-label="Wallpaper categories">
                 <button class="wallpaper-filter active" data-wallpaper-filter="all" type="button">All</button>
                 <button class="wallpaper-filter" data-wallpaper-filter="favorites" type="button">Favourites</button>
