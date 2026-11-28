@@ -29,6 +29,22 @@ function runCmd(cmd, args, allowFail = false) {
   }
 }
 
+// The official Mint ISO download must tolerate flaky CI mirror streams without
+// weakening authenticity checks: HTTP/1.1, retries, resumable partial downloads,
+// and removal of a checksum-invalid final file before a later retry.
+const mintDownload = read("scripts/download-linux-mint.sh");
+assert(
+  mintDownload.includes("--http1.1") &&
+    mintDownload.includes("--retry 8") &&
+    mintDownload.includes("--continue-at -"),
+  "Mint ISO download must use HTTP/1.1, retries, and resume interrupted transfers"
+);
+assert(
+  mintDownload.includes('rm -f -- "$ISO_PATH"') &&
+    mintDownload.includes("The manifest signature and ISO checksum both verified."),
+  "Mint ISO download must discard checksum-invalid files and retain signature/hash verification"
+);
+
 // 1. ISO Build Provenance, Branding & Verification Pipeline
 const buildIsoSh = read("linux/build/build-nexus-iso.sh");
 for (const field of [
