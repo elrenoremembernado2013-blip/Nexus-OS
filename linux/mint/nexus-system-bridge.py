@@ -1375,8 +1375,8 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                 if not image_bytes or len(image_bytes) > 8 * 1024 * 1024:
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Wallpaper image must be between 1 byte and 8 MiB."})
                     return
-                is_jpeg = image_bytes.startswith(b"\\xff\\xd8\\xff")
-                is_png = image_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+                is_jpeg = image_bytes.startswith(b"\xff\xd8\xff")
+                is_png = image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
                 is_webp = image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
                 if not ((mime == "image/jpeg" and is_jpeg) or (mime == "image/png" and is_png) or (mime == "image/webp" and is_webp)):
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Image content does not match its declared JPEG/PNG/WebP type."})
