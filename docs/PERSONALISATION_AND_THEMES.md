@@ -18,6 +18,14 @@ Every curated wallpaper in `linux/cinnamon/wallpapers.json` and `apps/personalis
 
 On Linux Mint, `apply-nexus-cinnamon.sh --wallpaper-url <https-or-path> --wallpaper-fit <zoom|scaled|stretched|centered|wallpaper>` caches verified HTTPS wallpapers under `~/.cache/nexus-os/wallpapers/` and applies them via `org.cinnamon.desktop.background`.
 
+## Custom Wallpaper Persistence (Phase 26)
+
+When the native Linux bridge is connected, importing a custom JPEG, PNG, or WebP wallpaper now sends the already-previewed image to the authenticated loopback bridge. The bridge validates the declared MIME type against the image signature, rejects malformed base64 and images over 8 MiB, and stores the image under:
+
+`~/.local/share/nexus-os/wallpapers/custom.<ext>`
+
+The file is written with user-only permissions and applied through the same cross-edition `nexus-wallpaper` CLI used by catalog wallpapers. This lets Cinnamon, XFCE, LXQt, and Openbox persist the imported image through their native desktop settings, including after a restart. In browser-only preview mode, the existing IndexedDB copy remains local to that browser and is not represented as a native OS wallpaper.
+
 ## Dock, Panel, Effects & Profiles
 
 - **Dock & Panel**: position (`bottom`, `left`, `right`), icon size (`36`, `43`, `52` px), spacing, auto-hide (`false`, `true`, `intel`), background style (`glass`, `solid`, `minimal`), running indicators, desktop shortcuts, and 24-hour clock format.
