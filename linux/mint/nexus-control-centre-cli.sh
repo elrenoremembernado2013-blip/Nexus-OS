@@ -83,6 +83,19 @@ elif "lxqt" in desktop:
     edition = "lite-lxqt"
 elif "openbox" in desktop:
     edition = "lite"
+elif Path("/etc/nexus-os-release").is_file():
+    rel_txt = Path("/etc/nexus-os-release").read_text(encoding="utf-8", errors="replace")
+    m = re.search(r'^NEXUS_EDITION="?([a-z0-9-]+)"?', rel_txt, re.M)
+    if m:
+        edition = m.group(1)
+    elif shutil.which("cinnamon-settings"):
+        edition = "cinnamon"
+    elif shutil.which("xfconf-query"):
+        edition = "xfce"
+    elif shutil.which("pcmanfm-qt"):
+        edition = "lite-lxqt"
+    else:
+        edition = "lite"
 elif Path("/etc/nexus-os/edition").is_file():
     edition = Path("/etc/nexus-os/edition").read_text(encoding="utf-8").strip() or "lite"
 elif shutil.which("cinnamon-settings"):

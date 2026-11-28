@@ -143,7 +143,12 @@ fi
 share_dir="$PREFIX_DIR/share/nexus-os"
 bin_dir="$PREFIX_DIR/bin"
 
-run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$share_dir/hardware" "$bin_dir" /usr/local/share/applications
+run_cmd install -d -m 0755 "$share_dir" "$share_dir/xfce" "$share_dir/cinnamon" "$share_dir/config" "$share_dir/branding" "$share_dir/docs" "$share_dir/hardware" "$share_dir/ui" "$bin_dir" /usr/local/share/applications
+run_cmd install -m 0644 "$REPO_ROOT/index.html" "$share_dir/ui/index.html"
+run_cmd install -m 0644 "$REPO_ROOT/app.js" "$share_dir/ui/app.js"
+run_cmd install -m 0644 "$REPO_ROOT/styles.css" "$share_dir/ui/styles.css"
+run_cmd cp -a "$REPO_ROOT/apps" "$share_dir/ui/"
+run_cmd cp -a "$REPO_ROOT/assets" "$share_dir/ui/"
 run_cmd install -m 0644 "$REPO_ROOT/linux/xfce/nexus-dark.css" "$share_dir/xfce/nexus-dark.css"
 run_cmd install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" "$share_dir/wallpapers.json"
 run_cmd install -m 0644 "$REPO_ROOT/linux/cinnamon/themes.json" "$share_dir/cinnamon/themes.json"
@@ -199,6 +204,7 @@ else
   fi
   cat > /etc/nexus-os-release <<META
 NEXUS_NAME="NEXUS OS"
+NEXUS_EDITION="$detected_de"
 NEXUS_BASE_DISTRO="$os_id"
 NEXUS_BASE_CODENAME="$os_codename"
 NEXUS_DESKTOP="$detected_de"

@@ -194,13 +194,60 @@
       installRuntime: (runtime, forceLowRam = false) => req("/api/compat/runtime/install", "POST", { runtime, confirm: true, forceLowRam: Boolean(forceLowRam) }),
       launchFile: filePath => req("/api/compat/launch", "POST", { path: filePath, confirm: true }),
     });
+    const terminalPollers = new Map();
     registerSafe("terminal", {
-      openSession: opts => req("/api/terminal/open", "POST", opts || {}),
+      openSession: async opts => {
+        const opened = await req("/api/terminal/open", "POST", {
+          cols: Number(opts?.cols) || 80,
+          rows: Number(opts?.rows) || 24,
+        });
+        const sid = opened?.sessionId;
+        if (sid && (typeof opts?.onOutput === "function" || typeof opts?.onExit === "function" || typeof opts?.onError === "function")) {
+          let active = true;
+          let inFlight = false;
+          let timer = null;
+          const stop = () => {
+            active = false;
+            if (timer !== null) {
+              clearInterval(timer);
+              timer = null;
+            }
+            terminalPollers.delete(sid);
+          };
+          const poll = async () => {
+            if (!active || inFlight) return;
+            inFlight = true;
+            try {
+              const res = await req(`/api/terminal/read?sessionId=${encodeURIComponent(sid)}`);
+              if (!active) return;
+              if (res?.output) opts.onOutput?.(res.output);
+              if (res?.exitCode !== null && res?.exitCode !== undefined) {
+                stop();
+                opts.onExit?.(res.exitCode);
+              }
+            } catch (err) {
+              if (!active) return;
+              stop();
+              opts.onError?.(err);
+            } finally {
+              inFlight = false;
+            }
+          };
+          timer = setInterval(poll, 120);
+          terminalPollers.set(sid, stop);
+          setTimeout(poll, 30);
+        }
+        return opened;
+      },
       read: sessionId => req(`/api/terminal/read?sessionId=${encodeURIComponent(sessionId)}`),
       write: (sessionId, data) => req("/api/terminal/write", "POST", { sessionId, data }),
       resize: (sessionId, cols, rows) => req("/api/terminal/resize", "POST", { sessionId, cols, rows }),
       interrupt: sessionId => req("/api/terminal/interrupt", "POST", { sessionId }),
-      closeSession: sessionId => req("/api/terminal/close", "POST", { sessionId }),
+      closeSession: sessionId => {
+        const stopFn = terminalPollers.get(sessionId);
+        if (stopFn) stopFn();
+        return req("/api/terminal/close", "POST", { sessionId });
+      },
     });
     for (const cat of ["display", "sound", "network", "bluetooth", "power", "accounts"]) {
       registerSafe(cat, {

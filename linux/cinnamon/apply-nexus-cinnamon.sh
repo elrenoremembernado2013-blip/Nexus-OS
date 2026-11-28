@@ -10,6 +10,8 @@ CINNAMON_TEMPLATE="$SCRIPT_DIR/cinnamon-base.css"
 GTK3_TEMPLATE="$SCRIPT_DIR/gtk3-base.css"
 DATA_THEME_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/themes"
 WALLPAPER_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/nexus-os/wallpapers"
+STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nexus-os"
+WALLPAPER_STATE_FILE="$STATE_DIR/wallpaper.conf"
 
 THEME="midnight"
 PROFILE="balanced"
@@ -260,16 +262,32 @@ if [[ -n "$WALLPAPER_URL" ]]; then
     if [[ "$DRY_RUN" == true ]]; then
       printf '[dry-run] Cache %s -> %s and set org.cinnamon.desktop.background picture-uri\n' "$WALLPAPER_URL" "$cache_path"
     else
-      mkdir -p -- "$WALLPAPER_CACHE_DIR"
+      mkdir -p -- "$WALLPAPER_CACHE_DIR" "$STATE_DIR"
       if [[ ! -s "$cache_path" ]]; then
-        curl -fsSL --proto '=https' --tlsv1.2 --max-time 25 -- "$WALLPAPER_URL" -o "${cache_path}.tmp"
-        mv -f -- "${cache_path}.tmp" "$cache_path"
+        tmp_wp="${cache_path}.tmp.$$"
+        curl -fsSL --proto '=https' --tlsv1.2 --max-time 25 -- "$WALLPAPER_URL" -o "$tmp_wp"
+        if ! python3 -c '
+import pathlib, sys
+b = pathlib.Path(sys.argv[1]).read_bytes()[:64]
+ok = b.startswith(b"\xff\xd8\xff") or b.startswith(b"\x89PNG\r\n\x1a\n") or (b.startswith(b"RIFF") and b[8:12] == b"WEBP") or b"<svg" in b.lower()
+sys.exit(0 if ok else 1)
+' "$tmp_wp"; then
+          rm -f -- "$tmp_wp"
+          echo 'Downloaded wallpaper is not a valid JPEG, PNG, WebP, or SVG image.' >&2
+          exit 2
+        fi
+        mv -f -- "$tmp_wp" "$cache_path"
       fi
       run_gsettings org.cinnamon.desktop.background picture-uri "'file://${cache_path}'"
+      printf 'WALLPAPER_ID=custom-url\nWALLPAPER_PATH=%s\nWALLPAPER_FIT=%s\n' "$cache_path" "$WALLPAPER_FIT" > "$WALLPAPER_STATE_FILE"
     fi
   elif [[ -f "$WALLPAPER_URL" ]]; then
     abs_wp="$(realpath "$WALLPAPER_URL")"
     run_gsettings org.cinnamon.desktop.background picture-uri "'file://${abs_wp}'"
+    if [[ "$DRY_RUN" == false ]]; then
+      mkdir -p -- "$STATE_DIR"
+      printf 'WALLPAPER_ID=custom-file\nWALLPAPER_PATH=%s\nWALLPAPER_FIT=%s\n' "$abs_wp" "$WALLPAPER_FIT" > "$WALLPAPER_STATE_FILE"
+    fi
   else
     printf 'Wallpaper source must be an https:// URL or readable local file: %s\n' "$WALLPAPER_URL" >&2
     exit 2

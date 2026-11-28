@@ -45,9 +45,9 @@
       <item label="NEXUS Recovery Tools">
         <action name="Execute"><command>lxterminal -e sh -c 'nexus-recovery --help; printf "\nPress Enter to close..."; read -r _'</command></action>
       </item>
-      <item label="Install NEXUS OS">
-        <action name="Execute"><command>nexus-installer-launcher</command></action>
-      </item>
+    <item label="Install NEXUS OS">
+      <action name="Execute"><command>nexus-installer-launcher --launch</command></action>
+    </item>
     </menu>
     <item label="Openbox Preferences">
       <action name="Execute"><command>obconf</command></action>

@@ -295,14 +295,14 @@ function runCliAndAppChecks() {
     const data = path.join(tmp, "data");
     const docs = path.join(tmp, "Documents");
     fs.mkdirSync(path.join(cache, "thumbnails", "normal"), { recursive: true });
-    fs.mkdirSync(path.join(data, "nexus-os", "wallpapers"), { recursive: true });
+    fs.mkdirSync(path.join(cache, "nexus-os", "wallpapers"), { recursive: true });
     fs.mkdirSync(path.join(cfg, "nexus-os"), { recursive: true });
     fs.mkdirSync(docs, { recursive: true });
 
     const keepDoc = path.join(docs, "important.txt");
     const thumbFile = path.join(cache, "thumbnails", "normal", "t1.png");
-    const activeWp = path.join(data, "nexus-os", "wallpapers", "active.jpg");
-    const oldWp = path.join(data, "nexus-os", "wallpapers", "unused.jpg");
+    const activeWp = path.join(cache, "nexus-os", "wallpapers", "active.jpg");
+    const oldWp = path.join(cache, "nexus-os", "wallpapers", "unused.jpg");
     fs.writeFileSync(keepDoc, "keep-me");
     fs.writeFileSync(thumbFile, "thumb");
     fs.writeFileSync(activeWp, "wp-active");
@@ -314,6 +314,7 @@ function runCliAndAppChecks() {
 
     const ov = JSON.parse(execFileSync("bash", [cli, "overview"], { env, encoding: "utf8" }));
     assert(ov.cleanup_preview.some(c => c.target === "thumbnails" && c.files === 1));
+    assert(ov.cleanup_preview.some(c => c.target === "wallpapers" && c.files === 2));
     assert(Array.isArray(ov.edition_recommendations) && ov.edition_recommendations.length > 0);
 
     // Cleanup without --confirm must fail and preserve files

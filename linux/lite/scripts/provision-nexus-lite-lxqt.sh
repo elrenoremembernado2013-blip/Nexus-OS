@@ -151,6 +151,12 @@ run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.png" /usr/local/shar
 run_cmd install -m 0644 "$LXQT_DIR/wallpaper-nexus-obsidian.svg" /usr/local/share/nexus-os/lite/wallpaper-nexus-obsidian.svg
 run_cmd install -m 0644 "$LXQT_DIR/theme/nexus-dark/lxqt-panel.qss" /usr/local/share/lxqt/themes/nexus-dark/lxqt-panel.qss
 run_cmd cp -a "$LXQT_DIR" /usr/local/share/nexus-os/lite-lxqt/
+run_cmd install -d -m 0755 /usr/local/share/nexus-os/ui
+run_cmd install -m 0644 "$REPO_ROOT/index.html" /usr/local/share/nexus-os/ui/index.html
+run_cmd install -m 0644 "$REPO_ROOT/app.js" /usr/local/share/nexus-os/ui/app.js
+run_cmd install -m 0644 "$REPO_ROOT/styles.css" /usr/local/share/nexus-os/ui/styles.css
+run_cmd cp -a "$REPO_ROOT/apps" /usr/local/share/nexus-os/ui/
+run_cmd cp -a "$REPO_ROOT/assets" /usr/local/share/nexus-os/ui/
 
 run_cmd install -d -m 0755 /etc/xdg/autostart
 run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-firstboot.desktop" /etc/xdg/autostart/nexus-firstboot.desktop

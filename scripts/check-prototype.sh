@@ -43,6 +43,7 @@ node scripts/check-phase20-performance.js
 node scripts/check-phase21-ecosystem.js
 node scripts/check-phase22-compatibility.js
 node scripts/check-phase23-validation.js
+node scripts/check-phase24-reliability.js
 bash scripts/check-native-launchers.sh
 
 python3 - <<'PY'

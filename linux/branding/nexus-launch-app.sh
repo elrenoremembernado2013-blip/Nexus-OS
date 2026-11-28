@@ -33,6 +33,21 @@ run_in_terminal() {
   return 1
 }
 
+run_in_terminal_wait() {
+  local target="$1"
+  shift
+  local cmd_str shell_cmd
+  printf -v cmd_str '%q ' "$target" "$@"
+  shell_cmd="${cmd_str}; printf '\\nPress Enter to close...'; read -r _"
+  for app in qterminal lxterminal; do
+    if has "$app"; then exec "$app" -e sh -c "$shell_cmd"; fi
+  done
+  if has gnome-terminal; then exec gnome-terminal -- sh -c "$shell_cmd"; fi
+  if has xfce4-terminal; then exec xfce4-terminal -x sh -c "$shell_cmd"; fi
+  if has x-terminal-emulator; then exec x-terminal-emulator -e sh -c "$shell_cmd"; fi
+  return 1
+}
+
 case "${1:-}" in
   files)
     shift
@@ -83,36 +98,42 @@ case "${1:-}" in
   gaming)
     shift
     [[ -x "$GAMING_CLI" ]] || fail "NEXUS Gaming CLI is not installed at $GAMING_CLI"
-    run_in_terminal "$GAMING_CLI" status || fail "no supported terminal emulator is available for NEXUS Gaming Hub"
+    run_in_terminal_wait "$GAMING_CLI" status || fail "no supported terminal emulator is available for NEXUS Gaming Hub"
     ;;
   security)
     shift
     [[ -x "$SECURITY_CLI" ]] || fail "NEXUS Security CLI is not installed at $SECURITY_CLI"
-    run_in_terminal "$SECURITY_CLI" status || fail "no supported terminal emulator is available for NEXUS Security"
+    run_in_terminal_wait "$SECURITY_CLI" status || fail "no supported terminal emulator is available for NEXUS Security"
     ;;
   wallpaper)
     shift
     [[ -x "$WALLPAPER_CLI" ]] || fail "NEXUS Wallpaper CLI is not installed at $WALLPAPER_CLI"
-    run_in_terminal "$WALLPAPER_CLI" list || fail "no supported terminal emulator is available for NEXUS Wallpaper"
+    run_in_terminal_wait "$WALLPAPER_CLI" list || fail "no supported terminal emulator is available for NEXUS Wallpaper"
     ;;
   performance)
     shift
     [[ -x "$PERF_CLI" ]] || fail "NEXUS Performance CLI is not installed at $PERF_CLI"
-    run_in_terminal "$PERF_CLI" overview || fail "no supported terminal emulator is available for NEXUS Performance Centre"
+    run_in_terminal_wait "$PERF_CLI" overview || fail "no supported terminal emulator is available for NEXUS Performance Centre"
     ;;
   compatibility)
     shift
     [[ -x "$COMPAT_CLI" ]] || fail "NEXUS Compatibility CLI is not installed at $COMPAT_CLI"
-    run_in_terminal "$COMPAT_CLI" status || fail "no supported terminal emulator is available for NEXUS Compatibility Centre"
+    run_in_terminal_wait "$COMPAT_CLI" status || fail "no supported terminal emulator is available for NEXUS Compatibility Centre"
     ;;
   quantum)
     shift
-    local_ui="/usr/local/share/nexus-os/ui/index.html"
+    local_ui="${NEXUS_OFFLINE_UI:-/usr/local/share/nexus-os/ui/index.html}"
     target_url="file://${local_ui}#quantum"
     for app in firefox chromium chromium-browser falkon x-www-browser; do
-      if has "$app"; then exec "$app" "$target_url"; fi
+      if has "$app"; then
+        [[ -r "$local_ui" ]] || printf 'NEXUS launcher: warning: offline UI bundle not found at %s\n' "$local_ui" >&2
+        exec "$app" "$target_url"
+      fi
     done
-    fail "no supported web browser is installed to open NEXUS Quantum"
+    if has notify-send; then
+      notify-send "NEXUS Quantum" "No web browser is installed. Install Firefox or Falkon via NEXUS Store." >/dev/null 2>&1 || true
+    fi
+    fail "no supported web browser is installed to open NEXUS Quantum (install firefox or falkon via NEXUS Store)"
     ;;
   *)
     printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot|gaming|security|wallpaper|performance|compatibility|quantum}\n' "$0" >&2

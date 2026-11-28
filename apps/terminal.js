@@ -66,6 +66,7 @@
     const modeEl = root.querySelector(".terminal-mode");
     const statusEl = root.querySelector("#terminalStatus");
     let sessionId = null;
+    let disposed = false;
 
     const reportUnavailable = () => {
       appendLine(out, "Bash backend unavailable — command was not executed.", "terminal-warning");
@@ -78,6 +79,27 @@
       if (statusEl) statusEl.textContent = "Native Bash backend: unavailable · Browser JavaScript cannot run Ubuntu commands.";
       if (interruptBtn) interruptBtn.disabled = true;
       if (message) appendLine(out, message, "terminal-warning");
+    };
+
+    const finalizeOpen = opened => {
+      const nextId = typeof opened === "string" ? opened : opened?.sessionId || null;
+      if (disposed) {
+        if (nextId) {
+          try {
+            const c = window.NexusNativeServices.call("terminal", "closeSession", nextId);
+            if (c && typeof c.then === "function") c.catch(() => {});
+          } catch {
+            // Ignore errors during teardown after async open
+          }
+        }
+        return false;
+      }
+      sessionId = nextId;
+      if (!sessionId) {
+        setDisconnectedState("Bash backend unavailable — native PTY session did not return a session ID.");
+        return false;
+      }
+      return true;
     };
 
     const connectNativeSession = () => {
@@ -99,12 +121,15 @@
             appendLine(out, err?.message || String(err), "terminal-warning");
           },
         });
-        sessionId = typeof opened === "string" ? opened : opened?.sessionId || null;
-        if (!sessionId) {
-          setDisconnectedState("Bash backend unavailable — native PTY session did not return a session ID.");
-          return false;
+        if (opened && typeof opened.then === "function") {
+          opened
+            .then(finalizeOpen)
+            .catch(err => {
+              if (!disposed) setDisconnectedState(err?.message || "Bash backend unavailable — command was not executed.");
+            });
+          return true;
         }
-        return true;
+        return finalizeOpen(opened);
       } catch (err) {
         setDisconnectedState(err?.message || "Bash backend unavailable — command was not executed.");
         return false;
@@ -112,6 +137,14 @@
     };
 
     connectNativeSession();
+
+    const handleAsyncError = (err, fallbackMsg) => {
+      if (err?.name === "NativeIntegrationUnavailableError") {
+        setDisconnectedState(err.message || "Native terminal session disconnected.", "CLOSED");
+        return;
+      }
+      appendLine(out, err?.message || fallbackMsg, "terminal-warning");
+    };
 
     const submitCommand = () => {
       if (!sessionId) {
@@ -121,26 +154,24 @@
       const value = inp.value;
       inp.value = "";
       try {
-        window.NexusNativeServices.call("terminal", "write", sessionId, `${value}\n`);
-      } catch (err) {
-        if (err?.name === "NativeIntegrationUnavailableError") {
-          setDisconnectedState(err.message || "Native terminal session disconnected.", "CLOSED");
-          return;
+        const res = window.NexusNativeServices.call("terminal", "write", sessionId, `${value}\n`);
+        if (res && typeof res.then === "function") {
+          res.catch(err => handleAsyncError(err, "Failed to write to native terminal session."));
         }
-        appendLine(out, err?.message || "Failed to write to native terminal session.", "terminal-warning");
+      } catch (err) {
+        handleAsyncError(err, "Failed to write to native terminal session.");
       }
     };
 
     const sendInterrupt = () => {
       if (!sessionId) return;
       try {
-        window.NexusNativeServices.call("terminal", "interrupt", sessionId);
-      } catch (err) {
-        if (err?.name === "NativeIntegrationUnavailableError") {
-          setDisconnectedState(err.message || "Native terminal session disconnected.", "CLOSED");
-          return;
+        const res = window.NexusNativeServices.call("terminal", "interrupt", sessionId);
+        if (res && typeof res.then === "function") {
+          res.catch(err => handleAsyncError(err, "Failed to interrupt native terminal session."));
         }
-        appendLine(out, err?.message || "Failed to interrupt native terminal session.", "terminal-warning");
+      } catch (err) {
+        handleAsyncError(err, "Failed to interrupt native terminal session.");
       }
     };
 
@@ -163,6 +194,7 @@
     inp.addEventListener("keydown", handleKeydown);
 
     return () => {
+      disposed = true;
       send.removeEventListener("click", submitCommand);
       if (interruptBtn) interruptBtn.removeEventListener("click", sendInterrupt);
       inp.removeEventListener("keydown", handleKeydown);
@@ -170,7 +202,8 @@
         const closingId = sessionId;
         sessionId = null;
         try {
-          window.NexusNativeServices.call("terminal", "closeSession", closingId);
+          const c = window.NexusNativeServices.call("terminal", "closeSession", closingId);
+          if (c && typeof c.then === "function") c.catch(() => {});
         } catch {
           // Ignore errors during teardown if native adapter was unregistered first.
         }

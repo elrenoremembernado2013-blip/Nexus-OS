@@ -33,3 +33,6 @@ if command -v lxpolkit >/dev/null 2>&1; then
 elif [ -x /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 ]; then
   /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
 fi
+if [ -x /usr/local/bin/nexus-firstboot ]; then
+  /usr/local/bin/nexus-firstboot --autostart &
+fi

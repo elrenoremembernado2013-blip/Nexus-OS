@@ -64,6 +64,25 @@ read_gaming_mode_state() {
   fi
 }
 
+lite_saved_args() {
+  LITE_PRESERVE_ARGS=()
+  local profile_file="$STATE_DIR/lite-profile"
+  [[ -r "$profile_file" ]] || return 0
+  local saved_theme saved_accent saved_appearance
+  saved_theme="$(grep -E '^theme=' "$profile_file" | head -n1 | cut -d= -f2- || true)"
+  saved_accent="$(grep -E '^accent=' "$profile_file" | head -n1 | cut -d= -f2- || true)"
+  saved_appearance="$(grep -E '^appearance=' "$profile_file" | head -n1 | cut -d= -f2- || true)"
+  case "$saved_theme" in
+    midnight|nebula|arctic|emerald|solar) LITE_PRESERVE_ARGS+=(--theme "$saved_theme") ;;
+  esac
+  if [[ "$saved_accent" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+    LITE_PRESERVE_ARGS+=(--accent "$saved_accent")
+  fi
+  if [[ "$saved_appearance" == "dark" || "$saved_appearance" == "light" ]]; then
+    LITE_PRESERVE_ARGS+=(--appearance "$saved_appearance")
+  fi
+}
+
 case "$CMD" in
   status)
     gm_state="$(read_gaming_mode_state)"
@@ -393,9 +412,11 @@ PY
           elif [[ -x "$CINNAMON_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Cinnamon* ]]; then
             bash "$CINNAMON_APPLY" --profile performance >/dev/null || true
           elif [[ -x "$LXQT_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *LXQt* ]]; then
-            bash "$LXQT_APPLY" --profile lite-1g >/dev/null || true
+            lite_saved_args
+            bash "$LXQT_APPLY" --profile lite-512 "${LITE_PRESERVE_ARGS[@]}" >/dev/null || true
           elif [[ -x "$LITE_APPLY" && ( "${XDG_CURRENT_DESKTOP:-}" == *Openbox* || "${XDG_CURRENT_DESKTOP:-}" == *NEXUS-Lite* ) ]]; then
-            bash "$LITE_APPLY" --profile lite-512 >/dev/null || true
+            lite_saved_args
+            bash "$LITE_APPLY" --profile lite-512 "${LITE_PRESERVE_ARGS[@]}" >/dev/null || true
           fi
           echo 'Gaming Mode enabled. Use "gamemoderun %command%" in Steam launch options when GameMode is installed.'
         fi
@@ -420,9 +441,11 @@ PY
           elif [[ -x "$CINNAMON_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *Cinnamon* ]]; then
             bash "$CINNAMON_APPLY" --profile balanced >/dev/null || true
           elif [[ -x "$LXQT_APPLY" && "${XDG_CURRENT_DESKTOP:-}" == *LXQt* ]]; then
-            bash "$LXQT_APPLY" --profile lite-1g >/dev/null || true
+            lite_saved_args
+            bash "$LXQT_APPLY" --profile lite-1g "${LITE_PRESERVE_ARGS[@]}" >/dev/null || true
           elif [[ -x "$LITE_APPLY" && ( "${XDG_CURRENT_DESKTOP:-}" == *Openbox* || "${XDG_CURRENT_DESKTOP:-}" == *NEXUS-Lite* ) ]]; then
-            bash "$LITE_APPLY" --profile lite-1g >/dev/null || true
+            lite_saved_args
+            bash "$LITE_APPLY" --profile lite-1g "${LITE_PRESERVE_ARGS[@]}" >/dev/null || true
           fi
           echo 'Gaming Mode disabled; balanced desktop defaults restored.'
         fi

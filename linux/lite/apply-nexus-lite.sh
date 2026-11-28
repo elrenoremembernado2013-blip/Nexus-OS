@@ -23,6 +23,8 @@ PROFILE_FILE="$STATE_DIR/lite-profile"
 
 PROFILE="lite-512"
 THEME="midnight"
+THEME_EXPLICIT=false
+APPEARANCE="dark"
 CUSTOM_ACCENT=""
 WALLPAPER_URL=""
 WALLPAPER_FIT="zoom"
@@ -56,9 +58,9 @@ USAGE
 while (($#)); do
   case "$1" in
     --profile) [[ $# -ge 2 ]] || { echo '--profile requires a value' >&2; exit 2; }; PROFILE="$2"; shift 2 ;;
-    --theme) [[ $# -ge 2 ]] || { echo '--theme requires a preset' >&2; exit 2; }; THEME="$2"; shift 2 ;;
+    --theme) [[ $# -ge 2 ]] || { echo '--theme requires a preset' >&2; exit 2; }; THEME="$2"; THEME_EXPLICIT=true; shift 2 ;;
     --accent) [[ $# -ge 2 ]] || { echo '--accent requires #RRGGBB' >&2; exit 2; }; CUSTOM_ACCENT="$2"; shift 2 ;;
-    --appearance) [[ $# -ge 2 ]] || { echo '--appearance requires dark|light' >&2; exit 2; }; [[ "$2" == "dark" || "$2" == "light" ]] || { echo 'Invalid --appearance' >&2; exit 2; }; shift 2 ;;
+    --appearance) [[ $# -ge 2 ]] || { echo '--appearance requires dark|light' >&2; exit 2; }; [[ "$2" == "dark" || "$2" == "light" ]] || { echo 'Invalid --appearance' >&2; exit 2; }; APPEARANCE="$2"; shift 2 ;;
     --wallpaper-url) [[ $# -ge 2 ]] || { echo '--wallpaper-url requires URL or path' >&2; exit 2; }; WALLPAPER_URL="$2"; shift 2 ;;
     --wallpaper-fit) [[ $# -ge 2 ]] || { echo '--wallpaper-fit requires mode' >&2; exit 2; }; WALLPAPER_FIT="$2"; shift 2 ;;
     --workspaces) [[ $# -ge 2 ]] || { echo '--workspaces requires 1-8' >&2; exit 2; }; WORKSPACES="$2"; shift 2 ;;
@@ -68,6 +70,10 @@ while (($#)); do
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [[ "$APPEARANCE" == "light" && "$THEME_EXPLICIT" == false ]]; then
+  THEME="arctic"
+fi
 
 case "$PROFILE" in
   lite-512|lite-1g|standard-2g) ;;
@@ -156,7 +162,7 @@ elif [[ "$PROFILE" == "lite-1g" ]]; then
 fi
 sed -i "s/<number>2<\/number>/<number>${ws_count}<\/number>/" "$OPENBOX_DIR/rc.xml"
 
-printf 'profile=%s\ntheme=%s\naccent=%s\n' "$PROFILE" "$THEME" "$effective_accent" > "$PROFILE_FILE"
+printf 'profile=%s\ntheme=%s\naccent=%s\nappearance=%s\n' "$PROFILE" "$THEME" "$effective_accent" "$APPEARANCE" > "$PROFILE_FILE"
 
 if [[ -n "$WALLPAPER_URL" && -x "$WALLPAPER_CLI" ]]; then
   bash "$WALLPAPER_CLI" apply --url "$WALLPAPER_URL" --fit "$WALLPAPER_FIT" --edition lite

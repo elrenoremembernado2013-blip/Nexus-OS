@@ -44,6 +44,13 @@ detect_edition() {
     *lxqt*) echo "lite-lxqt" ;;
     *openbox*) echo "lite" ;;
     *)
+      if [[ -r /etc/nexus-os-release ]]; then
+        rel_ed="$(grep -E '^NEXUS_EDITION=' /etc/nexus-os-release | head -n1 | cut -d= -f2- | tr -d '\"[:space:]')"
+        if [[ -n "$rel_ed" ]]; then
+          echo "$rel_ed"
+          return 0
+        fi
+      fi
       if [[ -r /etc/nexus-os/edition ]]; then
         tr -d '[:space:]' < /etc/nexus-os/edition
       elif command -v cinnamon-settings >/dev/null 2>&1; then

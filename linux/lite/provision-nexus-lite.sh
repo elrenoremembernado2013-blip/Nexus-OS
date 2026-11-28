@@ -128,6 +128,12 @@ run_cmd install -m 0644 "$REPO_ROOT/linux/branding/nexus-logo.svg" /usr/local/sh
 run_cmd install -m 0644 "$REPO_ROOT/linux/config/wallpapers.json" /usr/local/share/nexus-os/wallpapers.json
 run_cmd install -m 0644 "$SCRIPT_DIR/openbox/wallpaper.png" /usr/local/share/nexus-os/lite/wallpaper.png
 run_cmd cp -a "$SCRIPT_DIR/openbox" /usr/local/share/nexus-os/lite/
+run_cmd install -d -m 0755 /usr/local/share/nexus-os/ui
+run_cmd install -m 0644 "$REPO_ROOT/index.html" /usr/local/share/nexus-os/ui/index.html
+run_cmd install -m 0644 "$REPO_ROOT/app.js" /usr/local/share/nexus-os/ui/app.js
+run_cmd install -m 0644 "$REPO_ROOT/styles.css" /usr/local/share/nexus-os/ui/styles.css
+run_cmd cp -a "$REPO_ROOT/apps" /usr/local/share/nexus-os/ui/
+run_cmd cp -a "$REPO_ROOT/assets" /usr/local/share/nexus-os/ui/
 
 for desktop_file in "$REPO_ROOT"/linux/branding/applications/*.desktop; do
   [[ -f "$desktop_file" ]] || continue

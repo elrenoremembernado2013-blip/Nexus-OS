@@ -1154,4 +1154,15 @@
     showShortcuts: readStorage("nexus-desktop-shortcuts") !== "false",
     clock24h: readStorage("nexus-clock-24h") === "true"
   }, false);
+
+  function openAppFromHash() {
+    const rawHash = (window.location?.hash || "").replace(/^#/, "").trim();
+    if (!rawHash) return;
+    const targetId = rawHash.split(/[/?&]/)[0];
+    if (targetId && appNames[targetId] && window.NexusApplicationCatalog.isTargetInstalled(targetId)) {
+      openApp(targetId);
+    }
+  }
+  openAppFromHash();
+  window.addEventListener?.("hashchange", openAppFromHash);
 })();
