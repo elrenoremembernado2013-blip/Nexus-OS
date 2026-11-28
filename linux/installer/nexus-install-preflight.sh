@@ -512,8 +512,28 @@ if not default_route_present and not up_network_ifaces:
         "Connect Ethernet or Wi-Fi if you want updates/optional apps, or proceed offline with local squashfs installation.",
     )
 
+if battery and str(battery.get("status", "")).lower() == "discharging" and battery.get("capacity") is not None and battery["capacity"] < 30:
+    add_warning(
+        "low_battery_discharging",
+        "warning",
+        f"Laptop battery is discharging at {battery['capacity']}%.",
+        "Power loss while writing partitions, LUKS headers, or EFI boot entries can leave a system unbootable.",
+        True,
+        "Plug in AC power before starting partitioning or bootloader installation.",
+    )
+
 blockers = [w for w in structured_warnings if not w["can_continue"]]
 warnings = [f"[{w['severity'].upper()}] {w['problem']} -> {w['recommended_action']}" for w in structured_warnings if w["severity"] in ("blocker", "warning")]
+installation_risks = [
+    {
+        "id": w["id"],
+        "severity": w["severity"],
+        "risk": w["problem"],
+        "impact": w["why_it_matters"],
+        "mitigation": w["recommended_action"],
+    }
+    for w in structured_warnings
+]
 requirements_satisfied = len(blockers) == 0
 
 eligible_disk_count = len(eligible_disks)
@@ -606,6 +626,12 @@ payload = {
         "arch": "x86_64",
     },
     "blockers": blockers,
+    "installation_risks": installation_risks,
+    "network_requirements": {
+        "offline_iso_install_supported": True,
+        "online_updates_and_flatpak_require_network": True,
+        "network_currently_ready": bool(default_route_present or up_network_ifaces),
+    },
     "structured_warnings": structured_warnings,
     "warnings": warnings,
 }

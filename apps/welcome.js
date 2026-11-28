@@ -208,6 +208,7 @@
       const minRam = pre.data?.requirements?.edition_min_ram_mib || 2048;
       const sbState = pre.data?.secure_boot_status?.secure_boot_state || "unavailable";
       const dualBootDetected = pre.data?.dual_boot_detection?.dual_boot_candidates_detected;
+      const netReady = pre.data?.network_requirements?.network_currently_ready;
       const diskSummary = hw?.disks?.length
         ? hw.disks.map(d => `${d.device} (${d.size}, ${d.model})`).join(", ")
         : (pre.available ? "None detected" : "Unavailable in browser preview");
@@ -216,7 +217,8 @@
         ["Architecture / Firmware", pre.available ? `${pre.data.arch} · ${pre.data.firmware} (Secure Boot: ${sbState})` : "Unavailable (requires x86_64 UEFI or BIOS host)"],
         ["CPU", hw?.cpu || "Unavailable"],
         ["Memory", hw?.ram_total_mib ? `${hw.ram_total_mib} MiB (min ${minRam} MiB)` : "Unavailable"],
-        ["Target disks", diskSummary],
+        ["Target disks / Root free", pre.available ? `${diskSummary}${hw?.root_free_gib != null ? ` · / free: ${hw.root_free_gib} GiB` : ""}` : "Unavailable in browser preview"],
+        ["Network (offline install ok)", pre.available ? (netReady ? "Connected (online updates available)" : "Offline (local ISO install supported)") : "Unavailable in browser preview"],
         ["Dual-boot / Existing OS", pre.available ? (dualBootDetected ? "Existing OS partitions detected — use 'Something else' or --keep-efi" : "No conflicting OS partitions detected") : "Unavailable in browser preview"],
         ["Ubiquity installer", pre.available ? (pre.data.ubiquity_available ? "Ready (live session)" : "Not installed on this non-live host") : "Unavailable in browser preview"]
       ].forEach(([k, v]) => dl.append(node("dt", "", k), node("dd", "", v)));

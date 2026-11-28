@@ -15,6 +15,7 @@
     "files",
     "terminal",
     "gaming",
+    "hardware",
     "installer",
     "control-centre",
     "personalisation",
@@ -154,6 +155,11 @@
     registerSafe("installer", {
       preflight: () => req("/api/installer/preflight"),
       launch: () => req("/api/tools/launch", "POST", { category: "installer" }),
+    });
+    registerSafe("hardware", {
+      inventory: () => req("/api/hardware/inventory"),
+      diagnostics: () => req("/api/hardware/diagnostics"),
+      recoveryDiagnose: () => req("/api/recovery/diagnose"),
     });
     registerSafe("telemetry", {
       snapshot: () => req("/api/telemetry"),

@@ -22,7 +22,7 @@ Default behavior (--diagnose) is strictly read-only.
 Options:
   --diagnose            Inspect UEFI/BIOS, Secure Boot, EFI files, fstab/crypttab,
                         block layout, failed services, and installer logs (read-only)
-  --guide [TOPIC]       Print recovery steps: all | backup | grub | fsck | luks | packages | dualboot
+  --guide [TOPIC]       Print recovery steps: all | backup | grub | fsck | luks | packages | dualboot | drivers | network | desktop | storage | recovery
   --fsck-dry-run        Preview or run a read-only filesystem check (fsck -n) on --partition
   --partition DEV       Target partition for --fsck-dry-run (e.g. /dev/vda2)
   --confirm             Required to execute --fsck-dry-run (always read-only -n)
@@ -59,9 +59,9 @@ done
 print_guide() {
   local topic="$1"
   case "$topic" in
-    all|backup|grub|fsck|luks|packages|dualboot) ;;
+    all|backup|grub|fsck|luks|packages|dualboot|drivers|network|desktop|storage|recovery) ;;
     *)
-      printf 'Unknown guide topic: %s (expected all | backup | grub | fsck | luks | packages | dualboot)\n' "$topic" >&2
+      printf 'Unknown guide topic: %s (expected all | backup | grub | fsck | luks | packages | dualboot | drivers | network | desktop | storage | recovery)\n' "$topic" >&2
       exit 2
       ;;
   esac
@@ -151,6 +151,77 @@ TXT
     to `/boot/efi` with 'Format' UNCHECKED.
   - If an OS entry is missing from GRUB after install, ensure `GRUB_DISABLE_OS_PROBER=false` in
     `/etc/default/grub` and run `sudo update-grub`.
+TXT
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "drivers" ]]; then
+    cat <<'TXT'
+
+[7] GRAPHICS, WI-FI & AUDIO DRIVER PROBLEMS
+  - If display fails after a GPU driver change, boot with kernel parameter `nomodeset` at GRUB
+    (press `e`, add `nomodeset` after `quiet splash`, Ctrl+X) and inspect logs:
+      dmesg | grep -Ei "drm|amdgpu|i915|nvidia|firmware"
+  - Check proprietary/NVIDIA driver status safely:
+      ubuntu-drivers devices
+  - Inspect missing Wi-Fi or Intel SOF audio firmware safely without modifying files:
+      nexus-hw-inventory --markdown
+TXT
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "network" ]]; then
+    cat <<'TXT'
+
+[8] NETWORK & DNS TROUBLESHOOTING
+  - Check hardware/software radio blocks and NetworkManager link state:
+      rfkill list
+      nmcli general status
+      nmcli device status
+  - Unblock soft-blocked Wi-Fi if toggled off accidentally:
+      rfkill unblock wifi
+  - Restart NetworkManager cleanly and inspect DNS resolution:
+      sudo systemctl restart NetworkManager
+      resolvectl status
+TXT
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "desktop" ]]; then
+    cat <<'TXT'
+
+[9] DESKTOP ENVIRONMENT FAILURES (CINNAMON / XFCE / LITE LXQT / OPENBOX)
+  - Switch to a TTY with Ctrl+Alt+F3 and inspect recent user/display-manager errors:
+      systemctl status lightdm --no-pager
+      journalctl --user -p err -n 25 --no-pager
+  - Safely revert NEXUS per-user desktop styling without deleting personal files:
+      nexus-apply-xfce --revert      # or nexus-apply-lite --revert / nexus-apply-lite-lxqt --revert
+  - Verify disk space isn't 100% full (a full `/` partition prevents X11/Wayland login).
+TXT
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "storage" ]]; then
+    cat <<'TXT'
+
+[10] LOW STORAGE TRIAGE (SAFE, REVERSIBLE CLEANUP)
+  - Inspect disk & inode usage before deleting anything:
+      df -h / /boot /home
+      df -ih /
+  - Clear cached APT package archives safely (never removes installed apps):
+      sudo apt-get clean
+  - Preview unused old kernels/dependencies before removing:
+      sudo apt-get autoremove --dry-run
+  - Cap systemd journal logs without removing active units:
+      sudo journalctl --vacuum-size=200M
+TXT
+  fi
+
+  if [[ "$topic" == "all" || "$topic" == "recovery" ]]; then
+    cat <<'TXT'
+
+[11] RECOVERY MODE (GRUB ADVANCED OPTIONS)
+  - Hold Shift (BIOS) or tap Esc (UEFI) at boot -> 'Advanced options for NEXUS OS' -> '(recovery mode)'.
+  - In the recovery menu:
+      * Run `fsck` (check all filesystems) ONLY while root is mounted read-only.
+      * Run `dpkg` to repair interrupted package configurations (`dpkg --configure -a`).
+      * Use `root` shell sparingly; remount read-write only when repairing config: `mount -o remount,rw /`.
 TXT
   fi
 }
@@ -300,6 +371,27 @@ installer_logs = [
     ) if Path(p).is_file()
 ]
 
+root_storage = None
+try:
+    st = os.statvfs("/")
+    tot = st.f_blocks * st.f_frsize
+    avail = st.f_bavail * st.f_frsize
+    root_storage = {
+        "total_gib": round(tot / (1024 ** 3), 2),
+        "available_gib": round(avail / (1024 ** 3), 2),
+        "used_percent": round(((tot - avail) / tot) * 100.0, 1) if tot > 0 else 0.0,
+    }
+except OSError:
+    pass
+
+dpkg_health = "unavailable"
+if shutil.which("dpkg"):
+    try:
+        dres = subprocess.run(["dpkg", "--audit"], capture_output=True, text=True, timeout=4)
+        dpkg_health = "clean" if (dres.returncode == 0 and not dres.stdout.strip()) else "issues_detected"
+    except Exception:
+        dpkg_health = "error"
+
 findings = []
 if not uefi_active and not live_session:
     findings.append("System is not booted via UEFI (/sys/firmware/efi absent); UEFI GRUB repair requires UEFI boot.")
@@ -311,6 +403,10 @@ if crypttab_issues:
     findings.extend(crypttab_issues)
 if failed_units:
     findings.append(f"Failed systemd units detected: {', '.join(failed_units)}")
+if root_storage and root_storage["used_percent"] >= 90.0:
+    findings.append(f"Root filesystem usage is high ({root_storage['used_percent']}%); see `nexus-recovery --guide storage`.")
+if dpkg_health == "issues_detected":
+    findings.append("Incomplete or broken dpkg packages detected; see `nexus-recovery --guide packages`.")
 
 payload = {
     "read_only": True,
@@ -323,10 +419,12 @@ payload = {
     "crypttab_entries": crypttab_entries,
     "crypttab_issues": [redact_line(x) for x in crypttab_issues],
     "failed_systemd_units": failed_units,
+    "root_storage": root_storage,
+    "dpkg_health": dpkg_health,
     "installer_logs_present": installer_logs,
     "block_devices_count": len(disks_summary),
     "findings": [redact_line(x) for x in findings],
-    "recommended_next_step": "Run `nexus-recovery --guide` for safe backup, GRUB, fsck, LUKS2, and package recovery steps.",
+    "recommended_next_step": "Run `nexus-recovery --guide` for safe backup, GRUB, fsck, LUKS2, driver, network, desktop, and low-storage recovery steps.",
 }
 
 if fmt == "json":
@@ -334,6 +432,8 @@ if fmt == "json":
 else:
     print(f"NEXUS OS Recovery Diagnosis (read-only | edition={edition} | env={payload['environment']})")
     print(f"  Firmware: {'UEFI' if uefi_active else 'Legacy/Container'} | Secure Boot: {secure_boot}")
+    if root_storage:
+        print(f"  Root Storage: {root_storage['available_gib']} GiB free / {root_storage['total_gib']} GiB ({root_storage['used_percent']}% used) | dpkg: {dpkg_health}")
     print(f"  Installer logs present: {', '.join(installer_logs) if installer_logs else 'none'}")
     print(f"  fstab issues: {len(fstab_issues)} | crypttab entries: {crypttab_entries} (issues={len(crypttab_issues)}) | failed units: {len(failed_units)}")
     if findings:

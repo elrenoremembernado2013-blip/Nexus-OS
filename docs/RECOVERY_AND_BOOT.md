@@ -104,10 +104,16 @@ If an installed NEXUS OS system fails to boot or drops to a `grub>` prompt:
   ```
 - **Rebuild encrypted initramfs from a live session if boot fails after a kernel update:**
   Unlock `/dev/sdX3` to `nexus_crypt`, mount `/`, `/boot`, `/boot/efi`, bind `/dev /proc /sys /run`, verify `/etc/cryptsetup-initramfs/conf-hook` contains `CRYPTSETUP=y`, and run:
-  ```bash
-  sudo chroot /mnt update-initramfs -u -k all
-  sudo chroot /mnt update-grub
-  ```
+## 6. Driver, Network, Desktop Environment, Low Storage & Recovery Mode
+
+Use `nexus-recovery --guide <topic>` for quick terminal instructions or follow these safe steps:
+
+- **Driver problems (`--guide drivers`)**: Boot with `nomodeset` from GRUB if display fails, inspect `dmesg | grep -Ei "drm|amdgpu|i915|nvidia|firmware"`, check `ubuntu-drivers devices`, and run `nexus-hw-inventory --markdown` for missing Wi-Fi/SOF firmware.
+- **Network problems (`--guide network`)**: Check `rfkill list`, `nmcli general status`, and `resolvectl status`. Unblock Wi-Fi with `rfkill unblock wifi` and restart `NetworkManager` if needed.
+- **Desktop environment failures (`--guide desktop`)**: Switch to TTY3 (`Ctrl+Alt+F3`), inspect `systemctl status lightdm` and `journalctl --user -p err -n 25`, and revert NEXUS per-user theming safely via `nexus-apply-xfce --revert` (or `nexus-apply-lite --revert` / `nexus-apply-lite-lxqt --revert`).
+- **Low storage (`--guide storage`)**: Check `df -h / /boot /home` and `df -ih /`. Run `sudo apt-get clean`, preview `sudo apt-get autoremove --dry-run`, and trim logs safely with `sudo journalctl --vacuum-size=200M`.
+- **Broken updates (`--guide packages`)**: Run `sudo dpkg --configure -a && sudo apt-get update && sudo apt-get install -f`.
+- **GRUB Recovery Mode (`--guide recovery`)**: Hold Shift (BIOS) or tap Esc (UEFI) at boot -> **Advanced options for NEXUS OS** -> **(recovery mode)**. Always run `fsck -n` read-only first and remount `/` read-write (`mount -o remount,rw /`) only after confirming backups.
 
 ---
 

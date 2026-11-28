@@ -970,5 +970,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .wallpaper-fav-btn{position:absolute;top:6px;right:6px;z-index:2;border:0;border-radius:999px;width:24px;height:24px;background:rgba(12,16,28,.75);color:#ffd27d;cursor:pointer;font-size:12px;line-height:24px;text-align:center}
 .wallpaper-option{position:relative}
 .wallpaper-meta{font-size:10px;color:var(--muted);margin-top:4px;display:block}
+.hw-badge{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:600;border:1px solid var(--line);white-space:nowrap}
+.hw-working{background:rgba(80,210,145,.16);border-color:rgba(80,210,145,.45);color:#8ef0bd}
+.hw-limited{background:rgba(255,193,94,.16);border-color:rgba(255,193,94,.45);color:#ffd58a}
+.hw-detected{background:rgba(126,184,255,.16);border-color:rgba(126,184,255,.45);color:#b7d8ff}
+.hw-unsupported{background:rgba(255,112,112,.16);border-color:rgba(255,112,112,.45);color:#ffb0b0}
+.hw-unable{background:rgba(255,255,255,.07);color:var(--muted)}
+.desktop.theme-light .hw-working{color:#0c6b3d}
+.desktop.theme-light .hw-limited{color:#8a4f00}
+.desktop.theme-light .hw-detected{color:#144d8f}
+.desktop.theme-light .hw-unsupported{color:#9b1c1c}
 
 

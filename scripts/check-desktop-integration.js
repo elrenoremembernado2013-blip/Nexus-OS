@@ -690,7 +690,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
   const { window: win, document: doc, makeEvent } = env;
   const expectedApps = [
     "files", "calendar", "software", "monitor", "notes", "settings",
-    "browser", "terminal", "calculator", "gaming", "welcome", "quantum"
+    "browser", "terminal", "calculator", "gaming", "hardware", "welcome", "quantum"
   ];
   assert.deepEqual(Array.from(win.NexusAppRegistry.list(), a => a.id).sort(), [...expectedApps].sort());
 

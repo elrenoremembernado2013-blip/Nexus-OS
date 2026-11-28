@@ -920,6 +920,27 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
                     return
                 self._run_cli_json(cmd)
+            elif parsed.path == "/api/hardware/inventory":
+                try:
+                    cmd = resolve_helper("linux/hardware/nexus-hw-inventory.sh", "nexus-hw-inventory") + ["--json"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=15.0)
+            elif parsed.path == "/api/hardware/diagnostics":
+                try:
+                    cmd = resolve_helper("linux/hardware/nexus-hw-diagnostics.sh", "nexus-hw-diagnostics") + ["--json"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=18.0)
+            elif parsed.path == "/api/recovery/diagnose":
+                try:
+                    cmd = resolve_helper("linux/installer/nexus-recovery.sh", "nexus-recovery") + ["--diagnose", "--json", "--redacted"]
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
+                    return
+                self._run_cli_json(cmd, timeout=10.0)
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":

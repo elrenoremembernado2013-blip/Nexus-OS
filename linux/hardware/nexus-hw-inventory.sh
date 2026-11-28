@@ -60,6 +60,8 @@ if db_path.is_file():
 drv_db = db.get("drivers", {})
 ACTIVE_HOST = socket.gethostname()
 ACTIVE_USER = os.environ.get("USER", "")
+PROC_ROOT = Path(os.environ.get("NEXUS_PROC_ROOT") or "/proc")
+SYS_ROOT = Path(os.environ.get("NEXUS_SYS_ROOT") or "/sys")
 
 
 def read_text(p: Path):
@@ -122,26 +124,44 @@ def classify(category: str, driver: str, fallback: str = "detected") -> dict:
     }
 
 
-arch = platform.machine()
+arch = os.environ.get("NEXUS_ARCH_OVERRIDE") or platform.machine()
 arch_status = "supported" if arch == "x86_64" else "unsupported"
 
+cpu_vendor = "unavailable"
 cpu_model = "unavailable"
 cpu_flags = []
-cpuinfo = read_text(Path("/proc/cpuinfo"))
+cpu_physical_cores = None
+cpuinfo = read_text(PROC_ROOT / "cpuinfo")
 if cpuinfo:
     for line in cpuinfo.splitlines():
         low = line.lower()
-        if low.startswith("model name") and cpu_model == "unavailable":
+        if low.startswith("vendor_id") and cpu_vendor == "unavailable":
+            cpu_vendor = line.split(":", 1)[1].strip()
+        elif low.startswith("model name") and cpu_model == "unavailable":
             cpu_model = line.split(":", 1)[1].strip()
+        elif low.startswith("cpu cores") and cpu_physical_cores is None:
+            val = line.split(":", 1)[1].strip()
+            if val.isdigit():
+                cpu_physical_cores = int(val)
         elif low.startswith("flags") and not cpu_flags:
             cpu_flags = line.split(":", 1)[1].strip().split()
 cpu_cores = os.cpu_count() or 0
+if cpu_physical_cores is None and cpuinfo:
+    phys_ids = set()
+    cur_phys = "0"
+    for line in cpuinfo.splitlines():
+        if line.lower().startswith("physical id"):
+            cur_phys = line.split(":", 1)[1].strip()
+        elif line.lower().startswith("core id"):
+            phys_ids.add((cur_phys, line.split(":", 1)[1].strip()))
+    if phys_ids:
+        cpu_physical_cores = len(phys_ids)
 cpu_low = cpu_model.lower()
 if "qemu" in cpu_low or "virtual" in cpu_low or "hypervisor" in cpu_flags:
     cpu_category = "virtual_or_emulated"
-elif "intel" in cpu_low:
+elif "intel" in cpu_low or "genuineintel" in cpu_vendor.lower():
     cpu_category = "intel_x86_64"
-elif "amd" in cpu_low or "ryzen" in cpu_low or "epyc" in cpu_low:
+elif "amd" in cpu_low or "ryzen" in cpu_low or "epyc" in cpu_low or "authenticamd" in cpu_vendor.lower():
     cpu_category = "amd_x86_64"
 else:
     cpu_category = "other_x86_64" if arch == "x86_64" else "non_x86_64"
@@ -149,7 +169,7 @@ hw_virt = "vmx" if "vmx" in cpu_flags else ("svm" if "svm" in cpu_flags else "no
 
 ram_total_mib = None
 ram_avail_mib = None
-meminfo = read_text(Path("/proc/meminfo"))
+meminfo = read_text(PROC_ROOT / "meminfo")
 if meminfo:
     for line in meminfo.splitlines():
         if line.startswith("MemTotal:"):
@@ -162,10 +182,10 @@ if meminfo:
                 ram_avail_mib = round(int(tok) / 1024)
 
 # UEFI, Secure Boot & signed boot chain (no NVRAM UUID reads)
-uefi_active = Path("/sys/firmware/efi").is_dir()
+uefi_active = (SYS_ROOT / "firmware/efi").is_dir()
 secure_boot = "unavailable"
 try:
-    efivars = sorted(Path("/sys/firmware/efi/efivars").glob("SecureBoot-*")) if Path("/sys/firmware/efi/efivars").is_dir() else []
+    efivars = sorted((SYS_ROOT / "firmware/efi/efivars").glob("SecureBoot-*")) if (SYS_ROOT / "firmware/efi/efivars").is_dir() else []
 except OSError:
     efivars = []
 for cand in efivars:
@@ -300,7 +320,7 @@ pci_audio = []
 storage_controllers = []
 usb_controllers = []
 try:
-    pci_devs = sorted(Path("/sys/bus/pci/devices").glob("*")) if Path("/sys/bus/pci/devices").is_dir() else []
+    pci_devs = sorted((SYS_ROOT / "bus/pci/devices").glob("*")) if (SYS_ROOT / "bus/pci/devices").is_dir() else []
 except OSError:
     pci_devs = []
 for dev in pci_devs:
@@ -326,7 +346,7 @@ for dev in pci_devs:
 wifi_adapters = []
 ethernet_adapters = []
 try:
-    net_ifaces = sorted(Path("/sys/class/net").iterdir()) if Path("/sys/class/net").is_dir() else []
+    net_ifaces = sorted((SYS_ROOT / "class/net").iterdir()) if (SYS_ROOT / "class/net").is_dir() else []
 except OSError:
     net_ifaces = []
 for iface in net_ifaces:
@@ -358,7 +378,7 @@ if shutil.which("nmcli"):
 
 # Bluetooth
 bluetooth = []
-bt_dir = Path("/sys/class/bluetooth")
+bt_dir = SYS_ROOT / "class/bluetooth"
 if bt_dir.is_dir():
     try:
         bt_devs = sorted(bt_dir.iterdir())
@@ -371,14 +391,14 @@ if bt_dir.is_dir():
 
 # Audio cards, codecs, ALSA playback/capture, PipeWire/PulseAudio, and SOF status (NO recording)
 audio_cards = []
-asound = read_text(Path("/proc/asound/cards"))
+asound = read_text(PROC_ROOT / "asound/cards")
 if asound:
     for line in asound.splitlines():
         if line and line[0].strip().isdigit() and ":" in line:
             audio_cards.append(line.strip())
 
 audio_codecs = []
-asound_dir = Path("/proc/asound")
+asound_dir = PROC_ROOT / "asound"
 if asound_dir.is_dir():
     try:
         for cf in sorted(asound_dir.glob("card*/codec#*")):
@@ -455,7 +475,7 @@ if shutil.which("journalctl"):
 
 # Displays, DRI nodes, Mesa, GLX & Vulkan (read-only)
 displays = []
-drm_dir = Path("/sys/class/drm")
+drm_dir = SYS_ROOT / "class/drm"
 if drm_dir.is_dir():
     try:
         drm_conns = sorted(drm_dir.glob("card*-*"))
@@ -464,7 +484,31 @@ if drm_dir.is_dir():
     for conn in drm_conns:
         st = read_text(conn / "status") or "unknown"
         modes = (read_text(conn / "modes") or "").splitlines()[:3]
-        displays.append({"connector": conn.name, "status": st, "modes": modes})
+        displays.append({"connector": conn.name, "status": st, "modes": modes, "refresh_hz": None})
+
+if os.environ.get("DISPLAY") and shutil.which("xrandr"):
+    try:
+        xres = subprocess.run(["xrandr", "--current"], capture_output=True, text=True, timeout=3)
+        if xres.returncode == 0:
+            cur_conn = None
+            for line in xres.stdout.splitlines():
+                if " connected" in line:
+                    cur_conn = line.split()[0]
+                elif cur_conn and "*" in line:
+                    parts = line.strip().split()
+                    mode_res = parts[0] if parts else None
+                    hz = next((p.rstrip("*+") for p in parts[1:] if "*" in p), None)
+                    matched = next((d for d in displays if cur_conn in d["connector"] or d["connector"].endswith(cur_conn)), None)
+                    if matched:
+                        if mode_res and mode_res not in matched["modes"]:
+                            matched["modes"].insert(0, mode_res)
+                        if hz:
+                            matched["refresh_hz"] = hz
+                    else:
+                        displays.append({"connector": cur_conn, "status": "connected", "modes": [mode_res] if mode_res else [], "refresh_hz": hz})
+                    cur_conn = None
+    except Exception:
+        pass
 
 dri_nodes = sorted(str(p) for p in Path("/dev/dri").glob("*")) if Path("/dev/dri").is_dir() else []
 mesa_dri_present = Path("/usr/lib/x86_64-linux-gnu/dri").is_dir()
@@ -500,7 +544,7 @@ if shutil.which("vulkaninfo"):
 # Touchpads & Input devices (explicitly excludes Uniq serials/MACs)
 touchpads = []
 input_devices = []
-inp_text = read_text(Path("/proc/bus/input/devices")) or ""
+inp_text = read_text(PROC_ROOT / "bus/input/devices") or ""
 for block in inp_text.split("\n\n"):
     if not block.strip():
         continue
@@ -541,7 +585,7 @@ USB_CLASS_MAP = {
     "ff": "vendor_specific",
 }
 usb_devices = []
-usb_dir = Path("/sys/bus/usb/devices")
+usb_dir = SYS_ROOT / "bus/usb/devices"
 if usb_dir.is_dir():
     try:
         usb_nodes = sorted(usb_dir.iterdir())
@@ -575,7 +619,7 @@ if usb_dir.is_dir():
 # Power management, batteries, and suspend capabilities (STRICTLY READ-ONLY)
 batteries = []
 ac_adapters = []
-ps_dir = Path("/sys/class/power_supply")
+ps_dir = SYS_ROOT / "class/power_supply"
 if ps_dir.is_dir():
     try:
         ps_nodes = sorted(ps_dir.iterdir())
@@ -594,9 +638,9 @@ if ps_dir.is_dir():
         elif ptype == "Mains" or node.name.startswith(("AC", "ADP")):
             ac_adapters.append({"name": node.name, "online": read_text(node / "online")})
 
-suspend_states = (read_text(Path("/sys/power/state")) or "").split()
-mem_sleep_modes = (read_text(Path("/sys/power/mem_sleep")) or "").split()
-scaling_governor = read_text(Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")) or "unavailable"
+suspend_states = (read_text(SYS_ROOT / "power/state") or "").split()
+mem_sleep_modes = (read_text(SYS_ROOT / "power/mem_sleep") or "").split()
+scaling_governor = read_text(SYS_ROOT / "devices/system/cpu/cpu0/cpufreq/scaling_governor") or "unavailable"
 upower_active = False
 ppd_active = False
 if shutil.which("systemctl"):
@@ -626,9 +670,9 @@ if shutil.which("dmesg"):
     except Exception:
         pass
 
-dmi_vendor = read_text(Path("/sys/devices/virtual/dmi/id/sys_vendor")) or ""
-dmi_family = read_text(Path("/sys/devices/virtual/dmi/id/product_family")) or ""
-dmi_product = read_text(Path("/sys/devices/virtual/dmi/id/product_name")) or ""
+dmi_vendor = read_text(SYS_ROOT / "devices/virtual/dmi/id/sys_vendor") or ""
+dmi_family = read_text(SYS_ROOT / "devices/virtual/dmi/id/product_family") or ""
+dmi_product = read_text(SYS_ROOT / "devices/virtual/dmi/id/product_name") or ""
 is_qemu = ("qemu" in cpu_low) or ("qemu" in dmi_vendor.lower()) or any(g["driver"] in ("bochs-drm", "virtio_gpu", "virtio-pci") for g in gpus)
 is_vm = is_qemu or (cpu_category == "virtual_or_emulated") or any(k in dmi_vendor.lower() for k in ("virtualbox", "vmware", "microsoft corporation", "xen", "innotek"))
 is_chromebook = any(k in (dmi_family + " " + dmi_product + " " + dmi_vendor).lower() for k in ("chromebook", "chromebox", "google", "coreboot")) and not is_vm
@@ -752,6 +796,122 @@ component_matrix = [
     },
 ]
 
+ram_used_mib = (ram_total_mib - ram_avail_mib) if (ram_total_mib is not None and ram_avail_mib is not None) else None
+ram_used_pct = round((ram_used_mib / ram_total_mib) * 100.0, 1) if (ram_total_mib and ram_used_mib is not None) else None
+
+root_storage = None
+try:
+    sv = os.statvfs("/")
+    r_tot = round((sv.f_blocks * sv.f_frsize) / (1024 ** 3), 2)
+    r_avail = round((sv.f_bavail * sv.f_frsize) / (1024 ** 3), 2)
+    root_storage = {"mount": "/", "total_gib": r_tot, "available_gib": r_avail}
+except OSError:
+    pass
+
+
+def build_compatibility_report():
+    items = []
+    # CPU
+    if arch != "x86_64":
+        items.append({"component": "CPU & Architecture", "status": "Unsupported", "evidence": f"Architecture {arch} is not x86_64."})
+    elif cpu_model != "unavailable":
+        items.append({"component": "CPU & Architecture", "status": "Working", "evidence": f"{cpu_vendor} {cpu_model} ({cpu_physical_cores or '?'} cores / {cpu_cores} threads)"})
+    else:
+        items.append({"component": "CPU & Architecture", "status": "Unable to test", "evidence": "CPU info unavailable in /proc/cpuinfo."})
+
+    # RAM
+    if ram_total_mib is None:
+        items.append({"component": "Memory (RAM)", "status": "Unable to test", "evidence": "/proc/meminfo unavailable."})
+    elif ram_total_mib < 512:
+        items.append({"component": "Memory (RAM)", "status": "Unsupported", "evidence": f"{ram_total_mib} MiB below 512 MiB NEXUS Lite floor."})
+    elif ram_total_mib < 2048:
+        items.append({"component": "Memory (RAM)", "status": "Limited support", "evidence": f"{ram_total_mib} MiB: suitable for NEXUS Lite editions; below 2048 MiB Standard minimum."})
+    else:
+        items.append({"component": "Memory (RAM)", "status": "Working", "evidence": f"{ram_total_mib} MiB total ({ram_avail_mib} MiB available)."})
+
+    # GPU
+    if not gpus:
+        items.append({"component": "Graphics (GPU)", "status": "Unable to test", "evidence": "No PCI display controller detected under sysfs."})
+    elif any(g["driver"] == "none" for g in gpus):
+        items.append({"component": "Graphics (GPU)", "status": "Limited support", "evidence": "GPU detected without an active kernel DRM driver."})
+    elif software_render:
+        items.append({"component": "Graphics (GPU)", "status": "Limited support", "evidence": f"Virtual/software rendering active ({', '.join(gpu_drivers)})."})
+    elif gpu_accel_mode == "genuine_hardware_gpu_driver_bound":
+        items.append({"component": "Graphics (GPU)", "status": "Detected", "evidence": f"Driver bound ({', '.join(gpu_drivers)}); 3D/Vulkan/hotplug requires interactive hardware check."})
+    else:
+        items.append({"component": "Graphics (GPU)", "status": "Detected", "evidence": f"Drivers: {', '.join(gpu_drivers)}."})
+
+    # Wi-Fi
+    if not wifi_adapters:
+        items.append({"component": "Wi-Fi", "status": "Unable to test", "evidence": "No wireless network interface detected."})
+    elif any(w["driver"] == "none" for w in wifi_adapters):
+        items.append({"component": "Wi-Fi", "status": "Unsupported", "evidence": "Wi-Fi hardware found without a bound kernel driver."})
+    elif any(w["operstate"] == "up" for w in wifi_adapters):
+        items.append({"component": "Wi-Fi", "status": "Working", "evidence": f"{len(wifi_adapters)} adapter(s) up ({', '.join(w['driver'] for w in wifi_adapters)})."})
+    else:
+        items.append({"component": "Wi-Fi", "status": "Detected", "evidence": f"Driver bound ({', '.join(w['driver'] for w in wifi_adapters)}); AP association not active."})
+
+    # Ethernet
+    if not ethernet_adapters:
+        items.append({"component": "Ethernet", "status": "Unable to test", "evidence": "No wired Ethernet interface detected."})
+    elif any(e["operstate"] == "up" for e in ethernet_adapters):
+        items.append({"component": "Ethernet", "status": "Working", "evidence": f"{len(ethernet_adapters)} wired link(s) up."})
+    else:
+        items.append({"component": "Ethernet", "status": "Detected", "evidence": f"{len(ethernet_adapters)} interface(s) detected (link down/unplugged)."})
+
+    # Bluetooth
+    if not bluetooth:
+        items.append({"component": "Bluetooth", "status": "Unable to test", "evidence": "No HCI Bluetooth adapter detected."})
+    else:
+        items.append({"component": "Bluetooth", "status": "Detected", "evidence": f"{len(bluetooth)} adapter(s) detected; pairing/A2DP requires interactive test."})
+
+    # Audio
+    if not audio_cards and not pci_audio:
+        items.append({"component": "Audio Hardware", "status": "Unable to test", "evidence": "No ALSA cards or PCI audio controllers detected."})
+    elif audio_service_errors or any(a["driver"] == "none" for a in pci_audio):
+        items.append({"component": "Audio Hardware", "status": "Limited support", "evidence": "Audio device detected with missing driver or service errors."})
+    else:
+        items.append({"component": "Audio Hardware", "status": "Detected", "evidence": f"{len(audio_cards)} card(s), server={audio_server}; speaker/mic check requires user test."})
+
+    # Storage
+    if not storage and not storage_controllers:
+        items.append({"component": "Storage Devices", "status": "Unable to test", "evidence": "No block disks or storage controllers enumerated."})
+    elif storage:
+        items.append({"component": "Storage Devices", "status": "Working", "evidence": f"{len(storage)} disk(s) accessible ({', '.join(s['drive_type'] for s in storage)})."})
+    else:
+        items.append({"component": "Storage Devices", "status": "Detected", "evidence": f"{len(storage_controllers)} controller(s) detected."})
+
+    # UEFI & Secure Boot
+    if not uefi_active:
+        items.append({"component": "UEFI & Secure Boot", "status": "Limited support", "evidence": "Legacy BIOS/container environment; UEFI installer requires UEFI firmware."})
+    elif secure_boot == "enabled" and (not shim_paths or not grub_signed_paths):
+        items.append({"component": "UEFI & Secure Boot", "status": "Limited support", "evidence": "Secure Boot enabled, but signed shim/GRUB binary missing."})
+    elif secure_boot == "enabled":
+        items.append({"component": "UEFI & Secure Boot", "status": "Working", "evidence": "UEFI active with Secure Boot enabled and signed shim/GRUB present."})
+    else:
+        items.append({"component": "UEFI & Secure Boot", "status": "Working" if shim_paths else "Detected", "evidence": f"UEFI active (Secure Boot={secure_boot})."})
+
+    # Display
+    connected_disp = [d for d in displays if d.get("status") == "connected"]
+    if not displays:
+        items.append({"component": "Display & Refresh Rate", "status": "Unable to test", "evidence": "No DRM connectors or active X11 display detected."})
+    elif connected_disp and any(d.get("refresh_hz") for d in connected_disp):
+        d0 = connected_disp[0]
+        items.append({"component": "Display & Refresh Rate", "status": "Working", "evidence": f"{d0['connector']}: {(d0['modes'] or ['unknown'])[0]} @ {d0['refresh_hz']} Hz"})
+    else:
+        items.append({"component": "Display & Refresh Rate", "status": "Detected", "evidence": f"{len(displays)} DRM connector(s) found; active refresh rate requires live GUI session."})
+
+    # Touchpad & Peripherals
+    if not input_devices and not usb_devices:
+        items.append({"component": "Touchpad & Peripherals", "status": "Unable to test", "evidence": "No input or USB peripheral nodes detected."})
+    elif touchpads:
+        items.append({"component": "Touchpad & Peripherals", "status": "Detected", "evidence": f"{len(touchpads)} touchpad(s), {len(input_devices)} input devices; multi-touch requires manual test."})
+    else:
+        items.append({"component": "Touchpad & Peripherals", "status": "Detected", "evidence": f"{len(input_devices)} input node(s), {len(usb_devices)} USB device(s) (no touchpad detected)."})
+
+    return items
+
+
 payload = {
     "schema_version": 2,
     "privacy_redacted": True,
@@ -786,8 +946,24 @@ payload = {
         "kernel_sb_status": kernel_sb_verified,
         "packages_installed": sb_packages,
     },
-    "cpu": {"model": cpu_model, "category": cpu_category, "logical_cpus": cpu_cores, "hw_virt": hw_virt, "status": "detected"},
-    "memory": {"ram_total_mib": ram_total_mib, "ram_available_mib": ram_avail_mib},
+    "cpu": {
+        "vendor": cpu_vendor,
+        "model": cpu_model,
+        "category": cpu_category,
+        "physical_cores": cpu_physical_cores,
+        "logical_cpus": cpu_cores,
+        "logical_threads": cpu_cores,
+        "hw_virt": hw_virt,
+        "status": "detected",
+    },
+    "memory": {
+        "ram_total_mib": ram_total_mib,
+        "ram_used_mib": ram_used_mib,
+        "ram_available_mib": ram_avail_mib,
+        "ram_used_percent": ram_used_pct,
+    },
+    "root_storage": root_storage,
+    "compatibility_report": build_compatibility_report(),
     "storage_controllers": storage_controllers,
     "storage": storage,
     "gpus": gpus,

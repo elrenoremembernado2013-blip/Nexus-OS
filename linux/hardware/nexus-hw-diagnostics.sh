@@ -65,6 +65,8 @@ def redact(text: str) -> str:
     text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<REDACTED_IP>", text)
     text = re.sub(r"\bfe80:[0-9a-fA-F:]+\b", "<REDACTED_IPV6>", text)
     text = re.sub(r"/home/[A-Za-z0-9._-]+", "/home/<USER>", text)
+    text = re.sub(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----", "<REDACTED_PRIVATE_KEY>", text)
+    text = re.sub(r"(?i)\b(password|passwd|secret|token|x-nexus-token|authorization|bearer)\b\s*[:=]\s*[^\s,;\"']+", r"\1=<REDACTED>", text)
     if hostname and len(hostname) > 2:
         text = re.sub(rf"\b{re.escape(hostname)}\b", "<REDACTED_HOST>", text)
     if active_user and len(active_user) > 2 and active_user not in ("root", "user", "nexus"):
@@ -189,10 +191,107 @@ if rel.is_file():
 
 ts_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+failed_systemd_services = []
+if shutil.which("systemctl"):
+    for scope_args in ([], ["--user"]):
+        try:
+            fres = subprocess.run(["systemctl", *scope_args, "--failed", "--no-legend", "--plain"], capture_output=True, text=True, timeout=3)
+            if fres.returncode == 0:
+                for line in fres.stdout.splitlines():
+                    tok = line.strip().split()
+                    if tok:
+                        failed_systemd_services.append({"unit": tok[0], "scope": "user" if scope_args else "system"})
+        except Exception:
+            pass
+
+storage_availability = []
+for mnt in ("/", "/boot", "/boot/efi"):
+    p = Path(mnt)
+    if not p.exists():
+        continue
+    try:
+        st = os.statvfs(mnt)
+        tot = st.f_blocks * st.f_frsize
+        avail = st.f_bavail * st.f_frsize
+        used_pct = round(((tot - avail) / tot) * 100.0, 1) if tot > 0 else 0.0
+        storage_availability.append({
+            "mount": mnt,
+            "total_gib": round(tot / (1024 ** 3), 2),
+            "available_gib": round(avail / (1024 ** 3), 2),
+            "used_percent": used_pct,
+        })
+    except OSError:
+        pass
+
+system_logs = {"source": "unavailable", "recent_errors": [], "note": "journalctl/dmesg unavailable or permission-restricted."}
+if shutil.which("journalctl"):
+    try:
+        jres = subprocess.run(["journalctl", "-p", "err", "-n", "12", "--no-pager", "-q"], capture_output=True, text=True, timeout=4)
+        if jres.returncode == 0:
+            lines = [redact(l[:200]) for l in jres.stdout.splitlines() if l.strip()]
+            system_logs = {"source": "journalctl", "recent_errors": lines, "note": "Redacted system error lines (max 12)."}
+        elif jres.stderr.strip():
+            system_logs["note"] = redact(jres.stderr.strip().splitlines()[0][:160])
+    except Exception:
+        pass
+
+package_manager = {
+    "apt_available": shutil.which("apt-get") is not None,
+    "dpkg_available": shutil.which("dpkg") is not None,
+    "flatpak_available": shutil.which("flatpak") is not None,
+    "dpkg_audit_status": "unavailable",
+    "broken_packages": False,
+}
+if shutil.which("dpkg"):
+    try:
+        dres = subprocess.run(["dpkg", "--audit"], capture_output=True, text=True, timeout=5)
+        package_manager["dpkg_audit_status"] = "clean" if (dres.returncode == 0 and not dres.stdout.strip()) else "issues_detected"
+        package_manager["broken_packages"] = bool(dres.stdout.strip()) or dres.returncode != 0
+    except Exception:
+        package_manager["dpkg_audit_status"] = "error"
+
+security_updates = {
+    "status": "unavailable",
+    "upgradable_count": None,
+    "security_origin_count": None,
+    "note": "Read-only check from existing APT cache.",
+}
+if shutil.which("apt"):
+    try:
+        ares = subprocess.run(["apt", "list", "--upgradable"], capture_output=True, text=True, timeout=8)
+        if ares.returncode == 0:
+            up_lines = [l for l in ares.stdout.splitlines() if "/" in l and not l.startswith("Listing")]
+            sec_lines = [l for l in up_lines if "-security" in l.lower()]
+            security_updates = {
+                "status": "updates_available" if up_lines else "up_to_date",
+                "upgradable_count": len(up_lines),
+                "security_origin_count": len(sec_lines),
+                "note": "Read-only count from local APT lists (no apt update/upgrade executed).",
+            }
+    except Exception:
+        pass
+
+boot_recovery = {
+    "uefi_active": Path("/sys/firmware/efi").is_dir(),
+    "secure_boot_state": (inv.get("secure_boot_chain") or {}).get("secure_boot_state", "unavailable"),
+    "efi_grub_present": any(Path(p).is_file() for p in ("/boot/efi/EFI/ubuntu/grubx64.efi", "/boot/efi/EFI/nexus/grubx64.efi", "/boot/efi/EFI/BOOT/BOOTX64.EFI")),
+    "fstab_readable": Path("/etc/fstab").is_file(),
+    "recovery_tool_available": Path("/usr/local/bin/nexus-recovery").is_file() or Path("linux/installer/nexus-recovery.sh").is_file(),
+}
+
 report = redact_obj({
     "generated_at_utc": ts_utc,
-    "privacy_policy": "Redacted: zero serial numbers, MAC addresses, UUIDs, Wi-Fi SSIDs, hostnames, usernames, or external IPs.",
+    "edition": edition,
+    "privacy_policy": "Redacted: zero passwords, auth tokens, private keys, serial numbers, MAC addresses, UUIDs, Wi-Fi SSIDs, hostnames, usernames, or external IPs.",
     "non_destructive": True,
+    "export_manifest": [
+        "Hardware inventory & driver binding status",
+        "Failed systemd unit names & service states",
+        "Mount space summary (/ and /boot)",
+        "Redacted system error lines (max 12)",
+        "Package manager health (dpkg --audit) & cached update count",
+        "UEFI/Secure Boot/recovery readiness flags",
+    ],
     "connectivity": {
         "networkmanager_state": nm_state,
         "wifi_scan_capable": wifi_scan_capable,
@@ -200,6 +299,12 @@ report = redact_obj({
         "rfkill": rfkill_items,
     },
     "service_states": service_states,
+    "failed_systemd_services": failed_systemd_services,
+    "storage_availability": storage_availability,
+    "system_logs": system_logs,
+    "package_manager": package_manager,
+    "security_updates": security_updates,
+    "boot_recovery": boot_recovery,
     "graphics_glx": glx_summary,
     "graphics_qualification": inv.get("graphics_qualification", {}),
     "audio_sinks": audio_sinks,
@@ -211,7 +316,7 @@ report = redact_obj({
     "inventory": inv,
 })
 
-# Self-audit serialized JSON for any unredacted PII patterns
+# Self-audit serialized JSON for any unredacted PII or secret patterns
 raw_check = json.dumps(report)
 leaks = []
 if re.search(r"\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b", raw_check):
@@ -224,6 +329,8 @@ if re.search(r"\bfe80:[0-9a-fA-F:]+\b", raw_check):
     leaks.append("ipv6_address")
 if re.search(r"/home/(?!<USER>)[A-Za-z0-9._-]+", raw_check):
     leaks.append("home_username")
+if re.search(r"BEGIN [A-Z0-9 ]*PRIVATE KEY", raw_check):
+    leaks.append("private_key")
 if hostname and len(hostname) > 2 and re.search(rf"\b{re.escape(hostname)}\b", raw_check):
     leaks.append("hostname")
 
