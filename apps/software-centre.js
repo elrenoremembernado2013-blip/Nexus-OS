@@ -306,10 +306,28 @@
         { label: "Browse apps", view: "apps" }
       ));
       const notice = node("aside", "store-trust-note");
-      notice.append(
-        node("strong", "", "NEXUS Verified is not active yet."),
-        node("p", "", "Listings have not passed automated security checks. No app is marked verified, and third-party packages cannot be installed.")
-      );
+      if (packagesAvailable()) {
+        notice.append(
+          node("strong", "", "Connected to Linux Mint package management."),
+          node("p", "", "Search APT/Flatpak repositories, inspect package dependencies, and install or remove software via PolicyKit authentication. Search above to query live repositories.")
+        );
+        try {
+          const srcRes = window.NexusNativeServices.call("packages", "sources");
+          if (srcRes && typeof srcRes.then === "function") {
+            srcRes.then(s => {
+              if (!s) return;
+              notice.querySelector("p").textContent = `Package sources — APT: ${s.apt ? "available" : "unavailable"} · Flatpak: ${s.flatpak ? "available" : "unavailable"} · PolicyKit: ${s.pkexec ? "ready" : "unavailable"}.`;
+            }).catch(() => {});
+          }
+        } catch {
+          // Keep default connected notice
+        }
+      } else {
+        notice.append(
+          node("strong", "", "NEXUS Verified is not active yet."),
+          node("p", "", "Listings have not passed automated security checks. No app is marked verified, and third-party packages cannot be installed.")
+        );
+      }
       wrapper.append(notice);
       page.append(wrapper);
     }
@@ -439,6 +457,61 @@
         }
         wrapper.append(row);
       });
+      if (packagesAvailable()) {
+        const nativeHeading = node("div", "store-page-intro");
+        nativeHeading.style.marginTop = "18px";
+        nativeHeading.append(
+          node("h3", "", "Installed Linux Mint packages (APT / Flatpak)"),
+          node("p", "", "Manually installed APT packages and Flatpak apps detected on this host.")
+        );
+        const nativeList = node("div", "store-operation-list");
+        const loadingNote = node("p", "store-message", "Loading installed APT and Flatpak packages…");
+        wrapper.append(nativeHeading, loadingNote, nativeList);
+        const renderInstalled = res => {
+          if (typeof loadingNote.remove === "function") loadingNote.remove();
+          else loadingNote.textContent = "";
+          const all = [
+            ...(res?.flatpak || []),
+            ...(res?.apt || []).slice(0, 30)
+          ];
+          if (!all.length) {
+            nativeList.append(node("p", "store-message", "No user-installed APT or Flatpak apps reported."));
+            return;
+          }
+          all.forEach(pkg => {
+            const row = node("article", "store-operation-row");
+            const copy = node("div", "store-operation-copy");
+            copy.append(
+              node("strong", "", `${pkg.name || pkg.id} · ${String(pkg.source || "apt").toUpperCase()}`),
+              node("small", "", pkg.version ? `Version ${pkg.version}` : pkg.id)
+            );
+            const infoBtn = node("button", "store-text-button", "Info");
+            infoBtn.type = "button";
+            infoBtn.dataset.storeAction = "native-info";
+            infoBtn.dataset.pkgId = pkg.id;
+            infoBtn.dataset.pkgSource = pkg.source || "apt";
+            const rmBtn = node("button", "store-text-button", "Remove");
+            rmBtn.type = "button";
+            rmBtn.dataset.storeAction = "native-remove";
+            rmBtn.dataset.pkgId = pkg.id;
+            rmBtn.dataset.pkgSource = pkg.source || "apt";
+            row.append(copy, infoBtn, rmBtn);
+            nativeList.append(row);
+          });
+        };
+        try {
+          const instRes = window.NexusNativeServices.call("packages", "installed");
+          if (instRes && typeof instRes.then === "function") {
+            instRes.then(renderInstalled).catch(err => {
+              loadingNote.textContent = `Could not list installed packages: ${err.message}`;
+            });
+          } else {
+            renderInstalled(instRes);
+          }
+        } catch (err) {
+          loadingNote.textContent = `Could not list installed packages: ${err.message}`;
+        }
+      }
       page.append(wrapper);
     }
 
@@ -596,6 +669,10 @@
       primary.type = "button";
       primary.dataset.storeAction = action.action;
       primary.dataset.appId = application.id;
+      if (action.pkgId) {
+        primary.dataset.pkgId = action.pkgId;
+        primary.dataset.pkgSource = action.pkgSource;
+      }
       primary.disabled = action.disabled;
       if (action.disabled) primary.title = "A compatible installer or launcher integration is not available.";
       actionArea.append(primary);
@@ -646,6 +723,29 @@
       body.lastChild.append(metadata, permissions, trust);
       wrapper.append(identity, actionArea, body);
       page.append(wrapper);
+
+      if (packagesAvailable() && application.linuxPackage?.id) {
+        const pkgSrc = application.linuxPackage.source || "apt";
+        const pkgId = application.linuxPackage.id;
+        try {
+          const infoRes = window.NexusNativeServices.call("packages", "info", pkgSrc, pkgId);
+          const applyPkgInfo = info => {
+            if (!info || info.error) return;
+            const dds = metadata.querySelectorAll("dd");
+            if (dds[0]) dds[0].textContent = `Linux Mint ${pkgSrc.toUpperCase()} (${pkgId})`;
+            if (dds[1] && info.version) dds[1].textContent = info.version;
+            if (dds[2] && info.installed_size_kb) dds[2].textContent = `${Math.round(info.installed_size_kb / 102.4) / 10} MiB installed`;
+            if (dds[5]) dds[5].textContent = info.installed ? "Installed on host" : "Available in repository";
+            if (Array.isArray(info.dependencies) && info.dependencies.length) {
+              permissionList.append(node("li", "", `Top dependencies: ${info.dependencies.slice(0, 6).join(", ")}`));
+            }
+          };
+          if (infoRes && typeof infoRes.then === "function") infoRes.then(applyPkgInfo).catch(() => {});
+          else applyPkgInfo(infoRes);
+        } catch {
+          // Keep static metadata
+        }
+      }
     }
 
     function renderCollection(collectionId) {

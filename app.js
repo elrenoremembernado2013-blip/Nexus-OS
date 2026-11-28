@@ -592,6 +592,35 @@
     }
   }
 
+  function classifyAppMode(appId) {
+    const svc = window.NexusNativeServices;
+    const has = id => {
+      try { return Boolean(svc?.status(id)?.available); } catch { return false; }
+    };
+    const nativeMap = {
+      terminal: ["terminal"],
+      monitor: ["telemetry", "performance"],
+      software: ["packages"],
+      files: ["files"],
+      settings: ["control-centre", "personalisation", "privacy-security"],
+      gaming: ["gaming"],
+      hardware: ["hardware"],
+      welcome: ["installer"]
+    };
+    if (nativeMap[appId]) {
+      return nativeMap[appId].some(has)
+        ? { mode: "native", label: "Native Linux" }
+        : { mode: "preview", label: appId === "files" || appId === "settings" ? "Local / Preview" : "Preview" };
+    }
+    if (["quantum", "notes", "calculator", "calendar"].includes(appId)) {
+      if (appId === "quantum" && has("quantum")) {
+        return { mode: "local", label: "Local · Synced" };
+      }
+      return { mode: "local", label: "Local App" };
+    }
+    return { mode: "preview", label: "Preview" };
+  }
+
   window.NexusDesktopShell = Object.freeze({
     setDesktopWallpaper,
     getWallpaperUrl,
@@ -604,6 +633,7 @@
     setDockPreferences,
     setDesktopPreferences,
     getControlState: () => ({ ...controlState }),
+    getAppRuntimeMode: classifyAppMode,
     setControlPreference,
     isLowResourceMode: () => Boolean(controlState.power),
     setLowResourceMode: (enabled, syncNative = true) => setControlPreference("power", Boolean(enabled), syncNative),
@@ -699,6 +729,12 @@
     const titleSpan = document.createElement("span");
     titleSpan.textContent = titleText;
 
+    const runtime = classifyAppMode(appId);
+    el.dataset.runtimeMode = runtime.mode;
+    const modePill = document.createElement("span");
+    modePill.className = `window-mode-pill mode-${runtime.mode}`;
+    modePill.textContent = runtime.label;
+
     const maxBtn = document.createElement("button");
     maxBtn.type = "button";
     maxBtn.className = "window-control maximize";
@@ -706,7 +742,10 @@
     maxBtn.title = "Maximise or restore (Alt+F10)";
     maxBtn.textContent = "□";
 
-    titlebar.append(controls, titleSpan, maxBtn);
+    const rightControls = document.createElement("div");
+    rightControls.className = "window-title-right";
+    rightControls.append(modePill, maxBtn);
+    titlebar.append(controls, titleSpan, rightControls);
 
     const contentEl = document.createElement("div");
     contentEl.className = "window-content";

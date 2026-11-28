@@ -968,7 +968,7 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
 {
   const desktopDir = path.join(rootDir, "linux", "branding", "applications");
   const files = fs.readdirSync(desktopDir).filter(f => f.endsWith(".desktop")).sort();
-  assert.equal(files.length, 12, "Expected 12 .desktop launcher files");
+  assert.equal(files.length, 14, "Expected 14 .desktop launcher files");
   const contents = new Map();
   for (const file of files) {
     const text = fs.readFileSync(path.join(desktopDir, file), "utf8");
@@ -996,7 +996,9 @@ function bootDesktop(initialStorage = {}, extraOptions = {}) {
     "nexus-system-monitor.desktop": "monitor",
     "nexus-settings.desktop": "settings",
     "nexus-store.desktop": "store",
-    "nexus-gaming.desktop": "gaming"
+    "nexus-gaming.desktop": "gaming",
+    "nexus-performance.desktop": "performance",
+    "nexus-quantum.desktop": "quantum"
   };
   for (const [file, target] of Object.entries(expectedTargets)) {
     const suffix = target === "browser" ? " %u" : "";

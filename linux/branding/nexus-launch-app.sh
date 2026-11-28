@@ -7,6 +7,7 @@ set -euo pipefail
 STORE_CLI="${NEXUS_STORE_CLI:-/usr/local/bin/nexus-store-cli}"
 FIRSTBOOT_CLI="${NEXUS_FIRSTBOOT_CLI:-/usr/local/bin/nexus-firstboot}"
 GAMING_CLI="${NEXUS_GAMING_CLI:-/usr/local/bin/nexus-gaming-cli}"
+PERF_CLI="${NEXUS_PERF_CLI:-/usr/local/bin/nexus-performance-cli}"
 SECURITY_CLI="${NEXUS_SECURITY_CLI:-/usr/local/bin/nexus-security-cli}"
 WALLPAPER_CLI="${NEXUS_WALLPAPER_CLI:-/usr/local/bin/nexus-wallpaper}"
 
@@ -93,8 +94,22 @@ case "${1:-}" in
     [[ -x "$WALLPAPER_CLI" ]] || fail "NEXUS Wallpaper CLI is not installed at $WALLPAPER_CLI"
     run_in_terminal "$WALLPAPER_CLI" list || fail "no supported terminal emulator is available for NEXUS Wallpaper"
     ;;
+  performance)
+    shift
+    [[ -x "$PERF_CLI" ]] || fail "NEXUS Performance CLI is not installed at $PERF_CLI"
+    run_in_terminal "$PERF_CLI" overview || fail "no supported terminal emulator is available for NEXUS Performance Centre"
+    ;;
+  quantum)
+    shift
+    local_ui="/usr/local/share/nexus-os/ui/index.html"
+    target_url="file://${local_ui}#quantum"
+    for app in firefox chromium chromium-browser falkon x-www-browser; do
+      if has "$app"; then exec "$app" "$target_url"; fi
+    done
+    fail "no supported web browser is installed to open NEXUS Quantum"
+    ;;
   *)
-    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot|gaming|security|wallpaper}\n' "$0" >&2
+    printf 'Usage: %s {files|browser|terminal|monitor|settings|store|firstboot|gaming|security|wallpaper|performance|quantum}\n' "$0" >&2
     exit 2
     ;;
 esac

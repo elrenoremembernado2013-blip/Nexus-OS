@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NEXUS Performance Centre
+Comment=Inspect boot duration, RAM/ZRAM, startup apps, and safe cache cleanup
+Exec=/usr/local/bin/nexus-launch-app performance
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;
+StartupNotify=true

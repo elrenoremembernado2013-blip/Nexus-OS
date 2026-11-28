@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NEXUS Quantum
+Comment=Learning studio, single-qubit lab, study notes, and offline technology guide
+Exec=/usr/local/bin/nexus-launch-app quantum
+Icon=/usr/local/share/nexus-os/branding/nexus-logo.svg
+Terminal=false
+Categories=Education;Science;
+StartupNotify=true

@@ -989,5 +989,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .perf-row-actions{display:flex;gap:8px;align-items:center}
 .perf-changes-list{margin-top:8px}
 .desktop.theme-light .perf-sparkline{background:rgba(42,37,35,.05)}
+.window-title-right{display:flex;align-items:center;gap:6px}
+.window-mode-pill{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.05)}
+.window-mode-pill.mode-native{color:#8ef0bd;border-color:rgba(80,210,145,.45);background:rgba(80,210,145,.14)}
+.window-mode-pill.mode-local{color:#b7d8ff;border-color:rgba(126,184,255,.4);background:rgba(126,184,255,.12)}
+.desktop.theme-light .window-mode-pill.mode-native{color:#0c6b3d}
+.desktop.theme-light .window-mode-pill.mode-local{color:#144d8f}
 
 

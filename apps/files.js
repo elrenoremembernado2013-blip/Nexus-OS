@@ -8,16 +8,26 @@
     return Boolean(trimmed && trimmed !== "." && trimmed !== ".." && !/[\\/]/.test(trimmed));
   }
 
+  function nativeFilesAvailable() {
+    try {
+      return Boolean(window.NexusNativeServices?.status("files")?.available);
+    } catch {
+      return false;
+    }
+  }
+
   function render() {
+    const isNative = nativeFilesAvailable();
     return `
       <section class="file-manager" aria-labelledby="filesTitle">
         <header class="app-heading">
           <div>
-            <p class="app-eyebrow">PERSONAL FILES</p>
+            <p class="app-eyebrow">${isNative ? "LINUX HOME FILES" : "PERSONAL FILES"}</p>
             <h2 class="content-title" id="filesTitle">File Manager</h2>
-            <p class="content-sub">Your files stay under your control.</p>
+            <p class="content-sub">${isNative ? "Connected to your Linux home folder (~); protected system and credential paths stay blocked." : "Your files stay under your control."}</p>
           </div>
           <div class="files-open-actions">
+            ${isNative ? '<button type="button" class="action-button secondary-button" id="filesOpenNative">Open native app</button>' : ""}
             <button type="button" class="action-button" id="filesChooseFolder">Choose folder</button>
             <label class="action-button files-open-label" for="filesOpenInput">Open files</label>
             <input id="filesOpenInput" class="visually-hidden" type="file" multiple aria-label="Open files for read-only preview">
@@ -26,9 +36,10 @@
         <div class="files-layout">
           <aside class="files-sidebar" aria-label="File locations">
             <p class="app-eyebrow">LOCATIONS</p>
-            <button type="button" class="files-location selected" id="filesHomeLocation" aria-current="location"><span aria-hidden="true">⌂</span> Selected folder</button>
-            <div class="files-sidebar-note">Only a folder you choose is available to this app.</div>
-            <div class="files-storage" id="filesStorage" role="status">No folder selected</div>
+            <button type="button" class="files-location selected" id="filesHomeLocation" aria-current="location"><span aria-hidden="true">⌂</span> ${isNative ? "Home (~)" : "Selected folder"}</button>
+            ${isNative ? '<button type="button" class="files-location" data-native-loc="~/Documents">Documents</button><button type="button" class="files-location" data-native-loc="~/Downloads">Downloads</button><button type="button" class="files-location" data-native-loc="~/Desktop">Desktop</button>' : ""}
+            <div class="files-sidebar-note">${isNative ? "Confined strictly to your user $HOME directory (.ssh/.gnupg hidden)." : "Only a folder you choose is available to this app."}</div>
+            <div class="files-storage" id="filesStorage" role="status">${isNative ? "Connecting to $HOME…" : "No folder selected"}</div>
           </aside>
           <div class="files-main">
             <nav class="files-breadcrumbs" id="filesBreadcrumbs" aria-label="Current folder"></nav>
@@ -42,7 +53,7 @@
               <button type="button" class="action-button" id="filesPaste" disabled>Paste</button>
               <button type="button" class="action-button files-danger" id="filesDelete" disabled>Delete</button>
             </div>
-            <p class="files-status" id="filesStatus" role="status" aria-live="polite">Choose a folder to browse it, or open individual files for read-only preview.</p>
+            <p class="files-status" id="filesStatus" role="status" aria-live="polite">${isNative ? "Loading your Linux home folder…" : "Choose a folder to browse it, or open individual files for read-only preview."}</p>
             <div class="files-list-wrap">
               <table class="files-table">
                 <thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Size</th><th scope="col">Modified</th></tr></thead>
@@ -55,7 +66,7 @@
             <p class="files-preview-empty">Select a file to preview it.</p>
           </aside>
         </div>
-        <p class="integration-note">Folder access uses the browser's explicit directory picker and is limited to the folder you grant. Removable-device management and system-wide storage details require native Linux integration.</p>
+        <p class="integration-note">${isNative ? "Native File Manager mode accesses only your regular user $HOME directory through the authenticated loopback bridge." : "Folder access uses the browser's explicit directory picker and is limited to the folder you grant. Removable-device management and system-wide storage details require native Linux integration."}</p>
       </section>`;
   }
 
@@ -77,6 +88,9 @@
     let previewUrl = null;
     let previewGeneration = 0;
     let listingGeneration = 0;
+    let nativeMode = nativeFilesAvailable();
+    let nativeHome = "";
+    let nativeCurrentPath = "";
 
     chooseFolder.disabled = typeof window.showDirectoryPicker !== "function";
     chooseFolder.title = chooseFolder.disabled
@@ -129,6 +143,29 @@
       }
 
       try {
+        if (entry.nativePath && nativeMode) {
+          const data = await window.NexusNativeServices.call("files", "preview", entry.nativePath);
+          if (request !== previewGeneration) return;
+          if (data?.tooLarge) {
+            preview.append(Object.assign(document.createElement("p"), {
+              className: "files-preview-empty",
+              textContent: `Preview is limited to 256 KB. This file is ${prettySize(data.size)}.`
+            }));
+            return;
+          }
+          if (data?.binary || data?.text === null || data?.text === undefined) {
+            preview.append(Object.assign(document.createElement("p"), {
+              className: "files-preview-empty",
+              textContent: `${entry.mode || ""} · Binary or non-text file (${prettySize(entry.size)})`
+            }));
+            return;
+          }
+          const pre = document.createElement("pre");
+          pre.className = "files-text-preview";
+          pre.textContent = data.text;
+          preview.append(pre);
+          return;
+        }
         const file = await entryFile(entry);
         if (request !== previewGeneration) return;
         if (file.size > maxPreviewBytes) {
@@ -167,6 +204,17 @@
     }
 
     function updateActions() {
+      if (nativeMode && !currentHandle) {
+        const hasSelection = Boolean(selectedEntry?.nativePath);
+        $("#filesNewFolder").disabled = false;
+        $("#filesNewFile").disabled = false;
+        $("#filesRename").disabled = !hasSelection;
+        $("#filesCopy").disabled = true;
+        $("#filesCut").disabled = true;
+        $("#filesPaste").disabled = true;
+        $("#filesDelete").disabled = !hasSelection;
+        return;
+      }
       const hasWritableFolder = Boolean(currentHandle);
       const renameButton = $("#filesRename");
       const canMove = Boolean(selectedEntry?.handle && typeof selectedEntry.handle.move === "function");
@@ -208,13 +256,13 @@
       row.append(nameCell, kindCell, sizeCell, modifiedCell);
       row.addEventListener("click", () => selectEntry(entry, row));
       row.addEventListener("dblclick", () => {
-        if (entry.kind === "directory" && entry.handle) enterDirectory(entry);
+        if (entry.kind === "directory" && (entry.handle || entry.nativePath)) enterDirectory(entry);
         else selectEntry(entry, row);
       });
       row.addEventListener("keydown", event => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          if (event.key === "Enter" && entry.kind === "directory" && entry.handle) enterDirectory(entry);
+          if (event.key === "Enter" && entry.kind === "directory" && (entry.handle || entry.nativePath)) enterDirectory(entry);
           else selectEntry(entry, row);
         }
       });
@@ -254,7 +302,63 @@
       });
     }
 
+    async function loadNativeDirectory(targetPath = "") {
+      const request = ++listingGeneration;
+      rows.replaceChildren();
+      selectedEntry = null;
+      updateActions();
+      try {
+        setStatus("Reading Linux directory…");
+        const data = await window.NexusNativeServices.call("files", "list", targetPath);
+        if (request !== listingGeneration) return false;
+        nativeHome = data.home || nativeHome;
+        nativeCurrentPath = data.path || targetPath || nativeHome;
+        const term = search.value.trim().toLocaleLowerCase();
+        const visible = (data.entries || []).filter(e => e.name.toLocaleLowerCase().includes(term));
+        visible.forEach(entry => rows.append(makeRow({
+          name: entry.name,
+          kind: entry.kind,
+          size: entry.size,
+          modified: entry.modified,
+          mode: entry.mode,
+          nativePath: entry.path,
+        })));
+        const breadcrumbs = $("#filesBreadcrumbs");
+        breadcrumbs.replaceChildren();
+        const segs = data.relPath === "." ? [] : String(data.relPath || "").split("/").filter(Boolean);
+        const homeBtn = document.createElement("button");
+        homeBtn.type = "button";
+        homeBtn.textContent = "~";
+        homeBtn.setAttribute("aria-current", segs.length === 0 ? "location" : "false");
+        homeBtn.addEventListener("click", () => loadNativeDirectory(nativeHome));
+        breadcrumbs.append(homeBtn);
+        let acc = nativeHome;
+        segs.forEach((seg, idx) => {
+          acc = `${acc}/${seg}`;
+          const targetSeg = acc;
+          const sep = document.createElement("span");
+          sep.setAttribute("aria-hidden", "true");
+          sep.textContent = "/";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = seg;
+          btn.setAttribute("aria-current", idx === segs.length - 1 ? "location" : "false");
+          btn.addEventListener("click", () => loadNativeDirectory(targetSeg));
+          breadcrumbs.append(sep, btn);
+        });
+        storage.textContent = `${visible.length} item${visible.length === 1 ? "" : "s"} · ${data.free_gib ?? "?"} GiB free`;
+        setStatus(`${visible.length} item${visible.length === 1 ? "" : "s"} in ${data.relPath === "." ? "~" : "~/" + data.relPath}.`);
+        return true;
+      } catch (error) {
+        setStatus(error?.message || "Could not read directory.", true);
+        return false;
+      }
+    }
+
     async function drawEntries() {
+      if (nativeMode && !currentHandle) {
+        return loadNativeDirectory(nativeCurrentPath);
+      }
       const request = ++listingGeneration;
       rows.replaceChildren();
       selectedEntry = null;
@@ -310,6 +414,12 @@
     }
 
     async function enterDirectory(entry) {
+      if (entry.nativePath && nativeMode && !currentHandle) {
+        selectedEntry = null;
+        clearPreview();
+        await loadNativeDirectory(entry.nativePath);
+        return;
+      }
       const prevHandle = currentHandle;
       const prevPath = path;
       try {
@@ -432,6 +542,14 @@
         setStatus("Enter a valid folder name without / or \\ (cannot be . or ..).", true);
         return;
       }
+      if (nativeMode && !currentHandle) {
+        try {
+          await window.NexusNativeServices.call("files", "mkdir", nativeCurrentPath, name.trim());
+          setStatus(`Created folder “${name.trim()}”.`);
+          await loadNativeDirectory(nativeCurrentPath);
+        } catch (error) { reportError(error); }
+        return;
+      }
       try {
         await ensureWritePermission();
         if (await existsIn(currentHandle, name.trim())) throw new Error(`“${name.trim()}” already exists here.`);
@@ -448,6 +566,14 @@
         setStatus("Enter a valid file name without / or \\ (cannot be . or ..).", true);
         return;
       }
+      if (nativeMode && !currentHandle) {
+        try {
+          await window.NexusNativeServices.call("files", "touch", nativeCurrentPath, name.trim());
+          setStatus(`Created file “${name.trim()}”.`);
+          await loadNativeDirectory(nativeCurrentPath);
+        } catch (error) { reportError(error); }
+        return;
+      }
       try {
         await ensureWritePermission();
         if (await existsIn(currentHandle, name.trim())) throw new Error(`“${name.trim()}” already exists here.`);
@@ -461,6 +587,22 @@
     });
 
     $("#filesRename").addEventListener("click", async () => {
+      if (nativeMode && !currentHandle && selectedEntry?.nativePath) {
+        const entry = selectedEntry;
+        const name = window.prompt("Rename to", entry.name);
+        if (name === null) return;
+        if (!validName(name)) {
+          setStatus("Enter a valid name without / or \\ (cannot be . or ..).", true);
+          return;
+        }
+        if (name.trim() === entry.name) return;
+        try {
+          await window.NexusNativeServices.call("files", "rename", entry.nativePath, name.trim());
+          setStatus(`Renamed to “${name.trim()}”.`);
+          await loadNativeDirectory(nativeCurrentPath);
+        } catch (error) { reportError(error); }
+        return;
+      }
       if (!selectedEntry?.handle || typeof selectedEntry.handle.move !== "function") return;
       const entry = selectedEntry;
       const name = window.prompt("Rename to", entry.name);
@@ -534,6 +676,17 @@
     });
 
     $("#filesDelete").addEventListener("click", async () => {
+      if (nativeMode && !currentHandle && selectedEntry?.nativePath) {
+        const entry = selectedEntry;
+        if (!window.confirm(`Delete “${entry.name}”${entry.kind === "directory" ? " and its contents" : ""}?`)) return;
+        try {
+          await window.NexusNativeServices.call("files", "remove", entry.nativePath);
+          clearPreview();
+          setStatus(`Deleted “${entry.name}”.`);
+          await loadNativeDirectory(nativeCurrentPath);
+        } catch (error) { reportError(error); }
+        return;
+      }
       if (!selectedEntry?.handle) return;
       const entry = selectedEntry;
       if (!window.confirm(`Delete “${entry.name}”${entry.kind === "directory" ? " and its contents" : ""}?`)) return;
@@ -554,6 +707,10 @@
 
     search.addEventListener("input", drawEntries);
     $("#filesHomeLocation").addEventListener("click", () => {
+      if (nativeMode && !currentHandle) {
+        loadNativeDirectory(nativeHome || "");
+        return;
+      }
       if (!rootHandle) return;
       currentHandle = rootHandle;
       path = [{ name: rootHandle.name, handle: rootHandle }];
@@ -562,8 +719,25 @@
       drawBreadcrumbs();
       drawEntries();
     });
+    root.querySelectorAll("[data-native-loc]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (nativeMode) {
+          rootHandle = null;
+          currentHandle = null;
+          loadNativeDirectory(btn.dataset.nativeLoc);
+        }
+      });
+    });
+    $("#filesOpenNative")?.addEventListener("click", () => {
+      Promise.resolve(window.NexusNativeServices.call("files", "openControl"))
+        .then(res => setStatus(res?.message || "Opened native file manager.", res?.ok === false))
+        .catch(err => setStatus(err?.message || "Could not open native file manager.", true));
+    });
     updateActions();
     clearPreview();
+    if (nativeMode) {
+      loadNativeDirectory("");
+    }
     return () => {
       previewGeneration += 1;
       listingGeneration += 1;

@@ -14,21 +14,32 @@
     return `${re} ${sign} ${absIm.toFixed(3)}i`;
   }
 
+  const notesStorageKey = "nexus-quantum-notes-v1";
+
+  function quantumNativeAvailable() {
+    try {
+      return Boolean(window.NexusNativeServices?.status("quantum")?.available);
+    } catch {
+      return false;
+    }
+  }
+
   function render() {
     const views = [
       ["learn", "Learn"],
       ["lab", "Quantum Lab"],
       ["languages", "Languages"],
       ["coding", "Coding"],
+      ["notes", "Notes & Paths"],
       ["guide", "Guide"]
     ];
     return `
       <section class="quantum-studio" aria-labelledby="quantumTitle">
         <header class="quantum-header">
           <div>
-            <p class="app-eyebrow">OFFLINE LEARNING STUDIO</p>
+            <p class="app-eyebrow">LEARNING, NOTES &amp; TECH EXPLORATION</p>
             <h2 class="content-title" id="quantumTitle">Quantum</h2>
-            <p class="content-sub">Curated lessons, a real single-qubit lab, and an offline guide.</p>
+            <p class="content-sub">Curated learning paths, study notes, a single-qubit lab, and an offline guide.</p>
           </div>
           <div class="quantum-stats" aria-label="Learning progress">
             <span class="quantum-pill" id="quantumXp">0 XP</span>
@@ -66,6 +77,51 @@
 
     let progress = content.createEmptyProgress();
     let storageWritable = true;
+    let studyNotes = [];
+    let notesStorageBanner = quantumNativeAvailable()
+      ? "Syncing notes locally to ~/.local/share/nexus-os/quantum-notes.json (no cloud sync)."
+      : "Notes stored locally in this browser (no cloud sync or remote AI connected).";
+
+    function loadStudyNotes() {
+      try {
+        const raw = window.localStorage.getItem(notesStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) studyNotes = parsed;
+        }
+      } catch {
+        studyNotes = [];
+      }
+      if (quantumNativeAvailable()) {
+        try {
+          const res = window.NexusNativeServices.call("quantum", "loadNotes");
+          if (res && typeof res.then === "function") {
+            res.then(data => {
+              if (Array.isArray(data?.notes) && data.notes.length) {
+                studyNotes = data.notes;
+                try { window.localStorage.setItem(notesStorageKey, JSON.stringify(studyNotes)); } catch {}
+              }
+              if (data?.path) notesStorageBanner = `Synced locally to ${data.path} (no external cloud).`;
+              if (activeView === "notes") renderActiveView();
+            }).catch(() => {});
+          }
+        } catch {
+          // Ignore native notes error and stay local
+        }
+      }
+    }
+
+    function saveStudyNotes(nextNotes) {
+      studyNotes = nextNotes;
+      try {
+        window.localStorage.setItem(notesStorageKey, JSON.stringify(studyNotes));
+      } catch {
+        // Ignore storage quota restrictions
+      }
+      if (quantumNativeAvailable()) {
+        Promise.resolve(window.NexusNativeServices.call("quantum", "saveNotes", studyNotes)).catch(() => {});
+      }
+    }
 
     function loadSavedProgress() {
       try {
@@ -334,14 +390,108 @@
     function renderCodingView() {
       const intro = el("div", "quantum-section-intro");
       intro.append(
-        el("h3", "", "Python Concept Practice"),
-        el("p", "", "Read short Python snippets and trace their results. Code is not executed in this browser prototype.")
+        el("h3", "", "Python & Linux Systems Exploration"),
+        el("p", "", "Read short Python and Linux Mint architecture concepts without executing arbitrary code in the browser.")
       );
       body.append(intro);
 
       const grid = el("div", "quantum-lesson-grid");
-      content.getLessons("python").forEach(lesson => grid.append(makeLessonCard(lesson)));
+      [...content.getLessons("python"), ...content.getLessons("linux")].forEach(lesson => grid.append(makeLessonCard(lesson)));
       body.append(grid);
+    }
+
+    function renderNotesView() {
+      const intro = el("div", "quantum-section-intro");
+      intro.append(
+        el("h3", "", "Study Notes & Learning Paths"),
+        el("p", "", notesStorageBanner)
+      );
+      body.append(intro);
+
+      const pathsCard = el("div", "quantum-card");
+      pathsCard.append(el("h4", "", "Learning Path Progress"));
+      content.getTracks().forEach(track => {
+        const list = content.getLessons(track.id);
+        const done = list.filter(l => progress.completedLessonIds.includes(l.id)).length;
+        const pct = list.length ? Math.round((done / list.length) * 100) : 0;
+        const row = el("div", "quantum-prob-row");
+        row.append(el("span", "", `${track.title}: ${done} / ${list.length} (${pct}%)`));
+        const bar = el("div", "quantum-prob-bar");
+        const fill = el("div", "quantum-prob-fill");
+        fill.style.width = `${pct}%`;
+        bar.append(fill);
+        row.append(bar);
+        pathsCard.append(row);
+      });
+      body.append(pathsCard);
+
+      const formCard = el("form", "quantum-card");
+      formCard.append(el("h4", "", "Add study note"));
+      const titleInput = el("input", "quantum-answer-input");
+      titleInput.type = "text";
+      titleInput.placeholder = "Note title (e.g. Hadamard gate notes)";
+      titleInput.setAttribute("aria-label", "Study note title");
+
+      const trackSelect = el("select", "quantum-answer-input");
+      trackSelect.setAttribute("aria-label", "Learning track");
+      [["general", "General"], ["quantum", "Quantum"], ["python", "Python"], ["linux", "Linux"], ["languages", "Languages"]].forEach(([val, lbl]) => {
+        const opt = el("option", "", lbl);
+        opt.value = val;
+        trackSelect.append(opt);
+      });
+
+      const bodyInput = el("textarea", "quantum-answer-input");
+      bodyInput.rows = 3;
+      bodyInput.placeholder = "Write key takeaways, commands, or reminders…";
+      bodyInput.setAttribute("aria-label", "Study note content");
+
+      const saveBtn = el("button", "action-button", "Save note");
+      saveBtn.type = "submit";
+      formCard.append(titleInput, trackSelect, bodyInput, saveBtn);
+
+      formCard.addEventListener("submit", event => {
+        event.preventDefault();
+        const title = String(titleInput.value || "").trim();
+        const noteBody = String(bodyInput.value || "").trim();
+        if (!title && !noteBody) return;
+        const next = [
+          {
+            id: `note-${Date.now()}`,
+            title: title || "Study note",
+            track: trackSelect.value || "general",
+            body: noteBody,
+            updatedAt: new Date().toISOString().slice(0, 10)
+          },
+          ...studyNotes
+        ];
+        saveStudyNotes(next);
+        context.notify?.("Quantum study note saved");
+        renderActiveView();
+      });
+      body.append(formCard);
+
+      const listGrid = el("div", "quantum-lesson-grid");
+      if (!studyNotes.length) {
+        const empty = el("div", "quantum-card");
+        empty.append(el("h4", "", "No study notes yet"), el("p", "quantum-summary", "Create a note above to organise your learning across tracks."));
+        listGrid.append(empty);
+      } else {
+        studyNotes.forEach(note => {
+          const card = el("article", "quantum-card");
+          const top = el("div", "quantum-card-top");
+          top.append(el("h4", "", note.title), el("span", "quantum-badge", note.track || "general"));
+          const contentP = el("p", "quantum-summary", note.body || "");
+          const delBtn = el("button", "quantum-link-btn", "Delete note");
+          delBtn.type = "button";
+          delBtn.addEventListener("click", () => {
+            saveStudyNotes(studyNotes.filter(n => n.id !== note.id));
+            renderActiveView();
+          });
+          card.append(top, contentP, delBtn);
+          listGrid.append(card);
+        });
+      }
+      body.append(listGrid);
     }
 
     function renderGuideView(restoreFocus = false) {
@@ -400,6 +550,7 @@
       if (activeView === "lab") renderLabView();
       else if (activeView === "languages") renderLanguagesView();
       else if (activeView === "coding") renderCodingView();
+      else if (activeView === "notes") renderNotesView();
       else if (activeView === "guide") renderGuideView(focusTarget === "guide-input");
       else renderLearnView();
 
@@ -418,6 +569,7 @@
     });
 
     loadSavedProgress();
+    loadStudyNotes();
     renderActiveView();
 
     return () => {

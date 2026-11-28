@@ -17,6 +17,7 @@
     "gaming",
     "hardware",
     "performance",
+    "quantum",
     "installer",
     "control-centre",
     "personalisation",
@@ -171,6 +172,19 @@
       setStartup: (id, enable) => req("/api/performance/startup", "POST", { id, action: enable ? "enable" : "disable" }),
       cleanup: target => req("/api/performance/cleanup", "POST", { target, confirm: true }),
     });
+    registerSafe("files", {
+      list: path => req(`/api/files/list?path=${encodeURIComponent(path || "")}`),
+      preview: path => req(`/api/files/preview?path=${encodeURIComponent(path || "")}`),
+      mkdir: (path, name) => req("/api/files/mkdir", "POST", { path, name }),
+      touch: (path, name) => req("/api/files/touch", "POST", { path, name }),
+      rename: (path, newName) => req("/api/files/rename", "POST", { path, newName }),
+      remove: path => req("/api/files/delete", "POST", { path }),
+      openControl: () => req("/api/tools/launch", "POST", { category: "files" }),
+    });
+    registerSafe("quantum", {
+      loadNotes: () => req("/api/quantum/notes"),
+      saveNotes: notes => req("/api/quantum/notes", "POST", { notes }),
+    });
     registerSafe("terminal", {
       openSession: opts => req("/api/terminal/open", "POST", opts || {}),
       read: sessionId => req(`/api/terminal/read?sessionId=${encodeURIComponent(sessionId)}`),
@@ -179,7 +193,7 @@
       interrupt: sessionId => req("/api/terminal/interrupt", "POST", { sessionId }),
       closeSession: sessionId => req("/api/terminal/close", "POST", { sessionId }),
     });
-    for (const cat of ["display", "sound", "network", "bluetooth", "power", "accounts", "files"]) {
+    for (const cat of ["display", "sound", "network", "bluetooth", "power", "accounts"]) {
       registerSafe(cat, {
         openControl: () => req("/api/tools/launch", "POST", { category: cat }),
       });

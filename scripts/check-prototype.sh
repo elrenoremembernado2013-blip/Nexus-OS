@@ -40,6 +40,7 @@ node scripts/check-desktop-integration.js
 node scripts/check-phase18-integration.js
 node scripts/check-phase19-hardware-release.js
 node scripts/check-phase20-performance.js
+node scripts/check-phase21-ecosystem.js
 bash scripts/check-native-launchers.sh
 
 python3 - <<'PY'

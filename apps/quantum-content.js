@@ -26,6 +26,12 @@
       title: "Python Basics",
       view: "coding",
       summary: "Variables, lists, loops, and functions without executing code."
+    },
+    {
+      id: "linux",
+      title: "Linux & Open Source",
+      view: "coding",
+      summary: "Filesystem permissions, GNU Bash basics, and package trust."
     }
   ];
 
@@ -166,6 +172,29 @@
       acceptedAnswers: ["return"],
       hint: "`print` displays text, while this keyword hands a value back to the caller.",
       explanation: "Correct: `return` exits the function and passes the computed value back."
+    },
+    {
+      id: "lx-permissions",
+      trackId: "linux",
+      title: "Linux filesystem & least privilege",
+      summary: "Regular desktop apps run as your user account (~) and ask PolicyKit (pkexec) only when installing or removing system packages.",
+      snippet: "ls -la ~/Documents\nls -ld /etc/shadow",
+      prompt: "Which tool requests explicit user elevation only for administrative tasks on Linux Mint?",
+      choices: ["chmod 777", "pkexec", "telnet"],
+      acceptedAnswers: ["pkexec", "policykit", "polkit"],
+      hint: "NEXUS Store uses PolicyKit (`pkexec`) instead of running the whole desktop as root.",
+      explanation: "Correct: `pkexec` (PolicyKit) prompts for user authorization only for specific privileged operations."
+    },
+    {
+      id: "lx-packages",
+      trackId: "linux",
+      title: "APT vs Flatpak on Linux Mint",
+      summary: "APT packages are signed by Ubuntu/Mint repositories and run unsandboxed; Flatpak apps use portal permissions to limit host access.",
+      prompt: "Which Linux package format uses desktop portals to sandbox app permissions?",
+      choices: ["APT", "Flatpak", "tar.gz"],
+      acceptedAnswers: ["flatpak"],
+      hint: "Flatpak exposes granular filesystem/device permissions that can be inspected or revoked.",
+      explanation: "Correct: Flatpak isolates apps with portal permissions, whereas APT packages run with standard user privileges."
     }
   ];
 
@@ -204,6 +233,11 @@
       keywords: ["python", "len", "list", "index", "def", "return", "function"],
       title: "Python Concept Notes",
       body: "Python strings and lists are 0-indexed (`items[0]`), `len()` counts elements, and `def` functions return results with `return`. Quantum does not execute code."
+    },
+    {
+      keywords: ["linux", "bash", "apt", "flatpak", "pkexec", "polkit", "permissions"],
+      title: "Linux & Package Trust Notes",
+      body: "NEXUS OS runs desktop apps as an unprivileged user. APT packages use signed Ubuntu/Linux Mint repositories; Flatpak apps use sandboxed portals; privileged installs prompt via pkexec."
     }
   ];
 

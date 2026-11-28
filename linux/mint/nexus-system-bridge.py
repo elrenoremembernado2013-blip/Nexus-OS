@@ -788,6 +788,175 @@ class TerminalSessionManager:
             self.close_session(sid)
 
 
+class SafeHomeFilesManager:
+    """Strict $HOME-jailed file browser & safe manipulation helper for NEXUS Files."""
+
+    PROTECTED_TOP_DIRS = frozenset({".ssh", ".gnupg", ".pki", ".aws", ".kube"})
+    MAX_PREVIEW_BYTES = 262144
+
+    def __init__(self, home_root: Path | None = None) -> None:
+        self.home_root = (home_root or Path.home()).resolve()
+
+    def _resolve_in_home(self, rel_or_abs: str | None, *, allow_root: bool = False) -> Path:
+        raw = (rel_or_abs or "").strip()
+        if not raw or raw == "~":
+            target = self.home_root
+        elif raw.startswith("~/"):
+            target = self.home_root / raw[2:]
+        else:
+            p = Path(raw)
+            target = p if p.is_absolute() else (self.home_root / p)
+
+        resolved = target.resolve(strict=False)
+        try:
+            rel = resolved.relative_to(self.home_root)
+        except ValueError as err:
+            raise PermissionError("Access denied: path is outside the user's home directory.") from err
+
+        if not allow_root and resolved == self.home_root:
+            raise PermissionError("Refusing to modify or delete the user home directory root.")
+
+        parts = rel.parts
+        if parts and parts[0] in self.PROTECTED_TOP_DIRS:
+            raise PermissionError(f"Access denied: protected security directory ({parts[0]}) is never exposed.")
+        return resolved
+
+    @staticmethod
+    def _validate_entry_name(name: str) -> str:
+        clean = str(name or "").strip()
+        if not clean or clean in (".", "..") or "/" in clean or "\\" in clean or "\x00" in clean:
+            raise ValueError("Entry name must be non-empty and cannot contain path separators.")
+        if clean in SafeHomeFilesManager.PROTECTED_TOP_DIRS:
+            raise PermissionError(f"Name {clean} is reserved for system security credentials.")
+        return clean
+
+    def list_dir(self, path_arg: str | None = None) -> dict[str, object]:
+        target = self._resolve_in_home(path_arg, allow_root=True)
+        if not target.is_dir():
+            raise FileNotFoundError(f"Not a readable directory: {target}")
+        entries = []
+        for child in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+            try:
+                rel_child = child.resolve(strict=False).relative_to(self.home_root)
+            except ValueError:
+                continue
+            if rel_child.parts and rel_child.parts[0] in self.PROTECTED_TOP_DIRS:
+                continue
+            try:
+                st = child.lstat()
+                kind = "directory" if stat.S_ISDIR(st.st_mode) else "file"
+                entries.append({
+                    "name": child.name,
+                    "path": str(child),
+                    "relPath": str(rel_child),
+                    "kind": kind,
+                    "size": 0 if kind == "directory" else st.st_size,
+                    "modified": int(st.st_mtime * 1000),
+                    "mode": stat.filemode(st.st_mode),
+                })
+            except OSError:
+                continue
+        sv = os.statvfs(target)
+        free_gib = round((sv.f_bavail * sv.f_frsize) / (1024 ** 3), 1)
+        rel_cur = target.relative_to(self.home_root)
+        return {
+            "home": str(self.home_root),
+            "path": str(target),
+            "relPath": "." if str(rel_cur) == "." else str(rel_cur),
+            "free_gib": free_gib,
+            "entries": entries[:500],
+        }
+
+    def preview_file(self, path_arg: str) -> dict[str, object]:
+        target = self._resolve_in_home(path_arg, allow_root=False)
+        if not target.is_file():
+            raise FileNotFoundError("Preview is only supported on regular files inside your home folder.")
+        st = target.stat()
+        if st.st_size > self.MAX_PREVIEW_BYTES:
+            return {"name": target.name, "size": st.st_size, "tooLarge": True, "text": None}
+        raw = target.read_bytes()
+        if b"\x00" in raw:
+            return {"name": target.name, "size": st.st_size, "binary": True, "text": None}
+        return {"name": target.name, "size": st.st_size, "binary": False, "text": raw.decode("utf-8", errors="replace")}
+
+    def mkdir(self, parent_arg: str | None, name: str) -> dict[str, object]:
+        parent = self._resolve_in_home(parent_arg, allow_root=True)
+        clean = self._validate_entry_name(name)
+        new_dir = parent / clean
+        if new_dir.exists():
+            raise FileExistsError(f"“{clean}” already exists here.")
+        new_dir.mkdir(parents=False, exist_ok=False)
+        return {"ok": True, "path": str(new_dir), "name": clean}
+
+    def touch(self, parent_arg: str | None, name: str) -> dict[str, object]:
+        parent = self._resolve_in_home(parent_arg, allow_root=True)
+        clean = self._validate_entry_name(name)
+        new_file = parent / clean
+        if new_file.exists():
+            raise FileExistsError(f"“{clean}” already exists here.")
+        new_file.write_text("", encoding="utf-8")
+        return {"ok": True, "path": str(new_file), "name": clean}
+
+    def rename(self, path_arg: str, new_name: str) -> dict[str, object]:
+        target = self._resolve_in_home(path_arg, allow_root=False)
+        clean = self._validate_entry_name(new_name)
+        dest = target.parent / clean
+        self._resolve_in_home(str(dest), allow_root=False)
+        if dest.exists():
+            raise FileExistsError(f"“{clean}” already exists here.")
+        target.rename(dest)
+        return {"ok": True, "path": str(dest), "name": clean}
+
+    def remove(self, path_arg: str) -> dict[str, object]:
+        target = self._resolve_in_home(path_arg, allow_root=False)
+        if target.relative_to(self.home_root).parts[:2] == (".config", "nexus-os"):
+            raise PermissionError("Protected NEXUS desktop config directory cannot be removed from File Manager.")
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        return {"ok": True, "removed": str(target)}
+
+
+def quantum_notes_path(data_home: Path | None = None) -> Path:
+    base = data_home or Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+    return base / "nexus-os" / "quantum-notes.json"
+
+
+def read_quantum_notes(data_home: Path | None = None) -> dict[str, object]:
+    p = quantum_notes_path(data_home)
+    if not p.is_file():
+        return {"path": str(p), "notes": []}
+    try:
+        parsed = json.loads(p.read_text(encoding="utf-8"))
+        notes = parsed if isinstance(parsed, list) else parsed.get("notes", [])
+        if not isinstance(notes, list):
+            notes = []
+    except (OSError, json.JSONDecodeError):
+        notes = []
+    return {"path": str(p), "notes": notes[:200]}
+
+
+def write_quantum_notes(notes: object, data_home: Path | None = None) -> dict[str, object]:
+    if not isinstance(notes, list):
+        raise ValueError("notes must be a list")
+    cleaned = []
+    for item in notes[:200]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()[:120]
+        body = str(item.get("body") or "").strip()[:8000]
+        track = str(item.get("track") or "general").strip()[:40]
+        nid = str(item.get("id") or secrets.token_hex(6)).strip()[:40]
+        updated = str(item.get("updatedAt") or "")[:40]
+        if title or body:
+            cleaned.append({"id": nid, "title": title or "Untitled note", "body": body, "track": track, "updatedAt": updated})
+    p = quantum_notes_path(data_home)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"notes": cleaned}, indent=2), encoding="utf-8")
+    return {"ok": True, "path": str(p), "count": len(cleaned), "notes": cleaned}
+
+
 def run_bash_pty_self_test() -> dict[str, object]:
     mgr = TerminalSessionManager()
     sid = mgr.open_session(cols=100, rows=30)
@@ -852,6 +1021,7 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
         raise SystemExit("Refusing to run NEXUS desktop bridge as root.")
     token = secrets.token_urlsafe(32)
     pty_mgr = TerminalSessionManager()
+    files_mgr = SafeHomeFilesManager()
 
     class BridgeHandler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *args: object) -> None:
@@ -1044,6 +1214,30 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(err)})
                     return
                 self._run_cli_json(cmd, timeout=10.0)
+            elif parsed.path == "/api/files/list":
+                qs = urllib.parse.parse_qs(parsed.query)
+                path_arg = (qs.get("path") or [""])[0]
+                try:
+                    self._send_json(HTTPStatus.OK, files_mgr.list_dir(path_arg))
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": str(err)})
+                except OSError as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif parsed.path == "/api/files/preview":
+                qs = urllib.parse.parse_qs(parsed.query)
+                path_arg = (qs.get("path") or [""])[0]
+                try:
+                    self._send_json(HTTPStatus.OK, files_mgr.preview_file(path_arg))
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                except FileNotFoundError as err:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": str(err)})
+                except OSError as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif parsed.path == "/api/quantum/notes":
+                self._send_json(HTTPStatus.OK, read_quantum_notes())
             elif parsed.path == "/api/tools":
                 self._send_json(HTTPStatus.OK, list_available_tools())
             elif parsed.path == "/api/terminal/read":
@@ -1292,6 +1486,39 @@ def serve_loopback(port: int, runtime_file: Path | None = None) -> None:
                     HTTPStatus.OK if proc.returncode == 0 else HTTPStatus.BAD_REQUEST,
                     {"ok": proc.returncode == 0, "message": (proc.stdout + proc.stderr).strip()},
                 )
+            elif self.path == "/api/files/mkdir":
+                try:
+                    self._send_json(HTTPStatus.OK, files_mgr.mkdir(body.get("path"), str(body.get("name") or "")))
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                except (ValueError, FileExistsError, OSError) as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif self.path == "/api/files/touch":
+                try:
+                    self._send_json(HTTPStatus.OK, files_mgr.touch(body.get("path"), str(body.get("name") or "")))
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                except (ValueError, FileExistsError, OSError) as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif self.path == "/api/files/rename":
+                try:
+                    self._send_json(HTTPStatus.OK, files_mgr.rename(str(body.get("path") or ""), str(body.get("newName") or "")))
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                except (ValueError, FileNotFoundError, FileExistsError, OSError) as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif self.path == "/api/files/delete":
+                try:
+                    self._send_json(HTTPStatus.OK, files_mgr.remove(str(body.get("path") or "")))
+                except PermissionError as err:
+                    self._send_json(HTTPStatus.FORBIDDEN, {"error": str(err)})
+                except (FileNotFoundError, OSError) as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
+            elif self.path == "/api/quantum/notes":
+                try:
+                    self._send_json(HTTPStatus.OK, write_quantum_notes(body.get("notes")))
+                except ValueError as err:
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(err)})
             elif self.path == "/api/personalisation/apply":
                 try:
                     cmd = resolve_personalisation_cmd(body)
